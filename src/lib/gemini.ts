@@ -2,6 +2,7 @@ import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX } from "@/lib/adobeS
 
 const GEMINI_STORAGE_KEY = "gemini_api_key";
 const GEMINI_MODELS = [
+  "gemini-2.5-flash-lite", // أعلى حصة مجانية: 1000 طلب/يوم
   "gemini-2.0-flash",
   "gemini-1.5-flash-latest",
   "gemini-1.5-flash",
