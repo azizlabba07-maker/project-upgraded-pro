@@ -2,17 +2,25 @@ import { useEffect, useState } from "react";
 import {
   classifyGeminiError,
   generateAIVideoPrompts,
+  generateGeminiStockPrompts,
   getGeminiErrorUserMessage,
   hasAnyApiKey,
-  VideoPromptResult,
+  type VideoPromptResult,
+  type GeminiStockPrompt,
 } from "@/lib/gemini";
 import { toast } from "sonner";
 
 const VIDEO_CATEGORIES = [
-  "Nature", "Technology", "Food", "Abstract Concepts",
+  "Nature", "Technology", "Food", "Cooking", "Abstract Concepts",
   "Sustainability", "Business", "Science", "Travel",
   "Architecture", "Sports", "Fashion", "Music",
   "Medical", "Education", "Automotive",
+];
+
+const TRENDS_2026 = [
+  "AI Visuals", "Minimalism", "Clean Backgrounds", "Loop Animation",
+  "UI Elements", "Particle Systems", "Holographic", "Biophilic Design",
+  "Flat Lay", "Isometric 3D", "Dark Mode", "Social Media Assets",
 ];
 
 const CAMERA_MOVEMENTS = ["slow pan", "dolly zoom", "static shot", "aerial drone", "timelapse", "tracking shot", "crane shot", "orbit shot", "handheld shake", "steadicam glide", "whip pan", "tilt up reveal", "push in", "pull out", "dutch angle", "jib shot"];
@@ -56,6 +64,14 @@ const CATEGORY_SUBJECTS: Record<string, string[]> = {
     "Flexible OLED screen bending", "Lidar sensor scanning environment",
     "Microchip fabrication clean room", "Holographic keyboard on glass",
     "Electric vehicle battery cell assembly", "Laser cutting precision metal",
+  ],
+  Cooking: [
+    "Chef knife slicing vegetables", "Fresh herbs on wooden board", "Steam rising from pot",
+    "Olive oil drizzle on salad", "Pizza dough being stretched", "Wok stir-fry with flames",
+    "Chocolate melting in double boiler", "Fresh pasta being cut", "Spices cascading into bowl",
+    "Grilling meat on barbecue", "Baking bread in oven", "Coffee beans being ground",
+    "Sushi roll being prepared", "Sauce reduction in pan", "Fruit smoothie blending",
+    "Artisan cheese being sliced", "Honey dripping from dipper", "Egg cracking into bowl",
   ],
   Food: [
     "Fresh herbs on dark slate", "Steam from artisan coffee", "Tropical fruits cross-section",
@@ -152,6 +168,7 @@ const CATEGORY_SUBJECTS: Record<string, string[]> = {
 const CATEGORY_ENVIRONMENTS: Record<string, string[]> = {
   Nature: ["misty alpine valley", "volcanic coastline at dawn", "dense rainforest floor", "frozen arctic lake", "wildflower meadow thunderclouds", "desert oasis", "mountain summit above clouds", "underwater kelp forest"],
   Technology: ["futuristic clean room", "dark data center corridor", "neon lab", "manufacturing floor", "digital abstract backdrop", "quantum facility", "space station interior", "cyber operations center"],
+  Cooking: ["professional kitchen", "rustic farmhouse kitchen", "marble countertop", "chef's prep station", "restaurant kitchen", "home kitchen island", "outdoor cooking area", "industrial kitchen"],
   Food: ["dark editorial kitchen", "marble studio surface", "sunlit rustic tabletop", "premium restaurant station", "black background still life", "outdoor farmers market", "traditional bakery", "Mediterranean courtyard"],
   "Abstract Concepts": ["infinite black void", "soft gradient studio", "reflective metallic stage", "prismatic light chamber", "liquid simulation space", "zero-gravity chamber", "holographic room", "electromagnetic field"],
   Sustainability: ["eco-smart city", "green energy landscape", "recycling facility", "solar farm sunset", "urban vertical garden", "pristine coral reef", "ancient forest", "sustainable community"],
@@ -199,12 +216,21 @@ function generateLocalVideoPrompts(category: string, count: number): VideoPrompt
   return results;
 }
 
+type DisplayPrompt = VideoPromptResult & { type?: string; title?: string; keywords?: string[] };
+
 export default function PromptGenerator() {
   const [category, setCategory] = useState("Nature");
   const [promptCount, setPromptCount] = useState(5);
-  const [prompts, setPrompts] = useState<VideoPromptResult[]>([]);
+  const [prompts, setPrompts] = useState<DisplayPrompt[]>([]);
   const [loading, setLoading] = useState(false);
   const [useAI, setUseAI] = useState(() => hasAnyApiKey());
+  const [advancedMode, setAdvancedMode] = useState(true);
+  const [outputType, setOutputType] = useState<"image" | "video" | "both">("video");
+  const [competition, setCompetition] = useState("medium");
+  const [selectedTrends, setSelectedTrends] = useState<string[]>(["AI Visuals", "Clean Backgrounds"]);
+
+  const toggleTrend = (t: string) =>
+    setSelectedTrends((prev) => prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]);
 
   useEffect(() => {
     const onKeyUpdated = (event: Event) => {
@@ -224,11 +250,16 @@ export default function PromptGenerator() {
 
     try {
       if (useAI && hasAnyApiKey()) {
-        const result = await generateAIVideoPrompts(category, promptCount);
-        setPrompts(result);
+        if (advancedMode) {
+          const result = await generateGeminiStockPrompts(category, promptCount, outputType, selectedTrends, competition);
+          setPrompts(result as DisplayPrompt[]);
+        } else {
+          const result = await generateAIVideoPrompts(category, promptCount);
+          setPrompts(result as DisplayPrompt[]);
+        }
         toast.success(`✅ تم توليد ${promptCount} برومبت بالذكاء الاصطناعي!`);
       } else {
-        setPrompts(generateLocalVideoPrompts(category, promptCount));
+        setPrompts(generateLocalVideoPrompts(category, promptCount) as DisplayPrompt[]);
         toast.success(`تم توليد ${promptCount} برومبت محلياً`);
         if (useAI && !hasAnyApiKey()) {
           toast.error("أضف مفتاح API من الإعدادات ⚙️ لاستخدام AI");
@@ -241,7 +272,7 @@ export default function PromptGenerator() {
       if (errorType === "quota" || errorType === "rate_limit") {
         setUseAI(false);
       }
-      setPrompts(generateLocalVideoPrompts(category, promptCount));
+      setPrompts(generateLocalVideoPrompts(category, promptCount) as DisplayPrompt[]);
     } finally {
       setLoading(false);
     }
@@ -268,7 +299,14 @@ export default function PromptGenerator() {
   };
 
   const copyAll = async () => {
-    const table = prompts.map((p) => `${p.number}. [${p.category}] ${p.prompt}`).join("\n\n");
+    const table = prompts.map((p) => {
+      let line = `${p.number}. [${p.category}]`;
+      if (p.type) line += ` [${p.type}]`;
+      line += ` ${p.prompt}`;
+      if (p.title) line += `\n  Title: ${p.title}`;
+      if (p.keywords?.length) line += `\n  Keywords: ${p.keywords.join(", ")}`;
+      return line;
+    }).join("\n\n");
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(table);
@@ -294,7 +332,8 @@ export default function PromptGenerator() {
     <div className="animate-fade-in space-y-5">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
-          <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono">🎬 إعدادات برومبت الفيديو</h3>
+          <h3 className="text-base font-semibold text-primary text-glow mb-1 font-mono">🤖 مولد برومبتات Gemini (محسّن)</h3>
+          <p className="text-[10px] text-secondary font-mono mb-4">وضع متقدم مثل Claude • التزام صارم بالفئة • صور+فيديو+كلمات مفتاحية</p>
 
           <label className="text-primary text-xs font-semibold font-mono block mb-1.5">اختر الفئة:</label>
           <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
@@ -311,7 +350,7 @@ export default function PromptGenerator() {
             <option value={20}>20 برومبت</option>
           </select>
 
-          <div className="flex items-center gap-3 mb-3">
+          <div className="flex flex-wrap items-center gap-3 mb-3">
             <label className="text-primary text-xs font-semibold font-mono">وضع التوليد:</label>
             <button
               onClick={() => setUseAI(!useAI)}
@@ -323,7 +362,62 @@ export default function PromptGenerator() {
             >
               {useAI ? "🧠 AI مفعّل" : "⚙️ محلي"}
             </button>
+            <button
+              onClick={() => setAdvancedMode(!advancedMode)}
+              className={`px-3 py-1.5 rounded text-xs font-mono font-semibold border-2 transition-all ${
+                advancedMode
+                  ? "bg-accent/20 text-accent border-accent"
+                  : "bg-card text-secondary border-primary/50"
+              }`}
+            >
+              {advancedMode ? "✦ متقدم (مثل Claude)" : "بسيط"}
+            </button>
           </div>
+
+          {advancedMode && (
+            <div className="space-y-3 mb-3 p-3 bg-primary/5 rounded-md border border-primary/20">
+              <div>
+                <label className="text-primary text-[10px] font-semibold font-mono block mb-1">نوع المخرجات:</label>
+                <div className="flex gap-2">
+                  {(["image", "video", "both"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setOutputType(t)}
+                      className={`px-2 py-1 rounded text-[10px] font-mono border-2 transition-all ${
+                        outputType === t ? "gradient-primary text-primary-foreground border-primary" : "bg-card text-secondary border-primary/40"
+                      }`}
+                    >
+                      {t === "image" ? "📷 صور" : t === "video" ? "🎬 فيديو" : "⚡ كلاهما"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-primary text-[10px] font-semibold font-mono block mb-1">المنافسة:</label>
+                <select value={competition} onChange={(e) => setCompetition(e.target.value)} className={selectClass}>
+                  <option value="low">منخفضة (نيش نادر)</option>
+                  <option value="medium">متوسطة</option>
+                  <option value="avoid-high">تجنب المشبع</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-primary text-[10px] font-semibold font-mono block mb-1">تراندات 2026:</label>
+                <div className="flex flex-wrap gap-1">
+                  {TRENDS_2026.slice(0, 8).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => toggleTrend(t)}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-mono border transition-all ${
+                        selectedTrends.includes(t) ? "bg-accent/20 text-accent border-accent" : "bg-card text-secondary border-primary/30"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           {!useAI && (
             <p className="text-[10px] text-secondary font-mono mb-3">
               ℹ️ التوليد المحلي يعمل بدون API. أضف مفتاحك من ⚙️ الإعدادات لتفعيل AI.
@@ -407,10 +501,23 @@ export default function PromptGenerator() {
                   <tr key={i} className="border-b border-primary/30 hover:bg-primary/5 transition-colors">
                     <td className="text-secondary p-2 text-center font-semibold align-top">{p.number}</td>
                     <td className="p-2 align-top">
-                      <span className="text-accent font-semibold text-[10px] bg-primary/10 px-2 py-0.5 rounded inline-block">{p.category}</span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-accent font-semibold text-[10px] bg-primary/10 px-2 py-0.5 rounded inline-block w-fit">{p.category}</span>
+                        {p.type && <span className="text-[9px] text-secondary font-mono">{p.type}</span>}
+                      </div>
                     </td>
                     <td className="text-secondary p-2 leading-relaxed text-[11px] align-top min-w-0 break-words overflow-hidden">
-                      {p.prompt}
+                      <div>
+                        {p.prompt}
+                        {p.title && <div className="mt-1 text-primary text-[10px] font-semibold">📌 {p.title}</div>}
+                        {p.keywords && p.keywords.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {p.keywords.map((kw, ki) => (
+                              <span key={ki} className="text-[9px] bg-primary/5 border border-primary/20 px-1 py-0.5 rounded">{kw}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="p-2 align-top relative z-20 w-14 min-w-[3.5rem] bg-card/95 backdrop-blur-sm border-s border-primary/15">
                       <button

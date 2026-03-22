@@ -18,6 +18,7 @@ const CATEGORIES = [
   "Nature & Environment",
   "Architecture & Spaces",
   "Food & Beverage",
+  "Cooking & Culinary",
   "Science & Innovation",
   "Fashion & Lifestyle",
   "Travel & Destinations",

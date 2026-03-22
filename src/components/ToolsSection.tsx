@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { checklistItems } from "@/data/marketData";
-import { generateAIKeywords } from "@/lib/gemini";
+import { generateAIKeywords, getTopKeywordsForDomain, hasAnyApiKey } from "@/lib/gemini";
 import { generateClaudeKeywords, hasClaudeKey } from "@/lib/claude";
 import { toast } from "sonner";
 
@@ -19,6 +19,11 @@ export default function ToolsSection() {
   const [engine, setEngine]             = useState<"claude" | "gemini">("claude");
   const [keywords, setKeywords]         = useState<string[]>([]);
   const [loadingKw, setLoadingKw]       = useState(false);
+
+  // ── Top Keywords per Domain ──
+  const [domainTopic, setDomainTopic] = useState("");
+  const [topKeywords, setTopKeywords] = useState<string[]>([]);
+  const [loadingTop, setLoadingTop] = useState(false);
 
   // ── Checklist ──
   const [checked, setChecked] = useState<boolean[]>(new Array(checklistItems.length).fill(false));
@@ -60,6 +65,25 @@ export default function ToolsSection() {
       toast.error("تم استخدام المولد المحلي كبديل");
     } finally {
       setLoadingKw(false);
+    }
+  };
+
+  const handleTopKeywords = async () => {
+    const topic = domainTopic.trim() || "technology";
+    if (!hasAnyApiKey()) {
+      toast.error("أضف مفتاح Gemini API من الإعدادات ⚙️");
+      return;
+    }
+    setLoadingTop(true);
+    setTopKeywords([]);
+    try {
+      const result = await getTopKeywordsForDomain(topic, 50);
+      setTopKeywords(result);
+      toast.success(`✅ تم اكتشاف ${result.length} كلمة شائعة في مجال "${topic}"!`);
+    } catch {
+      toast.error("تعذر التحميل. تحقق من مفتاح API.");
+    } finally {
+      setLoadingTop(false);
     }
   };
 
@@ -210,6 +234,63 @@ export default function ToolsSection() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── اكتشاف الكلمات المفتاحية الشائعة لكل مجال ── */}
+      <div className="bg-card border-2 border-accent rounded-lg p-5 box-glow-gold">
+        <h3 className="text-base font-semibold text-accent text-glow-gold mb-4 font-mono">
+          🔎 اكتشاف الكلمات الأكثر استعمالاً في كل مجال
+        </h3>
+        <p className="text-secondary font-mono text-[11px] mb-3">
+          أدخل المجال أو الموضوع لاكتشاف أكثر الكلمات بحثاً على Adobe Stock (مثل: Cooking, Technology, Nature...)
+        </p>
+        <div className="flex gap-3 flex-wrap items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label className="text-primary text-xs font-semibold font-mono block mb-1.5">المجال:</label>
+            <input
+              type="text"
+              value={domainTopic}
+              onChange={(e) => setDomainTopic(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleTopKeywords()}
+              placeholder="Cooking, Food, Technology, Nature..."
+              className={inputClass}
+            />
+          </div>
+          <button
+            onClick={handleTopKeywords}
+            disabled={loadingTop}
+            className="gradient-primary text-primary-foreground px-5 py-2.5 rounded-md font-mono text-xs font-semibold box-glow-strong hover:scale-[1.02] transition-all disabled:opacity-50"
+          >
+            {loadingTop ? "⏳ جاري الاكتشاف..." : "🔍 اكتشف الكلمات الشائعة"}
+          </button>
+        </div>
+        {topKeywords.length > 0 && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-primary font-mono text-[10px] font-semibold">{topKeywords.length} كلمة الأكثر بحثاً</p>
+              <button
+                onClick={() => { navigator.clipboard.writeText(topKeywords.join(", ")); toast.success("تم النسخ!"); }}
+                className="text-[10px] px-2 py-1 border border-accent/40 text-accent rounded font-mono hover:bg-accent/10 transition-all"
+              >
+                نسخ الكل
+              </button>
+            </div>
+            <div className="bg-accent/5 border border-accent/20 rounded-lg p-3 max-h-48 overflow-y-auto">
+              <div className="flex flex-wrap gap-1.5">
+                {topKeywords.map((kw, i) => (
+                  <span
+                    key={i}
+                    onClick={() => { navigator.clipboard.writeText(kw); toast.success(`نسخ: ${kw}`); }}
+                    className="text-[10px] font-mono bg-accent/10 border border-accent/20 text-accent px-2 py-0.5 rounded cursor-pointer hover:bg-accent/20 transition-all"
+                    title="اضغط للنسخ"
+                  >
+                    {kw}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Quick Title Generator ── */}

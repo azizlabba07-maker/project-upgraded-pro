@@ -8,6 +8,7 @@ import PortfolioTracker from "@/components/PortfolioTracker";
 import ToolsSection from "@/components/ToolsSection";
 import ApiKeySettings from "@/components/ApiKeySettings";
 import InspirationLab from "@/components/InspirationLab";
+import StoreAnalyzer from "@/components/StoreAnalyzer";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("market");
@@ -22,6 +23,7 @@ const Index = () => {
         {activeTab === "dashboard"  && <Dashboard />}
         {activeTab === "portfolio"  && <PortfolioTracker />}
         {activeTab === "tools"      && <ToolsSection />}
+        {activeTab === "store"      && <StoreAnalyzer />}
         {activeTab === "inspiration" && <InspirationLab />}
         {activeTab === "settings"   && <ApiKeySettings />}
       </div>

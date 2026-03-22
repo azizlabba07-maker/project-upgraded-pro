@@ -1,10 +1,11 @@
 const tabs = [
   { id: "market",     label: "📊 تحليل السوق" },
-  { id: "generator",  label: "🤖 مولد Gemini" },
+  { id: "generator",  label: "🤖 مولد Gemini (محسّن)" },
   { id: "claude",     label: "✦ مولد Claude" },
   { id: "dashboard",  label: "📈 لوحة القيادة" },
   { id: "portfolio",  label: "📁 المحفظة" },
   { id: "tools",      label: "🛠️ أدوات" },
+  { id: "store",      label: "🔍 محلل المتجر" },
   { id: "inspiration", label: "💡 إلهام" },
   { id: "settings",   label: "⚙️ الإعدادات" },
 ];

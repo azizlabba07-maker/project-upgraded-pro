@@ -192,13 +192,13 @@ export async function validateGeminiApiKey(key: string): Promise<{ ok: boolean; 
   }
 }
 
-export async function generateWithGemini(prompt: string): Promise<string> {
+export async function generateWithGemini(prompt: string, temperature = 1.4): Promise<string> {
   const apiKey = getGeminiApiKey();
   if (!apiKey) throw new Error("NO_API_KEY: No API key configured");
 
   const body = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 1.4, topP: 0.99, maxOutputTokens: 4096 },
+    generationConfig: { temperature, topP: temperature > 1 ? 0.99 : 0.95, maxOutputTokens: 8192 },
   });
 
   let lastError: unknown = new Error("Unknown Gemini error");
@@ -236,31 +236,107 @@ export interface VideoPromptResult {
   prompt: string;
 }
 
+/** STRICT category enforcement - prevents wrong topics (e.g. cooking → space) */
+const CATEGORY_STRICT_RULES = `
+CRITICAL - CATEGORY ADHERENCE (DO NOT VIOLATE):
+- You MUST generate prompts ONLY and EXCLUSIVELY about the selected category: "{CATEGORY}"
+- EVERY prompt's subject MUST be directly related to "{CATEGORY}" - nothing else
+- If category is "Food" or "Cooking" → ONLY food, cooking, ingredients, kitchen, recipes
+- If category is "Technology" → ONLY tech, computers, gadgets, software
+- If category is "Nature" → ONLY nature, landscapes, wildlife, plants
+- NEVER mix categories. NEVER generate space/astronomy for Food. NEVER generate food for Science.
+- Double-check: each prompt must make the category obvious to a reader.
+`;
+
 export async function generateAIVideoPrompts(category: string, count: number): Promise<VideoPromptResult[]> {
   const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}-${crypto.getRandomValues(new Uint32Array(1))[0]}`;
+  const strictRules = CATEGORY_STRICT_RULES.replace(/\{CATEGORY\}/g, category);
 
-  const prompt = `You are an expert Adobe Stock video prompt engineer. Generate ${count} COMPLETELY UNIQUE prompts for "${category}".
+  const prompt = `You are an expert Adobe Stock video prompt engineer. Generate EXACTLY ${count} video prompts.
 
-DIVERSITY SEED (ensures unique output): ${seed}
+${strictRules}
+
+REQUIRED OUTPUT CATEGORY: "${category}" — ALL prompts MUST be about this topic only.
+
+DIVERSITY SEED: ${seed}
 
 ${ADOBE_AI_PROMPT_RULES}
 
-Formula: [Subject] + [Environment] + [Lighting] + [Camera Movement] + [Speed] + [Duration] + [Style] + [Commercial Appeal] + [Constraints]
+FORMULA: [Subject - MUST be from ${category}] + [Environment] + [Lighting] + [Camera Movement] + [Speed] + [Duration] + [Style] + [Commercial Appeal] + [Constraints]
 
-Rules:
+TECHNICAL:
 - 4K (3840x2160), 15-30 seconds, 24-30fps, sRGB
-- Camera: slow pan, dolly zoom, static, aerial drone, timelapse, tracking, crane, orbit, whip pan, steadicam
+- Camera: slow pan, dolly zoom, static, aerial drone, timelapse, tracking, crane, orbit, steadicam
 - Each prompt MUST end with: ${ADOBE_VIDEO_NEGATIVE_SUFFIX}
-- NO artist names, real people, fictional characters, copyrighted works, brands, IP in prompt/keywords
-- Each prompt MUST have completely different subject and environment
-- Be wildly creative and explore unexpected angles
+- NO artist names, real people, fictional characters, copyrighted works, brands
+- Each prompt: UNIQUE subject and environment within "${category}"
 
-Return ONLY a JSON array: [{"number":1,"category":"${category}","prompt":"..."}]`;
+Return ONLY valid JSON array, no markdown: [{"number":1,"category":"${category}","prompt":"FULL PROMPT HERE"}]`;
 
-  const result = await generateWithGemini(prompt);
+  const result = await generateWithGemini(prompt, 0.85);
   const jsonMatch = result.match(/\[[\s\S]*\]/);
   if (!jsonMatch) throw new Error("Failed to parse AI response");
-  return JSON.parse(jsonMatch[0]);
+  const parsed = JSON.parse(jsonMatch[0]) as VideoPromptResult[];
+  return parsed.map((p, i) => ({ ...p, number: i + 1, category }));
+}
+
+/** Gemini version of Claude's StockImagePrompt - full structure like Claude */
+export interface GeminiStockPrompt {
+  number: number;
+  category: string;
+  type: "image" | "video";
+  demand: "low" | "medium";
+  prompt: string;
+  title?: string;
+  keywords?: string[];
+}
+
+export async function generateGeminiStockPrompts(
+  category: string,
+  count: number,
+  outputType: "image" | "video" | "both",
+  trends: string[],
+  competition: string
+): Promise<GeminiStockPrompt[]> {
+  const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const strictRules = CATEGORY_STRICT_RULES.replace(/\{CATEGORY\}/g, category);
+
+  const typeReq = outputType === "image" ? "IMAGE prompts ONLY" :
+    outputType === "video" ? "VIDEO prompts ONLY (camera movement, 10-30s)" :
+    "MIX of image AND video, labeled";
+
+  const compReq = competition === "low" ? "ultra-niche, low competition" :
+    competition === "medium" ? "low-to-medium competition" :
+    "avoid oversaturated generic topics";
+
+  const trendsStr = trends.length > 0 ? `Trends to incorporate: ${trends.join(", ")}.` : "";
+
+  const prompt = `You are an expert Adobe Stock prompt engineer. Generate exactly ${count} prompts.
+
+${strictRules}
+
+REQUIRED CATEGORY: "${category}" — EVERY prompt MUST be about this topic ONLY.
+
+UNIQUENESS SEED: ${seed}
+OUTPUT TYPE: ${typeReq}
+COMPETITION: ${compReq}
+${trendsStr}
+
+${ADOBE_AI_PROMPT_RULES}
+
+FRAMEWORK: [Subject from ${category}] + [Environment] + [Lighting] + [Camera/Composition] + [Motion if video] + [Style] + [Commercial] + [Copy space]
+- sRGB, 4MP min, 4K for video, sharp focus
+- End each: no humans, no faces, no hands, no text, no logos, fictional AI-generated, commercial royalty-free stock
+- PROHIBITED: artist names, real people, brands, IP
+
+Return ONLY valid JSON array:
+[{"number":1,"category":"${category}","type":"image","demand":"low","prompt":"FULL DETAILED PROMPT 60+ words","title":"SEO title max 70 chars","keywords":["kw1","kw2","kw3","kw4","kw5"]}]`;
+
+  const result = await generateWithGemini(prompt, 0.8);
+  const jsonMatch = result.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) throw new Error("Failed to parse AI response");
+  const parsed = JSON.parse(jsonMatch[0]) as GeminiStockPrompt[];
+  return parsed.slice(0, count).map((p, i) => ({ ...p, number: i + 1, category }));
 }
 
 function escapeRegex(value: string): string {
@@ -284,7 +360,7 @@ Rules:
 
 One keyword per line, no numbering.`;
 
-  const result = await generateWithGemini(prompt);
+  const result = await generateWithGemini(prompt, 0.85);
   const escapedTopic = escapeRegex(topic.trim());
   const topicPrefixRegex = new RegExp(`^${escapedTopic}\\s*[:\\-–—|,]*\\s*`, "i");
 
@@ -297,6 +373,61 @@ One keyword per line, no numbering.`;
         .map((k) => [k.toLowerCase(), k] as [string, string])
     ).values()
   ).slice(0, count);
+}
+
+/** اكتشاف أكثر الكلمات المفتاحية استعمالاً في مجال معيّن */
+export async function getTopKeywordsForDomain(domain: string, limit = 50): Promise<string[]> {
+  const prompt = `You are an Adobe Stock SEO expert. List the TOP ${limit} most-searched keywords in the domain "${domain}" on Adobe Stock.
+
+RULES:
+- Keywords that buyers actually search for when looking for "${domain}" content
+- Mix: single words, 2-word phrases, 3-word phrases
+- Include: styles, moods, use cases, colors, compositions relevant to "${domain}"
+- Order by estimated search volume (most searched first)
+- NEVER include: artist names, real people, brands, copyrighted works
+- Each keyword on its own line, no numbering, no duplicates
+
+Return ONLY the keywords, one per line.`;
+  const result = await generateWithGemini(prompt, 0.7);
+  const escaped = escapeRegex(domain.trim());
+  const prefixRegex = new RegExp(`^${escaped}\\s*[:\\-–—|,]*\\s*`, "i");
+  return Array.from(
+    new Map(
+      result.split("\n")
+        .map((k) => k.replace(/^[\d\.\-\*\•]+\s*/, "").trim())
+        .map((k) => k.replace(prefixRegex, "").trim())
+        .filter((k) => k.length > 1)
+        .map((k) => [k.toLowerCase(), k] as [string, string])
+    ).values()
+  ).slice(0, limit);
+}
+
+/** تحليل المحتوى المرفوض أو منخفض المبيعات - اقتراح تحسينات */
+export async function analyzeRejectionOrLowSales(
+  title: string,
+  description: string,
+  keywords: string[],
+  rejectionReason?: string
+): Promise<string> {
+  const kwStr = keywords?.join(", ") || "(لا توجد)";
+  const rejectNote = rejectionReason ? `سبب الرفض المذكور: ${rejectionReason}.` : "المحتوى مرفوض أو مبيعاته منخفضة.";
+  return generateWithGemini(`أنت خبير Adobe Stock يساعد المساهمين في تحسين محتواهم.
+
+المساهم يريد تحليل المحتوى التالي:
+- Title: ${title}
+- Description: ${description}
+- Keywords: ${kwStr}
+
+${rejectNote}
+
+قدم تحليلاً بالعربية يشمل:
+1. أسباب محتملة للرفض أو قلة المبيعات
+2. كلمات مفتاحية قد تكون مشكلة (علامات تجارية، أشخاص، حقوق ملكية)
+3. اقتراحات لتحسين العنوان والوصف
+4. كلمات مفتاحية بديلة مقترحة (25-49 كلمة مناسبة لـ Adobe Stock)
+5. نصائح لزيادة فرص القبول والمبيعات
+
+اكتب بشكل واضح ومنظم، أقل من 400 كلمة.`, 0.75);
 }
 
 export async function getAIMarketAnalysis(topic: string): Promise<string> {
