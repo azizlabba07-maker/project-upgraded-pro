@@ -1,0 +1,438 @@
+import { useEffect, useState } from "react";
+import {
+  classifyGeminiError,
+  generateAIVideoPrompts,
+  getGeminiErrorUserMessage,
+  hasAnyApiKey,
+  VideoPromptResult,
+} from "@/lib/gemini";
+import { toast } from "sonner";
+
+const VIDEO_CATEGORIES = [
+  "Nature", "Technology", "Food", "Abstract Concepts",
+  "Sustainability", "Business", "Science", "Travel",
+  "Architecture", "Sports", "Fashion", "Music",
+  "Medical", "Education", "Automotive",
+];
+
+const CAMERA_MOVEMENTS = ["slow pan", "dolly zoom", "static shot", "aerial drone", "timelapse", "tracking shot", "crane shot", "orbit shot", "handheld shake", "steadicam glide", "whip pan", "tilt up reveal", "push in", "pull out", "dutch angle", "jib shot"];
+const MOTION_SPEEDS = ["slow motion", "normal speed", "fast motion", "timelapse", "ultra slow motion", "speed ramp", "reverse motion"];
+const LIGHTING = ["golden hour", "soft diffused", "dramatic rim", "cinematic", "natural ambient", "studio", "backlit silhouette", "neon glow", "moonlight", "overcast soft", "harsh midday", "volumetric fog", "sunset warm", "blue hour", "candlelight", "underwater caustics"];
+const DURATIONS = ["10 seconds", "15 seconds", "20 seconds", "25 seconds", "30 seconds"];
+const TECHNICAL_STYLES = [
+  "hyper-realistic 4K, cinematic depth of field, detailed textures, sharp focus",
+  "ultra-detailed 4K, clean composition, premium commercial look, razor-sharp",
+  "anamorphic lens flare, film-grain, cinematic color grading, wide dynamic range",
+  "macro close-up, shallow depth of field, studio-quality sharpness, vivid colors",
+  "aerial cinematography, sweeping landscapes, epic scale, HDR processing",
+  "documentary style, authentic feel, natural color palette, observational",
+];
+const COMMERCIAL_APPEAL = [
+  "commercial stock footage, modern clean aesthetic, clear space for overlays",
+  "authentic premium stock, minimal market-friendly composition, negative space",
+  "agency-ready commercial style, brand-safe framing, text overlay area",
+  "editorial-grade, storytelling composition, premium production value",
+];
+const NEGATIVE_CONSTRAINTS = "no humans, no hands, no fingers, no text, no logos, no watermarks, no copyrighted elements";
+
+const CATEGORY_SUBJECTS: Record<string, string[]> = {
+  Nature: [
+    "Crystal-clear mountain stream over mossy rocks", "Dense tropical rainforest canopy with mist",
+    "Rolling sand dunes in desert wind", "Ocean waves crashing on volcanic rocks",
+    "Lavender field swaying in breeze", "Frozen waterfall with ice crystals",
+    "Autumn leaves falling from oak tree", "Coral reef with colorful fish",
+    "Lightning storm over prairie", "Northern lights over snowy tundra",
+    "Bamboo forest with filtered sunlight", "Volcanic lava flowing into ocean",
+    "Bioluminescent plankton on dark beach", "Giant redwood trees in fog",
+    "Cherry blossom petals floating on stream", "Glacial ice calving into fjord",
+    "Wildflower meadow with butterflies", "Cave stalactites with water droplets",
+  ],
+  Technology: [
+    "Futuristic circuit board with pulsing lights", "Robotic arm assembling micro-components",
+    "Holographic data visualization spinning", "Server racks with fiber optic cables",
+    "3D printer building geometric sculpture", "Drone navigating obstacles",
+    "Quantum computer with supercooled chambers", "Neural chip under microscope",
+    "Smart city traffic visualization", "Satellite dish array tracking signals",
+    "Flexible OLED screen bending", "Lidar sensor scanning environment",
+    "Microchip fabrication clean room", "Holographic keyboard on glass",
+    "Electric vehicle battery cell assembly", "Laser cutting precision metal",
+  ],
+  Food: [
+    "Fresh herbs on dark slate", "Steam from artisan coffee", "Tropical fruits cross-section",
+    "Chocolate pour in macro detail", "Fresh pasta with olive oil", "Sushi knife slicing salmon",
+    "Honeycomb with dripping honey", "Artisan cheese wheel cutting", "Macarons geometric pattern",
+    "Fresh bread cracking with steam", "Avocado halved in slow motion", "Spices cascading from spoons",
+    "Ice cream melting under warm light", "Espresso extraction macro", "Berries falling into cream",
+    "Pizza dough being stretched", "Wok stir-fry with flames", "Molecular gastronomy spherification",
+  ],
+  "Abstract Concepts": [
+    "Fluid ink drops in zero gravity", "Geometric light fractals expanding", "Metallic liquid morphing shapes",
+    "Particle flow in magnetic field", "Crystal refractions rainbow spectrums", "Mercury droplets combining",
+    "Sound waves as rippling 3D surface", "Smoke trails through laser beams", "Ferrofluid magnetic spikes",
+    "Soap bubble interference patterns", "Paint swirls creating galaxies", "Kaleidoscopic crystal rotation",
+    "Digital glitch patterns dissolving", "Molten glass shaped by forces", "Aurora plasma in vacuum",
+    "Ink explosion in water tank", "Cymatics patterns on vibrating plate", "Oil and water light refraction",
+  ],
+  Sustainability: [
+    "Solar panels reflecting clouds", "Wind turbines at sunset", "Recycled materials transformation",
+    "Vertical garden on building", "EV charging station", "Rainwater harvesting rooftop garden",
+    "Biodegradable packaging timelapse", "Wave energy converter ocean", "Urban rooftop beehive",
+    "Geothermal steam vents", "Bamboo construction assembly", "Ocean cleanup device",
+    "Green hydrogen facility", "Regenerative farming soil", "Mangrove seedlings growing",
+    "Solar-powered water purification", "Algae biofuel cultivation", "Upcycled fashion materials",
+  ],
+  Business: [
+    "Minimalist workspace floating objects", "Network connection 3D visualization", "Rising bar chart glass floor",
+    "Corporate glass architecture", "Analytics dashboard data streams", "Golden compass strategic map",
+    "Stock market abstract data flow", "Innovation lightbulb shattering", "Chess strategic view",
+    "Supply chain flowing paths", "Currency symbols floating", "Gears business machinery",
+    "Target bullseye approaching", "Hourglass sand macro", "Puzzle pieces assembling",
+    "Blueprint technical drawing unfolding", "Global trade routes visualization", "Cryptocurrency mining rig",
+  ],
+  Science: [
+    "DNA helix rotating with glow", "Cell division vivid detail", "Chemical crystallization timelapse",
+    "Nebula swirling gas clouds", "Laboratory glassware reactions", "Atomic structure orbiting electrons",
+    "Tectonic plates geological sim", "Weather system forming over ocean", "Fractal patterns growing",
+    "Superconductor levitation", "Brain neural pathway visualization", "Protein folding molecular detail",
+    "Spectroscopy prism splitting", "Bacterial colony growth timelapse", "Eclipse shadow landscape",
+    "Particle collision visualization", "Deep ocean hydrothermal vent", "Mars terrain simulation",
+  ],
+  Travel: [
+    "Ancient stone temple morning light", "Hot air balloons cappadocia", "Venice canal golden hour",
+    "Northern lights Iceland lagoon", "Cherry blossom Japanese garden", "Moroccan mosaic tilework",
+    "Greek island blue sea", "Scottish highland misty mountains", "Balinese rice terraces",
+    "Desert caravan shadows sunset", "Fjord mountain reflections", "Tuscan cypress road morning mist",
+    "Maldives overwater bungalow sunrise", "Santorini caldera blue hour", "Angkor Wat jungle canopy",
+    "Sahara star trail night sky", "Norwegian fishing village aurora", "Patagonia glacier trek",
+  ],
+  Architecture: [
+    "Modern skyscraper glass facade", "Gothic cathedral ceiling vaults", "Brutalist concrete structure",
+    "Japanese zen temple garden", "Art deco building details", "Futuristic museum spiral staircase",
+    "Ancient Roman aqueduct", "Contemporary bridge cable design", "Islamic geometric tile patterns",
+    "Abandoned factory industrial decay", "Minimalist house interior", "Opera house acoustics ceiling",
+  ],
+  Sports: [
+    "Tennis ball bouncing slow motion", "Swimming pool underwater bubbles", "Soccer ball spinning in air",
+    "Skateboard wheels grinding rail", "Surfing wave curl underwater", "Boxing gloves impact powder",
+    "Cycling wheel spokes motion blur", "Rock climbing chalk explosion", "Golf ball dimple macro",
+    "Archery arrow flight path", "Gymnastics ribbon flowing", "Martial arts water splash kick",
+  ],
+  Fashion: [
+    "Silk fabric flowing in wind", "Luxury watch mechanism macro", "Leather crafting artisan detail",
+    "Perfume bottle light refraction", "Jewelry gemstone sparkle", "Haute couture textile weaving",
+    "Sunglasses reflection detail", "Sneaker sole pattern macro", "Handbag stitching close-up",
+    "Color palette swatches arrangement", "Runway lights bokeh", "Thread spool collection colors",
+  ],
+  Music: [
+    "Piano keys with water droplets", "Vinyl record grooves macro", "Guitar string vibration slow motion",
+    "Drum cymbal splash water", "Sound waves visualization neon", "Mixing console faders moving",
+    "Saxophone bell reflection", "Turntable needle groove detail", "Concert spotlight fog beams",
+    "Sheet music pages turning wind", "Headphones sound wave visual", "Synthesizer patch cables neon",
+  ],
+  Medical: [
+    "Microscopic blood cells flowing", "MRI brain scan visualization", "DNA strand double helix",
+    "Surgical instruments sterile tray", "Heart rhythm ECG visualization", "Pharmaceutical pills macro",
+    "Stethoscope sound wave visual", "Virus particle 3D structure", "Laboratory centrifuge spinning",
+    "X-ray skeletal overlay", "Prosthetic limb engineering", "Stem cell division microscopic",
+  ],
+  Education: [
+    "Books stacked with light glow", "Chalkboard equations timelapse", "Globe spinning with data overlay",
+    "Pencil sketching diagram formation", "Digital tablet learning interface", "Library bookshelves infinite",
+    "Microscope lens focusing specimen", "Math formulas floating 3D", "Science beakers bubbling",
+    "Graduation cap toss slow motion", "Interactive whiteboard animation", "Coding screen matrix flow",
+  ],
+  Automotive: [
+    "Sports car headlight detail", "Engine pistons in motion", "Tire tread water displacement",
+    "Dashboard instrument cluster glow", "Electric motor cross-section", "Paint spray booth application",
+    "Suspension spring compression", "Exhaust system heat shimmer", "Gear mechanism interlocking",
+    "Aerodynamic wind tunnel smoke", "Carbon fiber weave pattern", "Brake disc cooling glow",
+  ],
+};
+
+const CATEGORY_ENVIRONMENTS: Record<string, string[]> = {
+  Nature: ["misty alpine valley", "volcanic coastline at dawn", "dense rainforest floor", "frozen arctic lake", "wildflower meadow thunderclouds", "desert oasis", "mountain summit above clouds", "underwater kelp forest"],
+  Technology: ["futuristic clean room", "dark data center corridor", "neon lab", "manufacturing floor", "digital abstract backdrop", "quantum facility", "space station interior", "cyber operations center"],
+  Food: ["dark editorial kitchen", "marble studio surface", "sunlit rustic tabletop", "premium restaurant station", "black background still life", "outdoor farmers market", "traditional bakery", "Mediterranean courtyard"],
+  "Abstract Concepts": ["infinite black void", "soft gradient studio", "reflective metallic stage", "prismatic light chamber", "liquid simulation space", "zero-gravity chamber", "holographic room", "electromagnetic field"],
+  Sustainability: ["eco-smart city", "green energy landscape", "recycling facility", "solar farm sunset", "urban vertical garden", "pristine coral reef", "ancient forest", "sustainable community"],
+  Business: ["modern glass office atrium", "abstract financial space", "minimal corporate studio", "digital strategy room", "executive lounge", "innovation hub", "futuristic trading floor", "startup loft"],
+  Science: ["precision laboratory bench", "microscopic sim space", "observatory dome", "sterile biotech chamber", "particle accelerator tunnel", "marine research vessel", "geological survey site", "telescope control room"],
+  Travel: ["historic plaza", "coastal cliff promenade", "mountain viewpoint sunrise", "old medina alleyway", "iconic bridge blue hour", "tropical island shore", "alpine village", "ancient ruins courtyard"],
+  Architecture: ["urban skyline panorama", "historic district courtyard", "modern campus plaza", "rooftop observation deck", "waterfront promenade", "underground passage", "museum atrium", "construction site"],
+  Sports: ["professional stadium arena", "outdoor training field", "Olympic swimming pool", "extreme sports terrain", "indoor gym facility", "mountain trail course", "beach sports court", "ice rink surface"],
+  Fashion: ["high-end boutique interior", "editorial studio set", "Milan fashion week backdrop", "luxury showroom", "backstage dressing room", "outdoor fashion shoot location", "textile factory floor", "designer workshop"],
+  Music: ["recording studio booth", "concert hall stage", "underground club", "outdoor festival stage", "vinyl record shop", "orchestral rehearsal space", "rooftop performance venue", "sound mixing room"],
+  Medical: ["sterile operating theater", "modern hospital ward", "research laboratory", "pharmaceutical clean room", "diagnostic imaging suite", "rehabilitation center", "biotech startup lab", "telemedicine studio"],
+  Education: ["modern university library", "science classroom lab", "digital learning center", "historical lecture hall", "outdoor campus garden", "virtual reality classroom", "maker space workshop", "study lounge"],
+  Automotive: ["luxury car showroom", "race track pit lane", "automotive factory line", "wind tunnel facility", "design studio clay model", "electric charging station", "off-road terrain course", "classic car garage"],
+};
+
+function pickRandom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function generateLocalVideoPrompts(category: string, count: number): VideoPromptResult[] {
+  const subjects = CATEGORY_SUBJECTS[category] || CATEGORY_SUBJECTS.Nature;
+  const environments = CATEGORY_ENVIRONMENTS[category] || CATEGORY_ENVIRONMENTS.Nature;
+  const results: VideoPromptResult[] = [];
+  const usedSubjects = new Set<string>();
+
+  let safety = 0;
+  while (results.length < count && safety < count * 100) {
+    safety++;
+    const subject = pickRandom(subjects);
+    if (usedSubjects.has(subject) && usedSubjects.size < subjects.length) continue;
+    usedSubjects.add(subject);
+
+    const environment = pickRandom(environments);
+    const camera = pickRandom(CAMERA_MOVEMENTS);
+    const speed = pickRandom(MOTION_SPEEDS);
+    const light = pickRandom(LIGHTING);
+    const duration = pickRandom(DURATIONS);
+    const style = pickRandom(TECHNICAL_STYLES);
+    const appeal = pickRandom(COMMERCIAL_APPEAL);
+
+    const prompt = `${subject}, ${environment}, ${light} lighting, ${camera}, ${speed}, ${duration}, ${style}, ${appeal}, ${NEGATIVE_CONSTRAINTS}`;
+    results.push({ number: results.length + 1, category, prompt });
+  }
+
+  return results;
+}
+
+export default function PromptGenerator() {
+  const [category, setCategory] = useState("Nature");
+  const [promptCount, setPromptCount] = useState(5);
+  const [prompts, setPrompts] = useState<VideoPromptResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [useAI, setUseAI] = useState(() => hasAnyApiKey());
+
+  useEffect(() => {
+    const onKeyUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ hasKey?: boolean }>).detail;
+      if (detail?.hasKey) {
+        setUseAI(true);
+        toast.success("✅ تم تفعيل AI تلقائياً!");
+      }
+    };
+    window.addEventListener("gemini-key-updated", onKeyUpdated as EventListener);
+    return () => window.removeEventListener("gemini-key-updated", onKeyUpdated as EventListener);
+  }, []);
+
+  const handleGenerate = async () => {
+    setLoading(true);
+    setPrompts([]);
+
+    try {
+      if (useAI && hasAnyApiKey()) {
+        const result = await generateAIVideoPrompts(category, promptCount);
+        setPrompts(result);
+        toast.success(`✅ تم توليد ${promptCount} برومبت بالذكاء الاصطناعي!`);
+      } else {
+        setPrompts(generateLocalVideoPrompts(category, promptCount));
+        toast.success(`تم توليد ${promptCount} برومبت محلياً`);
+        if (useAI && !hasAnyApiKey()) {
+          toast.error("أضف مفتاح API من الإعدادات ⚙️ لاستخدام AI");
+          setUseAI(false);
+        }
+      }
+    } catch (error) {
+      const errorType = classifyGeminiError(error);
+      toast.error(getGeminiErrorUserMessage(error));
+      if (errorType === "quota" || errorType === "rate_limit") {
+        setUseAI(false);
+      }
+      setPrompts(generateLocalVideoPrompts(category, promptCount));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyPrompt = async (text: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      toast.success("تم النسخ!");
+    } catch {
+      toast.error("تعذر النسخ — جرّب المتصفح Chrome أو تأكد من HTTPS");
+    }
+  };
+
+  const copyAll = async () => {
+    const table = prompts.map((p) => `${p.number}. [${p.category}] ${p.prompt}`).join("\n\n");
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(table);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = table;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      toast.success("تم نسخ جميع البرومبتات!");
+    } catch {
+      toast.error("تعذر نسخ الكل");
+    }
+  };
+
+  const selectClass = "bg-card border-2 border-primary text-primary p-2.5 rounded-md font-mono text-xs focus:outline-none focus:box-glow-strong w-full mb-3";
+
+  return (
+    <div className="animate-fade-in space-y-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
+          <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono">🎬 إعدادات برومبت الفيديو</h3>
+
+          <label className="text-primary text-xs font-semibold font-mono block mb-1.5">اختر الفئة:</label>
+          <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
+            {VIDEO_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+
+          <label className="text-primary text-xs font-semibold font-mono block mb-1.5">عدد البرومبتات:</label>
+          <select value={promptCount} onChange={(e) => setPromptCount(Number(e.target.value))} className={selectClass}>
+            <option value={1}>1 برومبت</option>
+            <option value={3}>3 برومبتات</option>
+            <option value={5}>5 برومبتات</option>
+            <option value={10}>10 برومبتات</option>
+            <option value={15}>15 برومبت</option>
+            <option value={20}>20 برومبت</option>
+          </select>
+
+          <div className="flex items-center gap-3 mb-3">
+            <label className="text-primary text-xs font-semibold font-mono">وضع التوليد:</label>
+            <button
+              onClick={() => setUseAI(!useAI)}
+              className={`px-3 py-1.5 rounded text-xs font-mono font-semibold border-2 transition-all ${
+                useAI
+                  ? "gradient-primary text-primary-foreground border-primary box-glow-strong"
+                  : "bg-card text-secondary border-primary/50"
+              }`}
+            >
+              {useAI ? "🧠 AI مفعّل" : "⚙️ محلي"}
+            </button>
+          </div>
+          {!useAI && (
+            <p className="text-[10px] text-secondary font-mono mb-3">
+              ℹ️ التوليد المحلي يعمل بدون API. أضف مفتاحك من ⚙️ الإعدادات لتفعيل AI.
+            </p>
+          )}
+          {useAI && !hasAnyApiKey() && (
+            <p className="text-[10px] text-destructive font-mono mb-3">
+              ⚠️ لا يوجد مفتاح API! أضف مفتاحك من تبويب ⚙️ الإعدادات أولاً.
+            </p>
+          )}
+
+          <button
+            onClick={handleGenerate}
+            disabled={loading}
+            className="w-full gradient-primary text-primary-foreground py-3 rounded-md font-mono text-sm font-semibold box-glow-strong hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            {loading ? "⏳ جاري التوليد..." : "🚀 توليد برومبتات الفيديو"}
+          </button>
+        </div>
+
+        <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
+          <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono">📋 صيغة البرومبت</h3>
+          <div className="text-xs leading-7 text-secondary font-mono space-y-1">
+            <p className="text-primary font-semibold">كل برومبت يتضمن:</p>
+            <p>🎯 Subject - الموضوع الرئيسي</p>
+            <p>🌍 Environment - البيئة والخلفية</p>
+            <p>💡 Professional Lighting - إضاءة احترافية</p>
+            <p>🎥 Camera Movement - حركة الكاميرا</p>
+            <p>⚡ Motion Speed - سرعة الحركة</p>
+            <p>⏱️ Duration - مدة المشهد</p>
+            <p>🎨 Technical Style - النمط الفني</p>
+            <p>💼 Commercial Appeal - جاذبية تجارية</p>
+            <p>🚫 Negative Constraints - قيود سلبية</p>
+            <p className="mt-3 text-accent font-semibold">📐 4K (3840×2160) | 24-30fps | 15-30s</p>
+            <p className="mt-2 text-[10px] text-secondary">
+              📂 الفئات: {VIDEO_CATEGORIES.length} فئة متاحة
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {prompts.length > 0 && (
+        <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-semibold text-primary text-glow font-mono">🎬 البرومبتات ({prompts.length})</h3>
+            <div className="flex gap-2">
+              <button
+                onClick={handleGenerate}
+                disabled={loading}
+                className="bg-card border-2 border-primary text-primary px-3 py-1.5 rounded text-xs font-semibold font-mono hover:bg-primary/10 transition-all disabled:opacity-50"
+              >
+                🔄 توليد جديد
+              </button>
+              <button
+                onClick={copyAll}
+                className="gradient-primary text-primary-foreground px-4 py-1.5 rounded text-xs font-semibold font-mono hover:box-glow-strong transition-all"
+              >
+                📋 نسخ الكل
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full table-fixed border-collapse font-mono text-xs">
+              <colgroup>
+                <col className="w-10" />
+                <col className="w-[6.5rem]" />
+                <col />
+                <col className="w-14" />
+              </colgroup>
+              <thead>
+                <tr className="border-b-2 border-primary">
+                  <th className="text-primary text-right p-2">#</th>
+                  <th className="text-primary text-right p-2">Category</th>
+                  <th className="text-primary text-right p-2">Full Prompt</th>
+                  <th className="p-2 w-14" aria-label="نسخ" />
+                </tr>
+              </thead>
+              <tbody>
+                {prompts.map((p, i) => (
+                  <tr key={i} className="border-b border-primary/30 hover:bg-primary/5 transition-colors">
+                    <td className="text-secondary p-2 text-center font-semibold align-top">{p.number}</td>
+                    <td className="p-2 align-top">
+                      <span className="text-accent font-semibold text-[10px] bg-primary/10 px-2 py-0.5 rounded inline-block">{p.category}</span>
+                    </td>
+                    <td className="text-secondary p-2 leading-relaxed text-[11px] align-top min-w-0 break-words overflow-hidden">
+                      {p.prompt}
+                    </td>
+                    <td className="p-2 align-top relative z-20 w-14 min-w-[3.5rem] bg-card/95 backdrop-blur-sm border-s border-primary/15">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          void copyPrompt(p.prompt);
+                        }}
+                        className="gradient-primary text-primary-foreground px-2 py-2 rounded text-[10px] font-semibold hover:box-glow-strong transition-all cursor-pointer pointer-events-auto min-h-[2.25rem] min-w-[2.25rem] inline-flex items-center justify-center"
+                        aria-label="نسخ البرومبت"
+                      >
+                        📋
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

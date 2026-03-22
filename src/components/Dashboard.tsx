@@ -1,0 +1,374 @@
+import { useState, useEffect } from "react";
+import { marketData, dailyTips, seasonalEvents } from "@/data/marketData";
+import { EMERGING_TRENDS_2026 } from "@/data/trends2026";
+import { createSourcePulse, fetchMarketPulseFromBackend } from "@/lib/livePulse";
+import { generateMarketAnalytics, getTopCompetitors } from "@/lib/marketAnalytics";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, RadarChart, Radar, PolarGrid,
+  PolarAngleAxis, PolarRadiusAxis, LineChart, Line, Area, AreaChart
+} from "recharts";
+
+const RADIAN = Math.PI / 180;
+const COLORS = ['#00D4FF', '#FF6B6B', '#4ECDC4', '#FFD93D', '#FF8C42'];
+
+// ── Mini custom tooltip ──
+function ChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-card border border-primary/40 rounded-md px-3 py-2 font-mono text-[10px] text-primary shadow-lg">
+      {label && <div className="text-secondary mb-1">{label}</div>}
+      {payload.map((p: any, i: number) => (
+        <div key={i} style={{ color: p.color || "inherit" }}>
+          {p.name}: <span className="font-semibold">{p.value}{p.unit || ""}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function Dashboard() {
+  const [tip, setTip] = useState("");
+  const [ideas, setIdeas] = useState<string[]>([]);
+  const [analytics, setAnalytics] = useState<any[]>([]);
+  const [competitors, setCompetitors] = useState<any[]>([]);
+  const [pulseData, setPulseData] = useState<any[]>([]);
+
+  const goldOpportunities = marketData.filter((i) => i.demand === "high" && i.competition === "low").length;
+  const avgProfit = Math.round(marketData.reduce((s, i) => s + i.profitability, 0) / marketData.length);
+  const topTrend = marketData.reduce((max, i) => (i.searches > max.searches ? i : max));
+  const now = new Date();
+  const month = now.getMonth();
+  const season =
+    month >= 2 && month <= 4 ? "الربيع 🌸" :
+    month >= 5 && month <= 7 ? "الصيف ☀️" :
+    month >= 8 && month <= 10 ? "الخريف 🍂" : "الشتاء ❄️";
+
+  const top10 = [...marketData].sort((a, b) => b.searches - a.searches).slice(0, 10);
+  const sourcePulse = createSourcePulse(marketData);
+
+  useEffect(() => {
+    setTip(dailyTips[Math.floor(Math.random() * dailyTips.length)]);
+    setIdeas([
+      `حوّل "${top10[0]?.topic || "Top Topic"}" إلى 3 إصدارات: صورة + فيديو + Green Screen.`,
+      `ابنِ سلسلة 10 أصول في فئة ${top10[0]?.category || "Technology"} مع Copy Space ثابت.`,
+      `استهدف أقل منافسة ضمن أعلى ربحية وابدأ برفع 5 أصول يومياً لمدة 7 أيام.`,
+      `أنشئ حزمة SEO موحّدة للفائزين في Source Pulse (Impact الأعلى).`,
+    ]);
+  }, []);
+  const newTip = () => setTip(dailyTips[Math.floor(Math.random() * dailyTips.length)]);
+
+  // ── Chart data ──
+  const barData = top10.map((item) => ({
+    name: item.topic.length > 14 ? item.topic.slice(0, 14) + "…" : item.topic,
+    searches: item.searches,
+    profit: item.profitability,
+  }));
+
+  // Demand breakdown for pie
+  const demandCounts = {
+    high: marketData.filter((i) => i.demand === "high").length,
+    medium: marketData.filter((i) => i.demand === "medium").length,
+    low: marketData.filter((i) => i.demand === "low").length,
+  };
+  const pieData = [
+    { name: "طلب مرتفع", value: demandCounts.high, color: "#00ff88" },
+    { name: "طلب متوسط", value: demandCounts.medium, color: "#ffd700" },
+    { name: "طلب منخفض", value: demandCounts.low, color: "#ff6b6b" },
+  ];
+
+  // Competition breakdown for second pie
+  const compCounts = {
+    low: marketData.filter((i) => i.competition === "low").length,
+    medium: marketData.filter((i) => i.competition === "medium").length,
+    high: marketData.filter((i) => i.competition === "high").length,
+  };
+  const compPieData = [
+    { name: "منافسة قليلة", value: compCounts.low, color: "#00ff88" },
+    { name: "منافسة متوسطة", value: compCounts.medium, color: "#ffd700" },
+    { name: "منافسة شرسة", value: compCounts.high, color: "#ff6b6b" },
+  ];
+
+  // Category profitability radar
+  const categoryMap: Record<string, number[]> = {};
+  marketData.forEach((item) => {
+    if (!categoryMap[item.category]) categoryMap[item.category] = [];
+    categoryMap[item.category].push(item.profitability);
+  });
+  const radarData = Object.entries(categoryMap).map(([cat, vals]) => ({
+    category: cat,
+    avgProfit: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
+  }));
+
+  const TICK_STYLE = { fill: "#70d0ff", fontFamily: "monospace", fontSize: 10 };
+
+  const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: any) => {
+    if (percent < 0.1) return null;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    return (
+      <text x={x} y={y} fill="#0a1628" textAnchor="middle" dominantBaseline="central" fontSize={9} fontWeight="700" fontFamily="monospace">
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
+
+  return (
+    <div className="animate-fade-in space-y-5">
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { value: topTrend.topic, label: "أكثر موضوع بحثاً", size: "text-sm", icon: "🔥" },
+          { value: goldOpportunities, label: "فرص ذهبية", size: "text-2xl", icon: "⭐" },
+          { value: `${avgProfit}%`, label: "متوسط الربحية", size: "text-2xl", icon: "💰" },
+          { value: season, label: "الموسم الحالي", size: "text-lg", icon: "📅" },
+        ].map((stat, i) => (
+          <div key={i} className="bg-primary/5 border-2 border-primary rounded-lg p-4 text-center box-glow">
+            <div className="text-2xl mb-1">{stat.icon}</div>
+            <div className={`font-extrabold text-primary text-glow ${stat.size}`}>{stat.value}</div>
+            <div className="text-xs text-secondary mt-1 font-mono">{stat.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Charts Row 1 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Bar: Top searches */}
+        <div className="lg:col-span-2 bg-card border-2 border-primary rounded-lg p-5 box-glow">
+          <h3 className="text-sm font-semibold text-primary text-glow mb-4 font-mono">📊 أكثر المواضيع بحثاً</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={barData} margin={{ top: 0, right: 8, left: -20, bottom: 50 }}>
+              <XAxis
+                dataKey="name"
+                tick={TICK_STYLE}
+                angle={-35}
+                textAnchor="end"
+                interval={0}
+                height={60}
+              />
+              <YAxis tick={TICK_STYLE} />
+              <Tooltip content={<ChartTooltip />} />
+              <Bar dataKey="searches" name="عمليات البحث" fill="hsl(150 100% 50% / 0.8)" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Pie: Demand */}
+        <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
+          <h3 className="text-sm font-semibold text-primary text-glow mb-4 font-mono">🎯 توزيع الطلب</h3>
+          <ResponsiveContainer width="100%" height={160}>
+            <PieChart>
+              <Pie
+                data={pieData}
+                cx="50%" cy="50%"
+                outerRadius={65}
+                dataKey="value"
+                labelLine={false}
+                label={renderCustomLabel}
+              >
+                {pieData.map((entry, index) => (
+                  <Cell key={index} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip content={<ChartTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="flex flex-col gap-1 mt-2">
+            {pieData.map((d) => (
+              <div key={d.name} className="flex items-center gap-2 font-mono text-[10px] text-secondary">
+                <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: d.color }} />
+                {d.name}: <span className="font-semibold" style={{ color: d.color }}>{d.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Charts Row 2 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Radar: Category profitability */}
+        <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
+          <h3 className="text-sm font-semibold text-primary text-glow mb-4 font-mono">📡 ربحية الفئات</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <RadarChart data={radarData} cx="50%" cy="50%">
+              <PolarGrid stroke="hsl(150 100% 50% / 0.15)" />
+              <PolarAngleAxis dataKey="category" tick={{ fill: "#70d0ff", fontSize: 9, fontFamily: "monospace" }} />
+              <PolarRadiusAxis tick={{ fill: "#70d0ff", fontSize: 8 }} domain={[0, 100]} />
+              <Radar
+                name="متوسط الربحية"
+                dataKey="avgProfit"
+                stroke="hsl(150 100% 50%)"
+                fill="hsl(150 100% 50% / 0.15)"
+                strokeWidth={1.5}
+              />
+              <Tooltip content={<ChartTooltip />} />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Bar: Profitability */}
+        <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
+          <h3 className="text-sm font-semibold text-primary text-glow mb-4 font-mono">💹 الربحية %</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={barData.slice(0, 6)} layout="vertical" margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
+              <XAxis type="number" domain={[0, 100]} tick={TICK_STYLE} unit="%" />
+              <YAxis dataKey="name" type="category" tick={TICK_STYLE} width={70} />
+              <Tooltip content={<ChartTooltip />} />
+              <Bar dataKey="profit" name="الربحية" unit="%" fill="hsl(48 100% 50% / 0.8)" radius={[0, 3, 3, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Pie: Competition */}
+        <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
+          <h3 className="text-sm font-semibold text-primary text-glow mb-4 font-mono">⚔️ توزيع المنافسة</h3>
+          <ResponsiveContainer width="100%" height={160}>
+            <PieChart>
+              <Pie
+                data={compPieData}
+                cx="50%" cy="50%"
+                outerRadius={65}
+                dataKey="value"
+                labelLine={false}
+                label={renderCustomLabel}
+              >
+                {compPieData.map((entry, index) => (
+                  <Cell key={index} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip content={<ChartTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="flex flex-col gap-1 mt-2">
+            {compPieData.map((d) => (
+              <div key={d.name} className="flex items-center gap-2 font-mono text-[10px] text-secondary">
+                <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: d.color }} />
+                {d.name}: <span className="font-semibold" style={{ color: d.color }}>{d.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Top 10 list */}
+        <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
+          <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono">🔥 أكثر 10 مواضيع بحثاً</h3>
+          {top10.map((item, i) => {
+            const isGold = item.demand === "high" && item.competition === "low";
+            const barW = Math.round((item.searches / top10[0].searches) * 100);
+            return (
+              <div key={i} className="py-2 border-b border-primary/20">
+                <div className="flex items-center justify-between text-secondary font-mono text-xs mb-1">
+                  <span>
+                    <span className="text-primary font-bold">{i + 1}.</span>{" "}
+                    {item.topic}
+                    {isGold && <span className="ml-2 text-accent text-[9px]">⭐</span>}
+                  </span>
+                  <span className="text-primary font-semibold">{item.searches.toLocaleString()}</span>
+                </div>
+                <div className="h-1 bg-primary/10 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary/60 rounded-full transition-all"
+                    style={{ width: `${barW}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Seasonal */}
+        <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
+          <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono">📅 مؤشر الموسم</h3>
+          {seasonalEvents.map((ev, i) => (
+            <div key={i} className="p-3 mb-3 bg-primary/5 rounded-md border-r-[3px] border-primary hover:bg-primary/10 transition-all">
+              <div className="text-primary font-semibold font-mono text-sm">{ev.event}
+                <span className="text-secondary text-[10px] font-normal mr-2">({ev.month})</span>
+              </div>
+              <div className="text-secondary text-xs mt-1 font-mono">{ev.images}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Daily tip */}
+      <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
+        <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono">💡 نصيحة اليوم</h3>
+        <div className="bg-primary/5 rounded-md p-4 border border-primary/20">
+          <p className="text-secondary text-sm leading-relaxed font-mono">{tip}</p>
+        </div>
+        <button
+          onClick={newTip}
+          className="mt-4 bg-card border-2 border-primary text-primary px-5 py-2 rounded-md text-xs font-mono font-semibold hover:bg-primary/10 hover:box-glow transition-all"
+        >
+          🎲 نصيحة جديدة
+        </button>
+      </div>
+
+      {/* Quick links */}
+      <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
+        <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono">🔗 اختصارات سريعة</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { label: "📤 Adobe Stock Contributor", url: "https://stock.adobe.com/contributor" },
+            { label: "📊 Google Trends", url: "https://trends.google.com" },
+            { label: "📌 Pinterest Trends", url: "https://www.pinterest.com/trends/" },
+            { label: "🎨 Behance", url: "https://www.behance.net" },
+            { label: "🔍 EyeEm Market", url: "https://www.eyeem.com/market" },
+            { label: "📈 Shutterstock", url: "https://www.shutterstock.com/contribute" },
+            { label: "🌐 Freepik", url: "https://www.freepik.com/sell" },
+            { label: "🤖 Anthropic Console", url: "https://console.anthropic.com" },
+          ].map((link) => (
+            <a
+              key={link.url}
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="gradient-primary text-primary-foreground text-center py-2.5 px-2 rounded-md text-xs font-mono font-semibold box-glow-strong hover:scale-105 active:scale-95 transition-all no-underline block"
+            >
+              {link.label}
+            </a>
+          ))}
+        </div>
+      </div>
+
+      {/* Live source pulse in dashboard */}
+      <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
+        <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono">🌐 نبض المصادر الآن</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {sourcePulse.slice(0, 6).map((s) => (
+            <div key={s.url} className="bg-primary/5 border border-primary/20 rounded-md p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-primary font-mono text-xs font-semibold">{s.name}</span>
+                <span className="text-secondary font-mono text-[10px]">{s.lastChecked}</span>
+              </div>
+              <p className="text-secondary font-mono text-[10px] mt-1">
+                Topic: <span className="text-primary">{s.detectedTopic}</span>
+              </p>
+              <p className="text-secondary font-mono text-[10px] mt-1">
+                Impact: <span className="text-accent">{s.impact}%</span> | Delta:{" "}
+                <span className={s.delta >= 0 ? "text-primary" : "text-destructive"}>
+                  {s.delta >= 0 ? "+" : ""}{s.delta}%
+                </span>
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* New ideas */}
+      <div className="bg-card border-2 border-accent rounded-lg p-5 box-glow-gold">
+        <h3 className="text-base font-semibold text-accent text-glow-gold mb-4 font-mono">🧠 أفكار جديدة تلقائية</h3>
+        <div className="space-y-2">
+          {ideas.map((idea) => (
+            <div key={idea} className="bg-accent/5 border border-accent/20 rounded-md p-3 text-secondary font-mono text-xs">
+              {idea}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

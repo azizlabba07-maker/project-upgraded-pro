@@ -1,0 +1,45 @@
+═══════════════════════════════════════════════════════════════
+   نشر موقع Adobe Stock AI Hub على Vercel — أوامر CMD جاهزة
+═══════════════════════════════════════════════════════════════
+
+► الطريقة الأبسط (بدون GitHub):
+
+1) افتح CMD أو PowerShell
+2) انسخ والصق هذا الأمر بالكامل ثم اضغط Enter:
+
+   cd /d "d:\ADOBE\New folder (5)\ؤخعقسخق\project-upgraded"
+   npx vercel --yes
+
+3) عند أول تشغيل سيطلب منك تسجيل الدخول:
+   - يفتح المتصفح
+   - سجّل دخولك بحساب Vercel (أو GitHub)
+   - ارجع للطرفية واضغط Enter
+
+4) في النهاية سيظهر رابط الموقع الثابت، مثل:
+   https://project-upgraded-xxxx.vercel.app
+
+───────────────────────────────────────────────────────────────
+
+► لتحديث الموقع لاحقاً:
+
+   cd /d "d:\ADOBE\New folder (5)\ؤخعقسخق\project-upgraded"
+   npx vercel --prod
+
+───────────────────────────────────────────────────────────────
+
+► إذا أردت الربط مع GitHub (يحتاج تثبيت Git):
+
+1) ثبّت Git من: https://git-scm.com/download/win
+2) بعد التثبيت أعد فتح CMD ثم نفّذ:
+
+   cd /d "d:\ADOBE\New folder (5)\ؤخعقسخق\project-upgraded"
+   git init
+   git add .
+   git commit -m "Deploy"
+   git branch -M main
+   git remote add origin https://github.com/azizlabba07-maker/adobe-stock-ai-partner.git
+   git push -u origin main --force
+
+3) ثم من صفحة Vercel اضغط "Import" بجانب adobe-stock-ai-partner
+
+═══════════════════════════════════════════════════════════════
