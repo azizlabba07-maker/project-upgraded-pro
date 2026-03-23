@@ -165,6 +165,7 @@ export function classifyGeminiError(error: unknown): GeminiErrorType {
   const message = error instanceof Error ? error.message.toLowerCase() : "";
   if (!message) return "unknown";
   if (message.includes("no_api_key") || message.includes("no api key")) return "no_key";
+  if (message.includes("gemini_all_keys_exhausted_daily")) return "quota";
   if (message.includes("gemini_quota_daily_exceeded")) return "quota";
   if (message.includes("api_error_429")) return "rate_limit";
   if (
@@ -180,7 +181,7 @@ export function getGeminiErrorUserMessage(error: unknown): string {
   const type = classifyGeminiError(error);
   const messages: Record<string, string> = {
     no_key: "لم يتم تعيين مفتاح API. أضف مفتاحك من تبويب الإعدادات ⚙️",
-    quota: "تم استهلاك الحصة اليومية. انتظر 24 ساعة أو أضف مفتاح API جديد من الإعدادات.",
+    quota: "تم استهلاك الحصة اليومية. إذا أضفت عدة مفاتيح وما زال نفس الخطأ، غالبًا المفاتيح من نفس مشروع Google Cloud (حصة مشتركة). استخدم مفاتيح من مشاريع مختلفة أو انتظر 24 ساعة.",
     rate_limit: "تم تجاوز حد الطلبات. انتظر ثوانٍ ثم أعد المحاولة.",
     auth: "مفتاح API غير صالح أو مقيّد. تأكد من:\n1. تفعيل Generative Language API في Google Cloud Console\n2. إزالة قيود HTTP referrer عن المفتاح\n3. نسخ المفتاح بشكل صحيح من Google AI Studio",
     network: "تعذر الاتصال بخدمة Gemini. تحقق من الشبكة.",
@@ -281,10 +282,14 @@ export async function generateWithGemini(prompt: string, temperature = 1.4): Pro
   });
 
   let lastError: unknown = new Error("Unknown Gemini error");
+  let quotaLimitedKeys = 0;
+  let authLimitedKeys = 0;
 
   for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex++) {
     const apiKey = apiKeys[keyIndex];
+    let shouldMoveToNextKey = false;
     for (const version of GEMINI_API_VERSIONS) {
+      if (shouldMoveToNextKey) break;
       for (const model of GEMINI_MODELS) {
         try {
           const response = await fetchWithRetry(getGeminiUrl(model, version, apiKey), {
@@ -316,12 +321,26 @@ export async function generateWithGemini(prompt: string, temperature = 1.4): Pro
             msg.includes("api_error_403") ||
             msg.includes("api key not valid")
           ) {
+            if (msg.includes("gemini_quota_daily_exceeded")) quotaLimitedKeys++;
+            if (
+              msg.includes("api_error_401") ||
+              msg.includes("api_error_403") ||
+              msg.includes("api key not valid")
+            ) authLimitedKeys++;
+            shouldMoveToNextKey = true;
             break;
           }
           throw error;
         }
       }
     }
+  }
+
+  if (quotaLimitedKeys >= apiKeys.length) {
+    throw new Error("GEMINI_ALL_KEYS_EXHAUSTED_DAILY: جميع مفاتيح Gemini المستعملة وصلت للحصة اليومية.");
+  }
+  if (authLimitedKeys >= apiKeys.length) {
+    throw new Error("GEMINI_ALL_KEYS_AUTH_FAILED: جميع مفاتيح Gemini غير صالحة أو مقيّدة.");
   }
 
   throw lastError;
