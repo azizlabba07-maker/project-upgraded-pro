@@ -10,11 +10,13 @@ import {
 } from "@/lib/claude";
 import {
   generateAIKeywords,
+  generateGeminiStockPrompts,
   getAIMarketAnalysis,
   hasAnyApiKey,
   getGeminiErrorUserMessage,
   classifyGeminiError,
 } from "@/lib/gemini";
+import { getPromptEvolutionHint } from "@/lib/promptEvolution";
 
 type OutputType = "image" | "video" | "both" | "greenscreen";
 type CompetitionStrategy = "low" | "medium" | "avoid-high";
@@ -142,6 +144,23 @@ function pickLocalKeywordsFallback(count: number): string[] {
     "template",
   ];
   return fallback.slice(0, count);
+}
+
+function mapTrendCategoryToGeminiCategory(category: string): string {
+  const map: Record<string, string> = {
+    AI: "Technology",
+    Technology: "Technology",
+    Science: "Science",
+    Sustainability: "Sustainability",
+    Work: "Business",
+    Business: "Business",
+    Wellness: "Medical",
+    Diversity: "Fashion",
+    Design: "Abstract Concepts",
+    Nature: "Nature",
+    Food: "Food",
+  };
+  return map[category] || "Business";
 }
 
 function localGeneratePrompts(params: {
@@ -273,7 +292,34 @@ export default function OneClickOpportunity({
         return;
       }
 
-      // Claude not available => local fallback (still useful).
+      // 2-b) Claude unavailable => Gemini prompts fallback before local fallback.
+      if (hasAnyApiKey() && outputType !== "greenscreen") {
+        const geminiCategory = mapTrendCategoryToGeminiCategory(trend.category);
+        const geminiType = outputType === "both" ? "both" : outputType;
+        const evolutionHint = getPromptEvolutionHint(trend.category);
+        const generated = await generateGeminiStockPrompts(
+          geminiCategory,
+          count,
+          geminiType,
+          selectedTrends,
+          competition,
+          `${trend.topic}. ${evolutionHint}`.trim()
+        );
+        const normalized: StockImagePrompt[] = generated.map((p, i) => ({
+          number: i + 1,
+          category: uiCategory,
+          type: p.type,
+          demand: p.demand,
+          prompt: p.prompt,
+          title: p.title,
+          keywords: p.keywords,
+        }));
+        setPrompts(normalized);
+        toast.success(`تم توليد ${normalized.length} برومبت عبر Gemini Fallback!`);
+        return;
+      }
+
+      // 2-c) Last fallback: local generation.
       setKeywordsLoading(true);
       const kw =
         hasAnyApiKey()

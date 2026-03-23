@@ -8,6 +8,7 @@ import {
   type VideoPromptResult,
   type GeminiStockPrompt,
 } from "@/lib/gemini";
+import { getPromptEvolutionHint } from "@/lib/promptEvolution";
 import { toast } from "sonner";
 
 const VIDEO_CATEGORIES = [
@@ -184,8 +185,34 @@ const CATEGORY_ENVIRONMENTS: Record<string, string[]> = {
   Automotive: ["luxury car showroom", "race track pit lane", "automotive factory line", "wind tunnel facility", "design studio clay model", "electric charging station", "off-road terrain course", "classic car garage"],
 };
 
+const CATEGORY_GUARD_KEYWORDS: Record<string, string[]> = {
+  Nature: ["nature", "forest", "mountain", "wildlife", "landscape"],
+  Technology: ["technology", "digital", "ai", "robot", "circuit", "software"],
+  Cooking: ["cooking", "kitchen", "recipe", "chef", "food", "ingredients"],
+  Food: ["food", "meal", "dish", "restaurant", "kitchen", "ingredients"],
+  "Abstract Concepts": ["abstract", "concept", "geometric", "pattern", "texture"],
+  Sustainability: ["sustainability", "eco", "green", "renewable", "recycle"],
+  Business: ["business", "office", "finance", "corporate", "strategy"],
+  Science: ["science", "lab", "molecule", "research", "dna", "medical"],
+  Travel: ["travel", "tourism", "destination", "landmark", "journey"],
+  Architecture: ["architecture", "building", "interior", "structure", "urban"],
+  Sports: ["sports", "fitness", "athlete", "training", "game"],
+  Fashion: ["fashion", "style", "clothing", "runway", "luxury"],
+  Music: ["music", "instrument", "audio", "sound", "concert"],
+  Medical: ["medical", "healthcare", "hospital", "clinical", "diagnosis"],
+  Education: ["education", "learning", "school", "university", "study"],
+  Automotive: ["automotive", "car", "vehicle", "engine", "transport"],
+};
+
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function isPromptCategoryValid(prompt: string, category: string): boolean {
+  const text = prompt.toLowerCase();
+  const guard = CATEGORY_GUARD_KEYWORDS[category] || [];
+  if (guard.length === 0) return true;
+  return guard.some((kw) => text.includes(kw));
 }
 
 function generateLocalVideoPrompts(category: string, count: number): VideoPromptResult[] {
@@ -271,6 +298,7 @@ export default function PromptGenerator() {
 
     try {
       if (useAI && hasAnyApiKey()) {
+        const evolutionHint = getPromptEvolutionHint(category);
         if (advancedMode && batchTitles.length > 0) {
           const allResults: DisplayPrompt[] = [];
           for (const title of batchTitles) {
@@ -280,7 +308,7 @@ export default function PromptGenerator() {
               outputType,
               selectedTrends,
               competition,
-              title
+              `${title}. ${evolutionHint}`.trim()
             );
             allResults.push(
               ...(result as DisplayPrompt[]).map((item) => ({
@@ -289,12 +317,29 @@ export default function PromptGenerator() {
               }))
             );
           }
-          setPrompts(allResults.map((item, idx) => ({ ...item, number: idx + 1 })));
-          toast.success(`✅ تم توليد ${allResults.length} برومبت لـ ${batchTitles.length} عنوان`);
+          const validated = allResults.filter((item) => isPromptCategoryValid(item.prompt, category));
+          const finalList = (validated.length > 0 ? validated : allResults).map((item, idx) => ({ ...item, number: idx + 1 }));
+          setPrompts(finalList);
+          if (validated.length !== allResults.length) {
+            toast.warning(`تمت فلترة ${allResults.length - validated.length} برومبت خارج الفئة المختارة.`);
+          }
+          toast.success(`✅ تم توليد ${finalList.length} برومبت لـ ${batchTitles.length} عنوان`);
         } else if (advancedMode) {
-          const result = await generateGeminiStockPrompts(category, promptCount, outputType, selectedTrends, competition);
-          setPrompts(result as DisplayPrompt[]);
-          toast.success(`✅ تم توليد ${promptCount} برومبت بالذكاء الاصطناعي!`);
+          const result = await generateGeminiStockPrompts(
+            category,
+            promptCount,
+            outputType,
+            selectedTrends,
+            competition,
+            evolutionHint || undefined
+          );
+          const validated = (result as DisplayPrompt[]).filter((item) => isPromptCategoryValid(item.prompt, category));
+          const finalList = validated.length > 0 ? validated : (result as DisplayPrompt[]);
+          setPrompts(finalList);
+          if (validated.length !== (result as DisplayPrompt[]).length) {
+            toast.warning("تمت فلترة بعض البرومبتات غير المطابقة للفئة.");
+          }
+          toast.success(`✅ تم توليد ${finalList.length} برومبت بالذكاء الاصطناعي!`);
         } else {
           const result = await generateAIVideoPrompts(category, promptCount);
           setPrompts(result as DisplayPrompt[]);

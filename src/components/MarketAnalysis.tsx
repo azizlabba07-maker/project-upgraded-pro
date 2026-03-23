@@ -23,6 +23,41 @@ function CompetitionBadge({ competition }: { competition: string }) {
   return <span className={`inline-block px-2.5 py-1 rounded-sm text-[11px] font-semibold border font-mono ${config.cls}`}>{config.label}</span>;
 }
 
+function demandWeight(demand: MarketTrend["demand"]): number {
+  if (demand === "high") return 100;
+  if (demand === "medium") return 70;
+  return 40;
+}
+
+function competitionWeight(competition: MarketTrend["competition"]): number {
+  if (competition === "low") return 100;
+  if (competition === "medium") return 65;
+  return 30;
+}
+
+function normalizeSearches(searches: number): number {
+  // Clamp typical project range to avoid over/under spikes.
+  const min = 3000;
+  const max = 15000;
+  const clamped = Math.max(min, Math.min(max, searches || min));
+  return Math.round(((clamped - min) / (max - min)) * 100);
+}
+
+function getOpportunityScore(item: MarketTrend): number {
+  const demand = demandWeight(item.demand) * 0.35;
+  const competition = competitionWeight(item.competition) * 0.3;
+  const profitability = Math.max(0, Math.min(100, item.profitability)) * 0.25;
+  const searches = normalizeSearches(item.searches) * 0.1;
+  return Math.round(demand + competition + profitability + searches);
+}
+
+function scoreLabel(score: number): string {
+  if (score >= 85) return "🔥 ممتازة";
+  if (score >= 70) return "✅ قوية";
+  if (score >= 55) return "⚠️ متوسطة";
+  return "🧪 تجريبية";
+}
+
 export default function MarketAnalysis() {
   const [trends, setTrends] = useState<MarketTrend[]>(staticMarketData);
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -225,6 +260,7 @@ export default function MarketAnalysis() {
               <th className="p-3 text-right text-primary font-mono text-xs font-semibold text-glow">الطلب</th>
               <th className="p-3 text-right text-primary font-mono text-xs font-semibold text-glow">المنافسة</th>
               <th className="p-3 text-right text-primary font-mono text-xs font-semibold text-glow">الربحية</th>
+              <th className="p-3 text-right text-primary font-mono text-xs font-semibold text-glow">Score</th>
               <th className="p-3 text-right text-primary font-mono text-xs font-semibold text-glow">الفرصة</th>
               <th className="p-3 text-right text-primary font-mono text-xs font-semibold text-glow">تحليل AI</th>
             </tr>
@@ -232,6 +268,7 @@ export default function MarketAnalysis() {
           <tbody>
             {filtered.map((item, idx) => {
               const isGold = item.demand === "high" && item.competition === "low";
+              const score = getOpportunityScore(item);
               return (
                 <tr key={`${item.topic}-${idx}`} className="hover:bg-primary/5 transition-colors border-b border-primary/20">
                   <td className="p-2.5 text-secondary font-mono text-xs">{item.topic}</td>
@@ -245,6 +282,24 @@ export default function MarketAnalysis() {
                     }`}>
                       {item.profitability}%
                     </span>
+                  </td>
+                  <td className="p-2.5">
+                    <div className="flex flex-col gap-1">
+                      <span
+                        className={`inline-block px-2.5 py-1 rounded-sm text-[11px] font-semibold border font-mono ${
+                          score >= 85 ? "bg-accent/20 text-accent border-accent" :
+                          score >= 70 ? "bg-primary/20 text-primary border-primary" :
+                          score >= 55 ? "bg-cyber-yellow/20 text-cyber-yellow border-cyber-yellow" :
+                          "bg-cyber-red/20 text-cyber-red border-cyber-red"
+                        }`}
+                        title={`Demand: ${item.demand} | Competition: ${item.competition} | Profitability: ${item.profitability}% | Searches: ${item.searches}`}
+                      >
+                        {score}/100 {scoreLabel(score)}
+                      </span>
+                      <span className="text-[9px] text-secondary font-mono">
+                        طلب: {item.demand} • منافسة: {item.competition} • بحث: {item.searches.toLocaleString()}
+                      </span>
+                    </div>
                   </td>
                   <td className="p-2.5">
                     {isGold ? (

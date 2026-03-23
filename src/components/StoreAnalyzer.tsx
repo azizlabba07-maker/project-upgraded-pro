@@ -3,6 +3,11 @@ import { analyzeRejectionOrLowSales, hasAnyApiKey, classifyGeminiError, getGemin
 import { toast } from "sonner";
 
 export default function StoreAnalyzer() {
+  const [storeReference, setStoreReference] = useState("");
+  const [soldSummary, setSoldSummary] = useState("");
+  const [rejectedSummary, setRejectedSummary] = useState("");
+  const [keywordFocus, setKeywordFocus] = useState("");
+  const [extraNotes, setExtraNotes] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [keywordsRaw, setKeywordsRaw] = useState("");
@@ -20,8 +25,16 @@ export default function StoreAnalyzer() {
       toast.error("أضف مفتاح Gemini API من الإعدادات ⚙️");
       return;
     }
-    if (!title.trim() && !description.trim() && keywords.length === 0) {
-      toast.error("أدخل على الأقل العنوان أو الوصف أو الكلمات المفتاحية");
+    if (
+      !title.trim() &&
+      !description.trim() &&
+      keywords.length === 0 &&
+      !storeReference.trim() &&
+      !soldSummary.trim() &&
+      !rejectedSummary.trim() &&
+      !keywordFocus.trim()
+    ) {
+      toast.error("أدخل بيانات المحتوى أو بيانات المتجر للتحليل");
       return;
     }
     setLoading(true);
@@ -31,7 +44,14 @@ export default function StoreAnalyzer() {
         title.trim() || "(غير محدد)",
         description.trim() || "(غير محدد)",
         keywords,
-        rejectionReason.trim() || undefined
+        rejectionReason.trim() || undefined,
+        {
+          storeReference: storeReference.trim() || undefined,
+          soldSummary: soldSummary.trim() || undefined,
+          rejectedSummary: rejectedSummary.trim() || undefined,
+          keywordFocus: keywordFocus.trim() || undefined,
+          notes: extraNotes.trim() || undefined,
+        }
       );
       setAnalysis(result);
       toast.success("✅ تم التحليل بنجاح!");
@@ -58,6 +78,60 @@ export default function StoreAnalyzer() {
         </p>
 
         <div className="space-y-4">
+          <div className="bg-primary/5 border border-primary/20 rounded-md p-3 space-y-3">
+            <h4 className="text-primary font-mono text-xs font-semibold">🏪 بيانات متجرك على Adobe Stock (اختياري)</h4>
+            <div>
+              <label className={labelClass}>رابط الحساب أو اسم المتجر:</label>
+              <input
+                type="text"
+                value={storeReference}
+                onChange={(e) => setStoreReference(e.target.value)}
+                placeholder="مثال: https://stock.adobe.com/contributor/... أو اسم الحساب"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>ما تم بيعه أو الأداء الحالي:</label>
+              <textarea
+                value={soldSummary}
+                onChange={(e) => setSoldSummary(e.target.value)}
+                placeholder="مثال: مبيعات جيدة في خلفيات الأعمال - انخفاض في الطبيعة..."
+                className={`${inputClass} min-h-[60px]`}
+                rows={2}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>ملخص أسباب الرفض السابقة:</label>
+              <textarea
+                value={rejectedSummary}
+                onChange={(e) => setRejectedSummary(e.target.value)}
+                placeholder="مثال: مشاكل Trademark / جودة تقنية / تكرار..."
+                className={`${inputClass} min-h-[60px]`}
+                rows={2}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>مجال الكلمات المفتاحية المطلوب تحليله:</label>
+              <input
+                type="text"
+                value={keywordFocus}
+                onChange={(e) => setKeywordFocus(e.target.value)}
+                placeholder="مثال: cooking, business, ai backgrounds"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>ملاحظات إضافية:</label>
+              <textarea
+                value={extraNotes}
+                onChange={(e) => setExtraNotes(e.target.value)}
+                placeholder="أي تفاصيل إضافية تساعد في التحليل..."
+                className={`${inputClass} min-h-[60px]`}
+                rows={2}
+              />
+            </div>
+          </div>
+
           <div>
             <label className={labelClass}>العنوان (Title):</label>
             <input

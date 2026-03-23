@@ -102,7 +102,11 @@ export default function ApiKeySettings() {
           <button onClick={() => setShowGemini(!showGemini)} className="bg-card border-2 border-primary text-primary px-3 rounded-md text-xs font-mono hover:bg-primary/10 transition-all shrink-0">{showGemini ? "🙈" : "👁️"}</button>
         </div>
         {geminiKeys.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          <div className="space-y-2">
+            <p className="text-[10px] text-secondary font-mono">
+              النظام يستخدم المفاتيح بالتناوب (Round-Robin) تلقائياً، وينتقل للمفتاح التالي عند أي مشكلة حصة/صلاحية.
+            </p>
+            <div className="flex flex-wrap gap-2">
             {geminiKeys.map((key, index) => (
               <button
                 key={`${key}-${index}`}
@@ -120,6 +124,7 @@ export default function ApiKeySettings() {
                 API {index + 1} • {key.slice(0, 8)}...{key.slice(-4)} ×
               </button>
             ))}
+            </div>
           </div>
         )}
         {geminiResult && <div className={`rounded-md p-2.5 font-mono text-xs border ${geminiResult.ok ? "bg-primary/10 border-primary/30 text-primary" : "bg-destructive/10 border-destructive/30 text-destructive"}`}>{geminiResult.message}</div>}

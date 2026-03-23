@@ -2,6 +2,7 @@ import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX } from "@/lib/adobeS
 
 const GEMINI_STORAGE_KEY = "gemini_api_key";
 const GEMINI_STORAGE_KEYS = "gemini_api_keys";
+const GEMINI_STORAGE_LAST_KEY_INDEX = "gemini_api_last_key_index";
 const GEMINI_MODELS = [
   "gemini-2.5-flash-lite", // أعلى حصة مجانية: 1000 طلب/يوم
   "gemini-2.0-flash",
@@ -47,6 +48,28 @@ function getGeminiApiKey(): string {
 
 function getGeminiUrl(model: string, apiVersion: string, apiKey = getGeminiApiKey()): string {
   return `https://generativelanguage.googleapis.com/${apiVersion}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+}
+
+function getLastGeminiKeyIndex(): number {
+  try {
+    const raw = localStorage.getItem(GEMINI_STORAGE_LAST_KEY_INDEX);
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function setLastGeminiKeyIndex(index: number): void {
+  try {
+    localStorage.setItem(GEMINI_STORAGE_LAST_KEY_INDEX, String(Math.max(0, Math.floor(index))));
+  } catch {}
+}
+
+function buildRotatedKeyPool(keys: string[]): string[] {
+  if (keys.length <= 1) return keys;
+  const start = getLastGeminiKeyIndex() % keys.length;
+  return [...keys.slice(start), ...keys.slice(0, start)];
 }
 
 export function setUserGeminiApiKey(key: string) {
@@ -248,7 +271,8 @@ export async function validateGeminiApiKey(key: string): Promise<{ ok: boolean; 
 export async function generateWithGemini(prompt: string, temperature = 1.4): Promise<string> {
   const storedKeys = readStoredGeminiApiKeys();
   const envKey = (import.meta.env.VITE_GEMINI_API_KEY || "").trim();
-  const apiKeys = storedKeys.length > 0 ? storedKeys : (envKey ? [envKey] : []);
+  const apiKeysBase = storedKeys.length > 0 ? storedKeys : (envKey ? [envKey] : []);
+  const apiKeys = buildRotatedKeyPool(apiKeysBase);
   if (apiKeys.length === 0) throw new Error("NO_API_KEY: No API key configured");
 
   const body = JSON.stringify({
@@ -258,7 +282,8 @@ export async function generateWithGemini(prompt: string, temperature = 1.4): Pro
 
   let lastError: unknown = new Error("Unknown Gemini error");
 
-  for (const apiKey of apiKeys) {
+  for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex++) {
+    const apiKey = apiKeys[keyIndex];
     for (const version of GEMINI_API_VERSIONS) {
       for (const model of GEMINI_MODELS) {
         try {
@@ -269,7 +294,12 @@ export async function generateWithGemini(prompt: string, temperature = 1.4): Pro
           });
           const data = await response.json();
           const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) return text;
+          if (text) {
+            // Move pointer to next key for round-robin distribution.
+            const absoluteNext = (getLastGeminiKeyIndex() + keyIndex + 1) % Math.max(1, apiKeysBase.length);
+            setLastGeminiKeyIndex(absoluteNext);
+            return text;
+          }
           lastError = new Error("EMPTY_GEMINI_RESPONSE: لم يتم الحصول على رد");
         } catch (error) {
           lastError = error;
@@ -479,10 +509,26 @@ export async function analyzeRejectionOrLowSales(
   title: string,
   description: string,
   keywords: string[],
-  rejectionReason?: string
+  rejectionReason?: string,
+  storeContext?: {
+    storeReference?: string;
+    soldSummary?: string;
+    rejectedSummary?: string;
+    keywordFocus?: string;
+    notes?: string;
+  }
 ): Promise<string> {
   const kwStr = keywords?.join(", ") || "(لا توجد)";
   const rejectNote = rejectionReason ? `سبب الرفض المذكور: ${rejectionReason}.` : "المحتوى مرفوض أو مبيعاته منخفضة.";
+  const extraStoreContext = storeContext ? `
+
+سياق المتجر (Adobe Stock):
+- رابط/اسم الحساب: ${storeContext.storeReference?.trim() || "(غير محدد)"}
+- ما تم بيعه/الأداء: ${storeContext.soldSummary?.trim() || "(غير محدد)"}
+- ملخص الرفض السابق: ${storeContext.rejectedSummary?.trim() || "(غير محدد)"}
+- مجال الكلمات المفتاحية المطلوب تحليله: ${storeContext.keywordFocus?.trim() || "(غير محدد)"}
+- ملاحظات إضافية: ${storeContext.notes?.trim() || "(لا توجد)"}
+` : "";
   return generateWithGemini(`أنت خبير Adobe Stock يساعد المساهمين في تحسين محتواهم.
 
 المساهم يريد تحليل المحتوى التالي:
@@ -491,6 +537,7 @@ export async function analyzeRejectionOrLowSales(
 - Keywords: ${kwStr}
 
 ${rejectNote}
+${extraStoreContext}
 
 قدم تحليلاً بالعربية يشمل:
 1. أسباب محتملة للرفض أو قلة المبيعات
