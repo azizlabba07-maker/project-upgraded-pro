@@ -5,6 +5,7 @@ import {
   getUserGeminiApiKeys,
   removeUserGeminiApiKey,
   setUserGeminiApiKey,
+  validateAllGeminiApiKeys,
   validateGeminiApiKey,
 } from "@/lib/gemini";
 import { getClaudeApiKey, setClaudeApiKey, validateClaudeKey, isClaudeProxyEnabled } from "@/lib/claude";
@@ -15,7 +16,9 @@ export default function ApiKeySettings() {
   const [geminiKeys, setGeminiKeys] = useState<string[]>(getUserGeminiApiKeys());
   const [showGemini, setShowGemini] = useState(false);
   const [savingGemini, setSavingGemini] = useState(false);
+  const [checkingGeminiKeys, setCheckingGeminiKeys] = useState(false);
   const [geminiResult, setGeminiResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [geminiHealth, setGeminiHealth] = useState<Record<string, { status: string; message: string }>>({});
 
   const [claudeKey, setClaudeKeyState] = useState(getClaudeApiKey());
   const [showClaude, setShowClaude] = useState(false);
@@ -71,6 +74,25 @@ export default function ApiKeySettings() {
   };
 
   const inputClass = "bg-card border-2 border-primary text-primary p-2.5 rounded-md font-mono text-xs focus:outline-none focus:box-glow-strong w-full";
+
+  const handleCheckAllGeminiKeys = async () => {
+    if (geminiKeys.length === 0) {
+      toast.error("لا توجد مفاتيح Gemini للفحص.");
+      return;
+    }
+    setCheckingGeminiKeys(true);
+    try {
+      const results = await validateAllGeminiApiKeys();
+      const next: Record<string, { status: string; message: string }> = {};
+      for (const r of results) {
+        next[r.key] = { status: r.status, message: r.message };
+      }
+      setGeminiHealth(next);
+      toast.success("✅ تم فحص جميع مفاتيح Gemini");
+    } finally {
+      setCheckingGeminiKeys(false);
+    }
+  };
 
   return (
     <div className="space-y-5 animate-fade-in max-w-2xl mx-auto">
@@ -130,8 +152,29 @@ export default function ApiKeySettings() {
         {geminiResult && <div className={`rounded-md p-2.5 font-mono text-xs border ${geminiResult.ok ? "bg-primary/10 border-primary/30 text-primary" : "bg-destructive/10 border-destructive/30 text-destructive"}`}>{geminiResult.message}</div>}
         <div className="flex gap-3">
           <button onClick={handleAddGeminiKey} disabled={savingGemini || !geminiKey.trim()} className="flex-1 gradient-primary text-primary-foreground py-2.5 rounded-md font-mono text-xs font-semibold box-glow-strong hover:scale-[1.02] transition-all disabled:opacity-40">{savingGemini ? "⏳ جارِ الإضافة..." : "💾 إضافة Gemini API"}</button>
+          <button onClick={handleCheckAllGeminiKeys} disabled={checkingGeminiKeys || geminiKeys.length === 0} className="bg-card border-2 border-primary text-primary px-4 py-2.5 rounded-md font-mono text-xs font-semibold hover:bg-primary/10 transition-all disabled:opacity-40">
+            {checkingGeminiKeys ? "⏳" : "🧪 فحص الكل"}
+          </button>
           {geminiKeys.length > 0 && <button onClick={() => { setGeminiKeyState(""); setUserGeminiApiKey(""); setGeminiKeys([]); setGeminiResult(null); notifyKeyUpdated(false); toast.success("تمت إزالة كل مفاتيح Gemini."); }} className="bg-card border-2 border-destructive text-destructive px-4 py-2.5 rounded-md font-mono text-xs font-semibold hover:bg-destructive/10 transition-all">🗑️</button>}
         </div>
+        {Object.keys(geminiHealth).length > 0 && (
+          <div className="space-y-1">
+            {geminiKeys.map((key) => {
+              const h = geminiHealth[key];
+              if (!h) return null;
+              const badge =
+                h.status === "valid" ? "✅ صالح" :
+                h.status === "quota" ? "⚠️ حصة منتهية" :
+                h.status === "auth" ? "❌ مقيّد/غير صالح" :
+                h.status === "network" ? "🌐 شبكة" : "❔ غير معروف";
+              return (
+                <div key={`health-${key}`} className="text-[10px] font-mono text-secondary bg-primary/5 border border-primary/20 rounded px-2 py-1">
+                  {key.slice(0, 8)}...{key.slice(-4)} — {badge}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Claude Key */}

@@ -50,8 +50,17 @@ export default function ToolsSection() {
         result = await generateClaudeKeywords(topic, keywordCount);
         toast.success("✅ تم التوليد بـ Claude AI!");
       } else {
-        result = await generateAIKeywords(topic, keywordCount);
-        toast.success("✅ تم التوليد بـ Gemini AI!");
+        try {
+          result = await generateAIKeywords(topic, keywordCount);
+          toast.success("✅ تم التوليد بـ Gemini AI!");
+        } catch {
+          if (hasClaudeKey()) {
+            result = await generateClaudeKeywords(topic, keywordCount);
+            toast.success("✅ تم التحويل تلقائياً إلى Claude");
+          } else {
+            throw new Error("fallback-local");
+          }
+        }
       }
       setKeywords(result);
     } catch {
@@ -77,7 +86,10 @@ export default function ToolsSection() {
     setLoadingTop(true);
     setTopKeywords([]);
     try {
-      const result = await getTopKeywordsForDomain(topic, 50);
+      let result = await getTopKeywordsForDomain(topic, 50);
+      if (result.length === 0 && hasClaudeKey()) {
+        result = await generateClaudeKeywords(topic, 50);
+      }
       setTopKeywords(result);
       toast.success(`✅ تم اكتشاف ${result.length} كلمة شائعة في مجال "${topic}"!`);
     } catch {

@@ -8,6 +8,7 @@ import {
   type VideoPromptResult,
   type GeminiStockPrompt,
 } from "@/lib/gemini";
+import { generateStockPrompts, hasClaudeKey } from "@/lib/claude";
 import { getPromptEvolutionHint } from "@/lib/promptEvolution";
 import { toast } from "sonner";
 
@@ -215,6 +216,26 @@ function isPromptCategoryValid(prompt: string, category: string): boolean {
   return guard.some((kw) => text.includes(kw));
 }
 
+async function copyTextSafely(value: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+    const ta = document.createElement("textarea");
+    ta.value = value;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function generateLocalVideoPrompts(category: string, count: number): VideoPromptResult[] {
   const subjects = CATEGORY_SUBJECTS[category] || CATEGORY_SUBJECTS.Nature;
   const environments = CATEGORY_ENVIRONMENTS[category] || CATEGORY_ENVIRONMENTS.Nature;
@@ -302,14 +323,26 @@ export default function PromptGenerator() {
         if (advancedMode && batchTitles.length > 0) {
           const allResults: DisplayPrompt[] = [];
           for (const title of batchTitles) {
-            const result = await generateGeminiStockPrompts(
+            const baseHint = `${title}. ${evolutionHint}`.trim();
+            let result = await generateGeminiStockPrompts(
               category,
               promptCount,
               outputType,
               selectedTrends,
               competition,
-              `${title}. ${evolutionHint}`.trim()
+              baseHint
             );
+            const firstValid = (result as DisplayPrompt[]).filter((item) => isPromptCategoryValid(item.prompt, category));
+            if (firstValid.length === 0) {
+              result = await generateGeminiStockPrompts(
+                category,
+                promptCount,
+                outputType,
+                selectedTrends,
+                competition,
+                `${baseHint}. CRITICAL: return ONLY ${category} content`
+              );
+            }
             allResults.push(
               ...(result as DisplayPrompt[]).map((item) => ({
                 ...item,
@@ -325,7 +358,7 @@ export default function PromptGenerator() {
           }
           toast.success(`✅ تم توليد ${finalList.length} برومبت لـ ${batchTitles.length} عنوان`);
         } else if (advancedMode) {
-          const result = await generateGeminiStockPrompts(
+          let result = await generateGeminiStockPrompts(
             category,
             promptCount,
             outputType,
@@ -333,7 +366,18 @@ export default function PromptGenerator() {
             competition,
             evolutionHint || undefined
           );
-          const validated = (result as DisplayPrompt[]).filter((item) => isPromptCategoryValid(item.prompt, category));
+          let validated = (result as DisplayPrompt[]).filter((item) => isPromptCategoryValid(item.prompt, category));
+          if (validated.length === 0) {
+            result = await generateGeminiStockPrompts(
+              category,
+              promptCount,
+              outputType,
+              selectedTrends,
+              competition,
+              `${evolutionHint || ""}. CRITICAL: return ONLY ${category} content`
+            );
+            validated = (result as DisplayPrompt[]).filter((item) => isPromptCategoryValid(item.prompt, category));
+          }
           const finalList = validated.length > 0 ? validated : (result as DisplayPrompt[]);
           setPrompts(finalList);
           if (validated.length !== (result as DisplayPrompt[]).length) {
@@ -356,6 +400,23 @@ export default function PromptGenerator() {
     } catch (error) {
       const errorType = classifyGeminiError(error);
       toast.error(getGeminiErrorUserMessage(error));
+      if (advancedMode && hasClaudeKey()) {
+        try {
+          const claudeOutputType = outputType === "both" ? "both" : outputType === "video" ? "video" : "image";
+          const claudeResult = await generateStockPrompts(
+            category,
+            promptCount,
+            claudeOutputType,
+            selectedTrends,
+            competition
+          );
+          setPrompts(claudeResult.map((p, i) => ({ ...p, number: i + 1, category: p.category || category })));
+          toast.success("✅ تم التحويل تلقائيًا إلى Claude");
+          return;
+        } catch {
+          // Continue to local fallback.
+        }
+      }
       if (errorType === "quota" || errorType === "rate_limit") {
         setUseAI(false);
       }
@@ -367,18 +428,8 @@ export default function PromptGenerator() {
 
   const copyPrompt = async (text: string) => {
     try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        ta.style.position = "fixed";
-        ta.style.left = "-9999px";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-      }
+      const ok = await copyTextSafely(text);
+      if (!ok) throw new Error();
       toast.success("تم النسخ!");
     } catch {
       toast.error("تعذر النسخ — جرّب المتصفح Chrome أو تأكد من HTTPS");
@@ -395,22 +446,40 @@ export default function PromptGenerator() {
       return line;
     }).join("\n\n");
     try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(table);
-      } else {
-        const ta = document.createElement("textarea");
-        ta.value = table;
-        ta.style.position = "fixed";
-        ta.style.left = "-9999px";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-      }
+      const ok = await copyTextSafely(table);
+      if (!ok) throw new Error();
       toast.success("تم نسخ جميع البرومبتات!");
     } catch {
       toast.error("تعذر نسخ الكل");
     }
+  };
+
+  const exportCsv = () => {
+    if (prompts.length === 0) {
+      toast.error("لا توجد نتائج للتصدير.");
+      return;
+    }
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const header = ["number", "category", "type", "title", "keywords", "prompt"].join(",");
+    const rows = prompts.map((p) =>
+      [
+        p.number,
+        esc(p.category || ""),
+        esc(p.type || ""),
+        esc(p.title || ""),
+        esc((p.keywords || []).join(" | ")),
+        esc(p.prompt || ""),
+      ].join(",")
+    );
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `gemini-prompts-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("تم تصدير CSV");
   };
 
   const selectClass = "bg-card border-2 border-primary text-primary p-2.5 rounded-md font-mono text-xs focus:outline-none focus:box-glow-strong w-full mb-3";
@@ -605,6 +674,12 @@ export default function PromptGenerator() {
                 className="gradient-primary text-primary-foreground px-4 py-1.5 rounded text-xs font-semibold font-mono hover:box-glow-strong transition-all"
               >
                 📋 نسخ الكل
+              </button>
+              <button
+                onClick={exportCsv}
+                className="bg-card border-2 border-primary text-primary px-3 py-1.5 rounded text-xs font-semibold font-mono hover:bg-primary/10 transition-all"
+              >
+                ⬇ CSV
               </button>
             </div>
           </div>

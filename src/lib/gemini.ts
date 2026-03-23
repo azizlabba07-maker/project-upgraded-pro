@@ -119,6 +119,28 @@ export function removeUserGeminiApiKey(key: string): void {
   } catch {}
 }
 
+export type GeminiKeyHealthStatus = "valid" | "quota" | "auth" | "network" | "unknown";
+
+export async function validateAllGeminiApiKeys(): Promise<Array<{ key: string; status: GeminiKeyHealthStatus; message: string }>> {
+  const keys = readStoredGeminiApiKeys();
+  const results: Array<{ key: string; status: GeminiKeyHealthStatus; message: string }> = [];
+  for (const key of keys) {
+    const check = await validateGeminiApiKey(key);
+    const normalized = check.message.toLowerCase();
+    let status: GeminiKeyHealthStatus = "unknown";
+    if (check.ok && normalized.includes("صالح")) status = "valid";
+    else if (normalized.includes("الحصة") || normalized.includes("quota")) status = "quota";
+    else if (normalized.includes("غير صالح") || normalized.includes("مقيّد") || normalized.includes("403")) status = "auth";
+    else if (normalized.includes("الاتصال") || normalized.includes("network")) status = "network";
+    results.push({
+      key,
+      status,
+      message: check.message,
+    });
+  }
+  return results;
+}
+
 export function hasAnyApiKey(): boolean {
   return readStoredGeminiApiKeys().length > 0 || Boolean((import.meta.env.VITE_GEMINI_API_KEY || "").trim());
 }
