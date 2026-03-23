@@ -1,6 +1,7 @@
 import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX } from "@/lib/adobeStockCompliance";
 
 const GEMINI_STORAGE_KEY = "gemini_api_key";
+const GEMINI_STORAGE_KEYS = "gemini_api_keys";
 const GEMINI_MODELS = [
   "gemini-2.5-flash-lite", // أعلى حصة مجانية: 1000 طلب/يوم
   "gemini-2.0-flash",
@@ -11,9 +12,28 @@ const GEMINI_API_VERSIONS = ["v1", "v1beta"];
 
 function readStoredGeminiApiKey(): string {
   try {
+    const list = readStoredGeminiApiKeys();
+    if (list.length > 0) return list[0];
     return localStorage.getItem(GEMINI_STORAGE_KEY) || "";
   } catch {
     return "";
+  }
+}
+
+function readStoredGeminiApiKeys(): string[] {
+  try {
+    const raw = localStorage.getItem(GEMINI_STORAGE_KEYS);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(parsed)) {
+      const cleaned = parsed
+        .map((v) => (typeof v === "string" ? v.trim() : ""))
+        .filter(Boolean);
+      if (cleaned.length > 0) return Array.from(new Set(cleaned));
+    }
+    const legacy = localStorage.getItem(GEMINI_STORAGE_KEY)?.trim();
+    return legacy ? [legacy] : [];
+  } catch {
+    return [];
   }
 }
 
@@ -33,8 +53,10 @@ export function setUserGeminiApiKey(key: string) {
   try {
     if (key.trim()) {
       localStorage.setItem(GEMINI_STORAGE_KEY, key.trim());
+      localStorage.setItem(GEMINI_STORAGE_KEYS, JSON.stringify([key.trim()]));
     } else {
       localStorage.removeItem(GEMINI_STORAGE_KEY);
+      localStorage.removeItem(GEMINI_STORAGE_KEYS);
     }
   } catch {}
 }
@@ -43,8 +65,39 @@ export function getUserGeminiApiKey(): string {
   return readStoredGeminiApiKey();
 }
 
+export function getUserGeminiApiKeys(): string[] {
+  return readStoredGeminiApiKeys();
+}
+
+export function addUserGeminiApiKey(key: string): { added: boolean; reason?: "exists" | "limit" | "empty" } {
+  const trimmed = key.trim();
+  if (!trimmed) return { added: false, reason: "empty" };
+  const current = readStoredGeminiApiKeys();
+  if (current.some((k) => k === trimmed)) return { added: false, reason: "exists" };
+  if (current.length >= 10) return { added: false, reason: "limit" };
+  const next = [...current, trimmed];
+  try {
+    localStorage.setItem(GEMINI_STORAGE_KEYS, JSON.stringify(next));
+    localStorage.setItem(GEMINI_STORAGE_KEY, next[0]);
+  } catch {}
+  return { added: true };
+}
+
+export function removeUserGeminiApiKey(key: string): void {
+  const next = readStoredGeminiApiKeys().filter((k) => k !== key);
+  try {
+    if (next.length === 0) {
+      localStorage.removeItem(GEMINI_STORAGE_KEY);
+      localStorage.removeItem(GEMINI_STORAGE_KEYS);
+      return;
+    }
+    localStorage.setItem(GEMINI_STORAGE_KEYS, JSON.stringify(next));
+    localStorage.setItem(GEMINI_STORAGE_KEY, next[0]);
+  } catch {}
+}
+
 export function hasAnyApiKey(): boolean {
-  return Boolean(getGeminiApiKey().trim());
+  return readStoredGeminiApiKeys().length > 0 || Boolean((import.meta.env.VITE_GEMINI_API_KEY || "").trim());
 }
 
 type GeminiErrorPayload = {
@@ -193,8 +246,10 @@ export async function validateGeminiApiKey(key: string): Promise<{ ok: boolean; 
 }
 
 export async function generateWithGemini(prompt: string, temperature = 1.4): Promise<string> {
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) throw new Error("NO_API_KEY: No API key configured");
+  const storedKeys = readStoredGeminiApiKeys();
+  const envKey = (import.meta.env.VITE_GEMINI_API_KEY || "").trim();
+  const apiKeys = storedKeys.length > 0 ? storedKeys : (envKey ? [envKey] : []);
+  if (apiKeys.length === 0) throw new Error("NO_API_KEY: No API key configured");
 
   const body = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
@@ -203,26 +258,38 @@ export async function generateWithGemini(prompt: string, temperature = 1.4): Pro
 
   let lastError: unknown = new Error("Unknown Gemini error");
 
-  for (const version of GEMINI_API_VERSIONS) {
-    for (const model of GEMINI_MODELS) {
-      try {
-        const response = await fetchWithRetry(getGeminiUrl(model, version, apiKey), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body,
-        });
-        const data = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
-        lastError = new Error("EMPTY_GEMINI_RESPONSE: لم يتم الحصول على رد");
-      } catch (error) {
-        lastError = error;
-        const msg = error instanceof Error ? error.message.toLowerCase() : "";
-        // Keep trying model/version only for unsupported model/version errors.
-        if (msg.includes("not found") || msg.includes("is not supported for generatecontent")) {
-          continue;
+  for (const apiKey of apiKeys) {
+    for (const version of GEMINI_API_VERSIONS) {
+      for (const model of GEMINI_MODELS) {
+        try {
+          const response = await fetchWithRetry(getGeminiUrl(model, version, apiKey), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body,
+          });
+          const data = await response.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) return text;
+          lastError = new Error("EMPTY_GEMINI_RESPONSE: لم يتم الحصول على رد");
+        } catch (error) {
+          lastError = error;
+          const msg = error instanceof Error ? error.message.toLowerCase() : "";
+          // Keep trying model/version only for unsupported model/version errors.
+          if (msg.includes("not found") || msg.includes("is not supported for generatecontent")) {
+            continue;
+          }
+          // If this key is throttled/quota/auth-limited, try next configured key.
+          if (
+            msg.includes("gemini_quota_daily_exceeded") ||
+            msg.includes("api_error_429") ||
+            msg.includes("api_error_401") ||
+            msg.includes("api_error_403") ||
+            msg.includes("api key not valid")
+          ) {
+            break;
+          }
+          throw error;
         }
-        throw error;
       }
     }
   }

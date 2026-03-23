@@ -1,10 +1,18 @@
 import { useState } from "react";
-import { getUserGeminiApiKey, setUserGeminiApiKey, validateGeminiApiKey } from "@/lib/gemini";
+import {
+  addUserGeminiApiKey,
+  getUserGeminiApiKey,
+  getUserGeminiApiKeys,
+  removeUserGeminiApiKey,
+  setUserGeminiApiKey,
+  validateGeminiApiKey,
+} from "@/lib/gemini";
 import { getClaudeApiKey, setClaudeApiKey, validateClaudeKey, isClaudeProxyEnabled } from "@/lib/claude";
 import { toast } from "sonner";
 
 export default function ApiKeySettings() {
   const [geminiKey, setGeminiKeyState] = useState(getUserGeminiApiKey());
+  const [geminiKeys, setGeminiKeys] = useState<string[]>(getUserGeminiApiKeys());
   const [showGemini, setShowGemini] = useState(false);
   const [savingGemini, setSavingGemini] = useState(false);
   const [geminiResult, setGeminiResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -19,15 +27,29 @@ export default function ApiKeySettings() {
     window.dispatchEvent(new CustomEvent("gemini-key-updated", { detail: { hasKey } }));
   };
 
-  const handleSaveGemini = async () => {
+  const handleAddGeminiKey = async () => {
     const trimmed = geminiKey.trim();
-    if (!trimmed) { setUserGeminiApiKey(""); setGeminiKeyState(""); setGeminiResult(null); notifyKeyUpdated(false); toast.success("تم إزالة مفتاح Gemini."); return; }
+    if (!trimmed) return;
     setSavingGemini(true);
     try {
       const v = await validateGeminiApiKey(trimmed);
       setGeminiResult(v);
       if (!v.ok && !v.message.includes("صالح")) { toast.error(v.message); return; }
-      setUserGeminiApiKey(trimmed); notifyKeyUpdated(true); toast.success("✅ تم حفظ مفتاح Gemini!");
+      const added = addUserGeminiApiKey(trimmed);
+      if (!added.added) {
+        if (added.reason === "exists") {
+          toast.error("هذا المفتاح مضاف بالفعل.");
+        } else if (added.reason === "limit") {
+          toast.error("الحد الأقصى 10 مفاتيح Gemini.");
+        } else {
+          toast.error("تعذر إضافة المفتاح.");
+        }
+        return;
+      }
+      setGeminiKeys(getUserGeminiApiKeys());
+      setGeminiKeyState("");
+      notifyKeyUpdated(true);
+      toast.success("✅ تم إضافة API جديد لـ Gemini!");
     } finally { setSavingGemini(false); }
   };
 
@@ -68,12 +90,42 @@ export default function ApiKeySettings() {
         </div>
         <div className="flex gap-2">
           <input type={showGemini ? "text" : "password"} value={geminiKey} onChange={(e) => setGeminiKeyState(e.target.value)} placeholder="AIzaSy..." className={inputClass} dir="ltr" />
+          <button
+            onClick={handleAddGeminiKey}
+            disabled={savingGemini || !geminiKey.trim()}
+            className="gradient-primary text-primary-foreground px-3 rounded-md text-sm font-mono font-semibold transition-all shrink-0 disabled:opacity-40"
+            aria-label="إضافة API جديد لـ Gemini"
+            title="إضافة API جديد"
+          >
+            +
+          </button>
           <button onClick={() => setShowGemini(!showGemini)} className="bg-card border-2 border-primary text-primary px-3 rounded-md text-xs font-mono hover:bg-primary/10 transition-all shrink-0">{showGemini ? "🙈" : "👁️"}</button>
         </div>
+        {geminiKeys.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {geminiKeys.map((key, index) => (
+              <button
+                key={`${key}-${index}`}
+                type="button"
+                onClick={() => {
+                  removeUserGeminiApiKey(key);
+                  const next = getUserGeminiApiKeys();
+                  setGeminiKeys(next);
+                  if (next.length === 0) notifyKeyUpdated(false);
+                  toast.success("تم حذف مفتاح Gemini.");
+                }}
+                className="text-[10px] font-mono px-2 py-1 rounded border border-primary/30 bg-primary/10 text-primary hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40 transition-colors"
+                title="حذف هذا المفتاح"
+              >
+                API {index + 1} • {key.slice(0, 8)}...{key.slice(-4)} ×
+              </button>
+            ))}
+          </div>
+        )}
         {geminiResult && <div className={`rounded-md p-2.5 font-mono text-xs border ${geminiResult.ok ? "bg-primary/10 border-primary/30 text-primary" : "bg-destructive/10 border-destructive/30 text-destructive"}`}>{geminiResult.message}</div>}
         <div className="flex gap-3">
-          <button onClick={handleSaveGemini} disabled={savingGemini || !geminiKey.trim()} className="flex-1 gradient-primary text-primary-foreground py-2.5 rounded-md font-mono text-xs font-semibold box-glow-strong hover:scale-[1.02] transition-all disabled:opacity-40">{savingGemini ? "⏳ جارِ الحفظ..." : "💾 حفظ Gemini Key"}</button>
-          {getUserGeminiApiKey() && <button onClick={() => { setGeminiKeyState(""); setUserGeminiApiKey(""); setGeminiResult(null); notifyKeyUpdated(false); toast.success("تم الإزالة."); }} className="bg-card border-2 border-destructive text-destructive px-4 py-2.5 rounded-md font-mono text-xs font-semibold hover:bg-destructive/10 transition-all">🗑️</button>}
+          <button onClick={handleAddGeminiKey} disabled={savingGemini || !geminiKey.trim()} className="flex-1 gradient-primary text-primary-foreground py-2.5 rounded-md font-mono text-xs font-semibold box-glow-strong hover:scale-[1.02] transition-all disabled:opacity-40">{savingGemini ? "⏳ جارِ الإضافة..." : "💾 إضافة Gemini API"}</button>
+          {geminiKeys.length > 0 && <button onClick={() => { setGeminiKeyState(""); setUserGeminiApiKey(""); setGeminiKeys([]); setGeminiResult(null); notifyKeyUpdated(false); toast.success("تمت إزالة كل مفاتيح Gemini."); }} className="bg-card border-2 border-destructive text-destructive px-4 py-2.5 rounded-md font-mono text-xs font-semibold hover:bg-destructive/10 transition-all">🗑️</button>}
         </div>
       </div>
 
@@ -111,8 +163,8 @@ export default function ApiKeySettings() {
         <h4 className="text-sm font-semibold text-primary font-mono mb-3">📊 حالة المفاتيح</h4>
         <div className="space-y-2 font-mono text-xs">
           <div className="flex items-center gap-2">
-            <span className={getUserGeminiApiKey() ? "text-primary" : "text-destructive"}>{getUserGeminiApiKey() ? "✅" : "⚠️"}</span>
-            <span className="text-secondary">Gemini: {getUserGeminiApiKey() ? "مفعّل — تحليل السوق، التراندات" : "غير مفعّل"}</span>
+            <span className={geminiKeys.length > 0 ? "text-primary" : "text-destructive"}>{geminiKeys.length > 0 ? "✅" : "⚠️"}</span>
+            <span className="text-secondary">Gemini: {geminiKeys.length > 0 ? `مفعّل — ${geminiKeys.length} API` : "غير مفعّل"}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className={(proxyEnabled || getClaudeApiKey()) ? "text-accent" : "text-destructive"}>{(proxyEnabled || getClaudeApiKey()) ? "✅" : "⚠️"}</span>
