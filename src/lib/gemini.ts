@@ -296,7 +296,8 @@ export async function generateGeminiStockPrompts(
   count: number,
   outputType: "image" | "video" | "both",
   trends: string[],
-  competition: string
+  competition: string,
+  topicHint?: string
 ): Promise<GeminiStockPrompt[]> {
   const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const strictRules = CATEGORY_STRICT_RULES.replace(/\{CATEGORY\}/g, category);
@@ -310,6 +311,9 @@ export async function generateGeminiStockPrompts(
     "avoid oversaturated generic topics";
 
   const trendsStr = trends.length > 0 ? `Trends to incorporate: ${trends.join(", ")}.` : "";
+  const topicConstraint = topicHint?.trim()
+    ? `USER TITLE/TOPIC TO FOLLOW STRICTLY: "${topicHint.trim()}". Every prompt must stay aligned with this title and category.`
+    : "";
 
   const prompt = `You are an expert Adobe Stock prompt engineer. Generate exactly ${count} prompts.
 
@@ -321,6 +325,7 @@ UNIQUENESS SEED: ${seed}
 OUTPUT TYPE: ${typeReq}
 COMPETITION: ${compReq}
 ${trendsStr}
+${topicConstraint}
 
 ${ADOBE_AI_PROMPT_RULES}
 

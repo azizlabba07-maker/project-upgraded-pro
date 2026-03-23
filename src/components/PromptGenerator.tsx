@@ -228,9 +228,30 @@ export default function PromptGenerator() {
   const [outputType, setOutputType] = useState<"image" | "video" | "both">("video");
   const [competition, setCompetition] = useState("medium");
   const [selectedTrends, setSelectedTrends] = useState<string[]>(["AI Visuals", "Clean Backgrounds"]);
+  const [batchTitleInput, setBatchTitleInput] = useState("");
+  const [batchTitles, setBatchTitles] = useState<string[]>([]);
 
   const toggleTrend = (t: string) =>
     setSelectedTrends((prev) => prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]);
+
+  const addBatchTitle = () => {
+    const trimmed = batchTitleInput.trim();
+    if (!trimmed) return;
+    if (batchTitles.length >= 20) {
+      toast.error("الحد الأقصى 20 عنوان");
+      return;
+    }
+    if (batchTitles.some((t) => t.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error("هذا العنوان مضاف مسبقاً");
+      return;
+    }
+    setBatchTitles((prev) => [...prev, trimmed]);
+    setBatchTitleInput("");
+  };
+
+  const removeBatchTitle = (index: number) => {
+    setBatchTitles((prev) => prev.filter((_, i) => i !== index));
+  };
 
   useEffect(() => {
     const onKeyUpdated = (event: Event) => {
@@ -250,14 +271,35 @@ export default function PromptGenerator() {
 
     try {
       if (useAI && hasAnyApiKey()) {
-        if (advancedMode) {
+        if (advancedMode && batchTitles.length > 0) {
+          const allResults: DisplayPrompt[] = [];
+          for (const title of batchTitles) {
+            const result = await generateGeminiStockPrompts(
+              category,
+              promptCount,
+              outputType,
+              selectedTrends,
+              competition,
+              title
+            );
+            allResults.push(
+              ...(result as DisplayPrompt[]).map((item) => ({
+                ...item,
+                title: item.title ? `${item.title} | Seed: ${title}` : `Seed: ${title}`,
+              }))
+            );
+          }
+          setPrompts(allResults.map((item, idx) => ({ ...item, number: idx + 1 })));
+          toast.success(`✅ تم توليد ${allResults.length} برومبت لـ ${batchTitles.length} عنوان`);
+        } else if (advancedMode) {
           const result = await generateGeminiStockPrompts(category, promptCount, outputType, selectedTrends, competition);
           setPrompts(result as DisplayPrompt[]);
+          toast.success(`✅ تم توليد ${promptCount} برومبت بالذكاء الاصطناعي!`);
         } else {
           const result = await generateAIVideoPrompts(category, promptCount);
           setPrompts(result as DisplayPrompt[]);
+          toast.success(`✅ تم توليد ${promptCount} برومبت بالذكاء الاصطناعي!`);
         }
-        toast.success(`✅ تم توليد ${promptCount} برومبت بالذكاء الاصطناعي!`);
       } else {
         setPrompts(generateLocalVideoPrompts(category, promptCount) as DisplayPrompt[]);
         toast.success(`تم توليد ${promptCount} برومبت محلياً`);
@@ -339,6 +381,48 @@ export default function PromptGenerator() {
           <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
             {VIDEO_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
+
+          <label className="text-primary text-xs font-semibold font-mono block mb-1.5">
+            عناوين متعددة (اختياري):
+          </label>
+          <div className="flex gap-2 mb-2">
+            <input
+              value={batchTitleInput}
+              onChange={(e) => setBatchTitleInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addBatchTitle();
+                }
+              }}
+              placeholder="اكتب عنواناً ثم اضغط +"
+              className="bg-card border-2 border-primary text-primary p-2.5 rounded-md font-mono text-xs focus:outline-none focus:box-glow-strong w-full"
+            />
+            <button
+              type="button"
+              onClick={addBatchTitle}
+              className="gradient-primary text-primary-foreground px-3 rounded-md font-mono text-sm font-semibold shrink-0"
+              aria-label="إضافة عنوان"
+            >
+              +
+            </button>
+          </div>
+          {batchTitles.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {batchTitles.map((title, index) => (
+                <button
+                  key={`${title}-${index}`}
+                  type="button"
+                  onClick={() => removeBatchTitle(index)}
+                  className="text-[10px] font-mono px-2 py-1 rounded border border-primary/30 bg-primary/10 text-primary hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40 transition-colors"
+                  title="إزالة العنوان"
+                >
+                  {title} ×
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="text-[10px] text-secondary font-mono mb-3">أضف حتى 20 عنواناً بزر +، وسيتم التوليد دفعة واحدة.</p>
 
           <label className="text-primary text-xs font-semibold font-mono block mb-1.5">عدد البرومبتات:</label>
           <select value={promptCount} onChange={(e) => setPromptCount(Number(e.target.value))} className={selectClass}>
