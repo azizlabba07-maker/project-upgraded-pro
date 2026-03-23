@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { checklistItems } from "@/data/marketData";
 import { generateAIKeywords, getTopKeywordsForDomain, hasAnyApiKey } from "@/lib/gemini";
 import { generateClaudeKeywords, hasClaudeKey } from "@/lib/claude";
 import { toast } from "sonner";
 
 export default function ToolsSection() {
+  const NOTES_STORAGE_KEY = "tools_notes_v1";
+  const NOTES_ARCHIVE_STORAGE_KEY = "tools_notes_archive_v1";
+
   // ── Profit Calculator ──
   const [imageCount, setImageCount]     = useState(100);
   const [pricePerImage, setPricePerImage] = useState(5);
@@ -27,6 +30,9 @@ export default function ToolsSection() {
 
   // ── Checklist ──
   const [checked, setChecked] = useState<boolean[]>(new Array(checklistItems.length).fill(false));
+  const [showChecklist, setShowChecklist] = useState(false);
+  const [quickNote, setQuickNote] = useState("");
+  const [savedNotes, setSavedNotes] = useState<string[]>([]);
 
   // ── Title Generator ──
   const [titleDesc, setTitleDesc]       = useState("");
@@ -118,6 +124,49 @@ export default function ToolsSection() {
   const checkedCount = checked.filter(Boolean).length;
   const percentage = Math.round((checkedCount / checklistItems.length) * 100);
   const isReady = percentage === 100;
+
+  useEffect(() => {
+    try {
+      setQuickNote(localStorage.getItem(NOTES_STORAGE_KEY) || "");
+      const saved = localStorage.getItem(NOTES_ARCHIVE_STORAGE_KEY);
+      setSavedNotes(saved ? JSON.parse(saved) : []);
+    } catch {
+      setQuickNote("");
+      setSavedNotes([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(NOTES_STORAGE_KEY, quickNote);
+    } catch {}
+  }, [quickNote]);
+
+  const saveCurrentNote = () => {
+    const trimmed = quickNote.trim();
+    if (!trimmed) {
+      toast.error("اكتب ملاحظة أو برومبت أولاً");
+      return;
+    }
+    if (savedNotes.includes(trimmed)) {
+      toast.error("هذا النص محفوظ بالفعل");
+      return;
+    }
+    const next = [trimmed, ...savedNotes].slice(0, 20);
+    setSavedNotes(next);
+    try {
+      localStorage.setItem(NOTES_ARCHIVE_STORAGE_KEY, JSON.stringify(next));
+    } catch {}
+    toast.success("تم حفظ النص في المذكرة");
+  };
+
+  const deleteSavedNote = (index: number) => {
+    const next = savedNotes.filter((_, i) => i !== index);
+    setSavedNotes(next);
+    try {
+      localStorage.setItem(NOTES_ARCHIVE_STORAGE_KEY, JSON.stringify(next));
+    } catch {}
+  };
 
   // Quick title generator (local, no API needed)
   const generateTitles = () => {
@@ -338,10 +387,16 @@ export default function ToolsSection() {
         )}
       </div>
 
-      {/* ── Pre-Upload Checklist ── */}
+      {/* ── Pre-Upload Checklist (collapsible) ── */}
       <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-          <h3 className="text-base font-semibold text-primary text-glow font-mono">✅ قائمة فحص ما قبل الرفع</h3>
+          <button
+            onClick={() => setShowChecklist((v) => !v)}
+            className="flex items-center gap-2 text-base font-semibold text-primary text-glow font-mono"
+          >
+            <span>{showChecklist ? "▾" : "▸"}</span>
+            <span>✅ قائمة فحص ما قبل الرفع</span>
+          </button>
           <div className="flex items-center gap-3">
             {isReady && <span className="text-primary text-xs font-mono font-semibold animate-pulse-glow">🚀 جاهز للرفع!</span>}
             <button onClick={resetChecklist} className="text-[10px] px-3 py-1.5 border border-destructive/40 text-destructive rounded font-mono hover:bg-destructive/10 transition-all">
@@ -350,38 +405,107 @@ export default function ToolsSection() {
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div className="mb-4">
-          <div className="flex justify-between text-[10px] font-mono text-secondary mb-1">
-            <span>{checkedCount}/{checklistItems.length} عنصر</span>
-            <span className="text-primary font-semibold">{percentage}%</span>
-          </div>
-          <div className="h-2 bg-primary/10 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${isReady ? "bg-accent" : "bg-primary/70"}`}
-              style={{ width: `${percentage}%` }}
-            />
-          </div>
+        {showChecklist && (
+          <>
+            {/* Progress bar */}
+            <div className="mb-4">
+              <div className="flex justify-between text-[10px] font-mono text-secondary mb-1">
+                <span>{checkedCount}/{checklistItems.length} عنصر</span>
+                <span className="text-primary font-semibold">{percentage}%</span>
+              </div>
+              <div className="h-2 bg-primary/10 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${isReady ? "bg-accent" : "bg-primary/70"}`}
+                  style={{ width: `${percentage}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {checklistItems.map((item, i) => (
+                <div
+                  key={i}
+                  onClick={() => toggleCheck(i)}
+                  className={`flex items-center gap-3 p-3 rounded-md cursor-pointer transition-all font-mono text-xs ${
+                    checked[i] ? "bg-primary/5 opacity-50" : "bg-primary/5 hover:bg-primary/10"
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
+                    checked[i] ? "bg-primary border-primary" : "border-primary/50"
+                  }`}>
+                    {checked[i] && <span className="text-background text-[8px] font-bold">✓</span>}
+                  </div>
+                  <label className={`flex-1 cursor-pointer text-secondary ${checked[i] ? "line-through" : ""}`}>{item}</label>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── Quick Notes / Prompt Vault ── */}
+      <div className="bg-card border-2 border-accent rounded-lg p-5 box-glow-gold">
+        <h3 className="text-base font-semibold text-accent text-glow-gold mb-3 font-mono">📝 مذكرة البرومبتات</h3>
+        <p className="text-[11px] text-secondary font-mono mb-3">
+          مساحة سريعة لحفظ أي نص/برومبت تحتاجه لاحقًا.
+        </p>
+        <textarea
+          value={quickNote}
+          onChange={(e) => setQuickNote(e.target.value)}
+          placeholder="اكتب هنا مذكرتك أو البرومبت..."
+          className="w-full min-h-[120px] bg-card border-2 border-accent/50 text-primary p-3 rounded-md font-mono text-xs focus:outline-none focus:box-glow-gold"
+        />
+        <div className="flex gap-2 mt-3 flex-wrap">
+          <button
+            onClick={saveCurrentNote}
+            className="gradient-primary text-primary-foreground px-4 py-2 rounded-md font-mono text-xs font-semibold box-glow-strong hover:scale-[1.02] transition-all"
+          >
+            💾 حفظ في المذكرة
+          </button>
+          <button
+            onClick={() => {
+              setQuickNote("");
+              toast.success("تم مسح خانة الكتابة");
+            }}
+            className="bg-card border-2 border-primary text-primary px-4 py-2 rounded-md font-mono text-xs font-semibold hover:bg-primary/10 transition-all"
+          >
+            🧹 مسح الخانة
+          </button>
         </div>
 
-        <div className="space-y-2">
-          {checklistItems.map((item, i) => (
-            <div
-              key={i}
-              onClick={() => toggleCheck(i)}
-              className={`flex items-center gap-3 p-3 rounded-md cursor-pointer transition-all font-mono text-xs ${
-                checked[i] ? "bg-primary/5 opacity-50" : "bg-primary/5 hover:bg-primary/10"
-              }`}
-            >
-              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
-                checked[i] ? "bg-primary border-primary" : "border-primary/50"
-              }`}>
-                {checked[i] && <span className="text-background text-[8px] font-bold">✓</span>}
+        {savedNotes.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <p className="text-primary font-mono text-[10px] font-semibold">النصوص المحفوظة ({savedNotes.length})</p>
+            {savedNotes.map((note, index) => (
+              <div key={`${note.slice(0, 20)}-${index}`} className="bg-accent/5 border border-accent/30 rounded-md p-3">
+                <div className="text-secondary font-mono text-[11px] whitespace-pre-wrap">{note}</div>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(note);
+                      toast.success("تم نسخ النص");
+                    }}
+                    className="text-[10px] px-2 py-1 border border-accent/40 text-accent rounded font-mono hover:bg-accent/10 transition-all"
+                  >
+                    📋 نسخ
+                  </button>
+                  <button
+                    onClick={() => setQuickNote(note)}
+                    className="text-[10px] px-2 py-1 border border-primary/40 text-primary rounded font-mono hover:bg-primary/10 transition-all"
+                  >
+                    ✏️ تحميل للخانة
+                  </button>
+                  <button
+                    onClick={() => deleteSavedNote(index)}
+                    className="text-[10px] px-2 py-1 border border-destructive/40 text-destructive rounded font-mono hover:bg-destructive/10 transition-all"
+                  >
+                    🗑️ حذف
+                  </button>
+                </div>
               </div>
-              <label className={`flex-1 cursor-pointer text-secondary ${checked[i] ? "line-through" : ""}`}>{item}</label>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

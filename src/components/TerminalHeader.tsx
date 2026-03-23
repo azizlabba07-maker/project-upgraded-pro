@@ -1,9 +1,7 @@
 const tabs = [
   { id: "market",     label: "📊 تحليل السوق" },
-  { id: "generator",  label: "🤖 مولد Gemini (محسّن)" },
-  { id: "claude",     label: "✦ مولد Claude" },
+  { id: "generator",  label: "🤖 المولد الموحد (Gemini + Claude)" },
   { id: "dashboard",  label: "📈 لوحة القيادة" },
-  { id: "portfolio",  label: "📁 المحفظة" },
   { id: "tools",      label: "🛠️ أدوات" },
   { id: "store",      label: "🔍 محلل المتجر" },
   { id: "inspiration", label: "💡 إلهام" },
@@ -46,13 +44,9 @@ export default function TerminalHeader({ activeTab, onTabChange }: TerminalHeade
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               className={`px-4 py-2.5 rounded-md text-xs font-semibold font-mono transition-all duration-300 border-2 ${
-                tab.id === "claude"
-                  ? activeTab === tab.id
-                    ? "bg-accent text-background border-accent box-glow-gold"
-                    : "bg-card text-accent border-accent/50 hover:bg-accent/10 hover:box-glow-gold"
-                  : activeTab === tab.id
-                    ? "gradient-primary text-primary-foreground border-primary box-glow-strong"
-                    : "bg-card text-secondary border-primary hover:bg-primary/10 hover:box-glow"
+                activeTab === tab.id
+                  ? "gradient-primary text-primary-foreground border-primary box-glow-strong"
+                  : "bg-card text-secondary border-primary hover:bg-primary/10 hover:box-glow"
               }`}
             >
               {tab.label}

@@ -1,10 +1,8 @@
 import { useState } from "react";
 import TerminalHeader from "@/components/TerminalHeader";
 import MarketAnalysis from "@/components/MarketAnalysis";
-import PromptGenerator from "@/components/PromptGenerator";
-import ImagePromptGenerator from "@/components/ImagePromptGenerator";
+import UnifiedPromptHub from "@/components/UnifiedPromptHub";
 import Dashboard from "@/components/Dashboard";
-import PortfolioTracker from "@/components/PortfolioTracker";
 import ToolsSection from "@/components/ToolsSection";
 import ApiKeySettings from "@/components/ApiKeySettings";
 import InspirationLab from "@/components/InspirationLab";
@@ -18,10 +16,8 @@ const Index = () => {
       <TerminalHeader activeTab={activeTab} onTabChange={setActiveTab} />
       <div className="container mx-auto px-5 pb-10">
         {activeTab === "market"     && <MarketAnalysis />}
-        {activeTab === "generator"  && <PromptGenerator />}
-        {activeTab === "claude"     && <ImagePromptGenerator />}
+        {activeTab === "generator"  && <UnifiedPromptHub />}
         {activeTab === "dashboard"  && <Dashboard />}
-        {activeTab === "portfolio"  && <PortfolioTracker />}
         {activeTab === "tools"      && <ToolsSection />}
         {activeTab === "store"      && <StoreAnalyzer />}
         {activeTab === "inspiration" && <InspirationLab />}
