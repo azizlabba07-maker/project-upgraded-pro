@@ -291,15 +291,25 @@ export async function validateGeminiApiKey(key: string): Promise<{ ok: boolean; 
   }
 }
 
-export async function generateWithGemini(prompt: string, temperature = 1.4): Promise<string> {
+export async function generateWithGemini(prompt: string, temperature = 1.4, image?: { base64: string; mimeType: string }): Promise<string> {
   const storedKeys = readStoredGeminiApiKeys();
   const envKey = (import.meta.env.VITE_GEMINI_API_KEY || "").trim();
   const apiKeysBase = storedKeys.length > 0 ? storedKeys : (envKey ? [envKey] : []);
   const apiKeys = buildRotatedKeyPool(apiKeysBase);
   if (apiKeys.length === 0) throw new Error("NO_API_KEY: No API key configured");
 
+  const parts: any[] = [{ text: prompt }];
+  if (image) {
+    parts.push({
+      inlineData: {
+        data: image.base64.split(",").pop() || image.base64,
+        mimeType: image.mimeType
+      }
+    });
+  }
+
   const body = JSON.stringify({
-    contents: [{ parts: [{ text: prompt }] }],
+    contents: [{ parts }],
     generationConfig: { temperature, topP: temperature > 1 ? 0.99 : 0.95, maxOutputTokens: 8192 },
   });
 
@@ -670,4 +680,52 @@ Return ONLY a valid JSON object:
   const jsonMatch = result.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("Failed to parse AI response");
   return JSON.parse(jsonMatch[0]) as TopSellerAnalysis;
+}
+
+export interface ImageAnalysisResult {
+  filename: string;
+  title: string;
+  keywords: string[];
+}
+
+export async function analyzeImageForStock(
+  file: File,
+  base64Data: string
+): Promise<ImageAnalysisResult> {
+  const prompt = `You are an expert Adobe Stock contributor and SEO specialist. Analyze this image and provide:
+1. A highly descriptive, commercially appealing English title (max 70 chars). Focus on the main subject, action, lighting, and mood.
+2. 49 highly relevant English keywords. Start with the most important subjects, then actions, concepts, styles, and colors.
+
+RULES:
+- DO NOT use forbidden words: artist names, real people, trademarked brands (e.g., Apple, Nike, Disney), "style of", "inspired by".
+- No mentions of "AI generated", "Midjourney", etc.
+- Keywords must be single words or short phrases.
+
+Return ONLY a valid JSON object in this exact format:
+{
+  "title": "...",
+  "keywords": ["kw1", "kw2", "..."]
+}`;
+
+  const result = await generateWithGemini(prompt, 0.4, {
+    base64: base64Data,
+    mimeType: file.type
+  });
+  
+  const jsonMatch = result.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("Failed to parse Image Analysis AI response");
+  
+  const parsed = JSON.parse(jsonMatch[0]) as { title: string; keywords: string[] };
+  
+  // Clean keywords
+  const cleanKeywords = parsed.keywords
+    .map(k => k.trim().toLowerCase())
+    .filter(k => k.length > 1)
+    .slice(0, 49);
+
+  return {
+    filename: file.name,
+    title: parsed.title,
+    keywords: cleanKeywords
+  };
 }

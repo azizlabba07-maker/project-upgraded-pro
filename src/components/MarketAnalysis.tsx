@@ -140,19 +140,9 @@ export default function MarketAnalysis() {
         setLastRefresh(new Date().toLocaleTimeString("ar-EG"));
         return;
       }
-      if (hasAnyApiKey()) {
-        try {
-          const aiTrends = await generateAITrends();
-          setTrends(aiTrends as MarketTrend[]);
-        } catch {
-          setTrends((prev) => pulseLocalTrends(prev));
-        } finally {
-          setLastRefresh(new Date().toLocaleTimeString("ar-EG"));
-        }
-      } else {
-        setTrends((prev) => pulseLocalTrends(prev));
-        setLastRefresh(new Date().toLocaleTimeString("ar-EG"));
-      }
+      // Never consume API keys automatically during pulse. Use local randomizer.
+      setTrends((prev) => pulseLocalTrends(prev));
+      setLastRefresh(new Date().toLocaleTimeString("ar-EG"));
     }, ms);
     return () => window.clearInterval(id);
   }, [autoPulse, pulseSeconds, refreshing, analyzing]);

@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { marketData, dailyTips, seasonalEvents } from "@/data/marketData";
+import { marketData as initialMarketData, dailyTips, seasonalEvents, type MarketTrend } from "@/data/marketData";
 import { EMERGING_TRENDS_2026 } from "@/data/trends2026";
-import { createSourcePulse, fetchMarketPulseFromBackend } from "@/lib/livePulse";
-import { generateMarketAnalytics, getTopCompetitors } from "@/lib/marketAnalytics";
+import { createSourcePulse, pulseLocalTrends } from "@/lib/livePulse";
+import { generateAITrends, hasAnyApiKey } from "@/lib/gemini";
+import { toast } from "sonner";
 import { calcSuccessRate, getTodayAiMetrics } from "@/lib/aiMetrics";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -29,6 +30,8 @@ function ChartTooltip({ active, payload, label }: any) {
 }
 
 export default function Dashboard() {
+  const [marketData, setMarketData] = useState<MarketTrend[]>(initialMarketData);
+  const [refreshing, setRefreshing] = useState(false);
   const [tip, setTip] = useState("");
   const [ideas, setIdeas] = useState<string[]>([]);
   const [analytics, setAnalytics] = useState<any[]>([]);
@@ -62,9 +65,27 @@ export default function Dashboard() {
   useEffect(() => {
     const id = window.setInterval(() => {
       setAiMetrics(getTodayAiMetrics());
+      setMarketData(prev => pulseLocalTrends(prev));
     }, 4000);
     return () => window.clearInterval(id);
   }, []);
+
+  const handleRefreshTrends = async () => {
+    if (!hasAnyApiKey()) {
+      toast.error("أضف مفتاح Gemini API من الإعدادات ⚙️ لتحديث التراندات بالذكاء الاصطناعي");
+      return;
+    }
+    setRefreshing(true);
+    try {
+      const aiTrends = await generateAITrends();
+      setMarketData(aiTrends as MarketTrend[]);
+      toast.success("🔄 تم تحديث التراندات بنجاح في لوحة القيادة!");
+    } catch {
+      toast.error("تعذر التحديث بالذكاء الاصطناعي. تأكد من صحة المفتاح.");
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const newTip = () => setTip(dailyTips[Math.floor(Math.random() * dailyTips.length)]);
 
   // ── Chart data ──
@@ -131,6 +152,21 @@ export default function Dashboard() {
 
   return (
     <div className="animate-fade-in space-y-5">
+      {/* Action Header */}
+      <div className="flex items-center justify-between bg-card border-2 border-primary rounded-lg p-4 box-glow">
+        <div>
+          <h2 className="text-lg font-bold text-primary font-mono">لوحة القيادة</h2>
+          <p className="text-xs text-secondary font-mono mt-1">يتم تحديث البيانات محلياً كل 4 ثوانٍ</p>
+        </div>
+        <button
+          onClick={handleRefreshTrends}
+          disabled={refreshing}
+          className="gradient-primary text-primary-foreground px-4 py-2 rounded-md font-mono text-xs font-semibold hover:scale-105 transition-all disabled:opacity-50 flex items-center gap-2"
+        >
+          {refreshing ? "⏳ جاري التحديث..." : "🔄 التحديث بالذكاء الاصطناعي"}
+        </button>
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[

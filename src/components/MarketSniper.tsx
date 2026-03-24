@@ -56,7 +56,7 @@ export default function MarketSniper() {
       for (const target of goldenTargets.slice(0, 5)) {
         toast.info(`🎯 قنص: ${target.topic}...`);
 
-        // Generate prompt
+        // Generate prompt, title, and keywords in a SINGLE API call
         const prompts = await generateGeminiStockPrompts(
           target.category,
           1,
@@ -68,21 +68,19 @@ export default function MarketSniper() {
 
         const rawPrompt = prompts[0]?.prompt || `Professional ${target.topic} concept, studio lighting, clean commercial composition, 4K, sRGB, copy space, no text, no logos, no faces`;
 
-        // Auto-optimize the prompt
-        const optimized = await optimizePrompt(rawPrompt, target.category);
+        // Skip secondary optimization API call to save quota - V1 is already highly optimized!
+        const optimized = rawPrompt;
 
-        // Generate keywords
-        let keywords: string[] = [];
-        try {
-          keywords = await generateAIKeywords(target.topic, 49);
-        } catch {
+        // Use keywords already generated in the first API call, fallback if missing
+        let keywords: string[] = prompts[0]?.keywords || [];
+        if (keywords.length === 0) {
           keywords = target.topic.toLowerCase().split(/\s+/).concat([
             "abstract", "commercial", "royalty free", "stock photo", "background",
             "modern", "professional", "digital", "creative", "design",
           ]);
         }
 
-        const title = `${target.topic} - Professional Stock ${target.category} Concept`.slice(0, 70);
+        const title = (prompts[0]?.title || `${target.topic} - Professional Stock ${target.category} Concept`).slice(0, 70);
 
         results.push({
           trend: target,

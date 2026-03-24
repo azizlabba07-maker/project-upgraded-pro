@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { checklistItems } from "@/data/marketData";
-import { generateAIKeywords, getTopKeywordsForDomain, hasAnyApiKey } from "@/lib/gemini";
+import { generateAIKeywords, getTopKeywordsForDomain, hasAnyApiKey, analyzeImageForStock, type ImageAnalysisResult } from "@/lib/gemini";
 import { generateClaudeKeywords, hasClaudeKey } from "@/lib/claude";
 import { trackAiMetric } from "@/lib/aiMetrics";
 import { toast } from "sonner";
@@ -9,13 +9,9 @@ export default function ToolsSection() {
   const NOTES_STORAGE_KEY = "tools_notes_v1";
   const NOTES_ARCHIVE_STORAGE_KEY = "tools_notes_archive_v1";
 
-  // ── Profit Calculator ──
-  const [imageCount, setImageCount]     = useState(100);
-  const [pricePerImage, setPricePerImage] = useState(5);
-  const [convRate, setConvRate]         = useState(2);
-  const [profitResult, setProfitResult] = useState<{
-    monthly: number; yearly: number; perDownload: number; breakEven: number;
-  } | null>(null);
+  // ── Image Analyzer ──
+  const [analyzingImages, setAnalyzingImages] = useState(false);
+  const [imageResults, setImageResults] = useState<ImageAnalysisResult[]>([]);
 
   // ── Keywords ──
   const [keywordTopic, setKeywordTopic] = useState("");
@@ -39,12 +35,61 @@ export default function ToolsSection() {
   const [titleDesc, setTitleDesc]       = useState("");
   const [generatedTitles, setGeneratedTitles] = useState<string[]>([]);
 
-  const calculateProfit = () => {
-    const monthly   = imageCount * pricePerImage * (convRate / 100);
-    const yearly    = monthly * 12;
-    const perDownload = pricePerImage;
-    const breakEven = imageCount > 0 ? Math.ceil(100 / convRate) : 0;
-    setProfitResult({ monthly, yearly, perDownload, breakEven });
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    if (!hasAnyApiKey()) {
+      toast.error("أضف مفتاح Gemini API من الإعدادات ⚙️");
+      return;
+    }
+
+    setAnalyzingImages(true);
+    const newResults: ImageAnalysisResult[] = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const result = await analyzeImageForStock(file, base64);
+        newResults.push(result);
+        toast.success(`✅ تم تحليل: ${file.name}`);
+      } catch (err: any) {
+        toast.error(`❌ خطأ في تحليل ${file.name}: ${err.message}`);
+      }
+    }
+    
+    setImageResults(prev => [...prev, ...newResults]);
+    setAnalyzingImages(false);
+    if (e.target) e.target.value = ''; // reset
+  };
+
+  const exportToCSV = () => {
+    if (imageResults.length === 0) {
+      toast.error("لا توجد بيانات للتصدير");
+      return;
+    }
+    
+    let csv = "Filename,Title,Keywords,Category,Releases\\n";
+    imageResults.forEach(res => {
+      const escapedTitle = res.title.replace(/"/g, '""');
+      const escapedKeywords = res.keywords.join(",").replace(/"/g, '""');
+      csv += `"${res.filename}","${escapedTitle}","${escapedKeywords}","",\n`;
+    });
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `adobe_stock_metadata_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("تم التصدير بنجاح! جاهز للرفع إلى Adobe Stock 🚀");
   };
 
   const handleKeywords = async () => {
@@ -196,34 +241,69 @@ export default function ToolsSection() {
   return (
     <div className="animate-fade-in space-y-5">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* ── Profit Calculator (upgraded) ── */}
-        <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
-          <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono">💰 حاسبة الأرباح المتقدمة</h3>
+        {/* ── Image Analyzer (Replaced Profit Calculator) ── */}
+        <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow flex flex-col">
+          <div className="flex justify-between items-start mb-4">
+            <h3 className="text-base font-semibold text-primary text-glow font-mono">🖼️ محلل الصور & مصدر CSV</h3>
+            {imageResults.length > 0 && (
+              <button 
+                onClick={exportToCSV}
+                className="text-[10px] px-3 py-1.5 gradient-primary text-primary-foreground rounded font-mono font-bold hover:scale-105 transition-all shadow-glow"
+              >
+                📥 تصدير CSV
+              </button>
+            )}
+          </div>
+          
+          <p className="text-secondary font-mono text-[11px] mb-4">
+            ارفع صورك هنا وسيقوم الذكاء الاصطناعي بكتابة العناوين والكلمات المفتاحية لها تلقائياً.
+          </p>
 
-          <label className="text-primary text-xs font-semibold font-mono block mb-1.5">عدد الصور في المحفظة:</label>
-          <input type="number" value={imageCount} onChange={(e) => setImageCount(Number(e.target.value))} min={1} className={inputClass} />
+          <label className="border-2 border-dashed border-primary/50 hover:border-primary bg-primary/5 flex flex-col items-center justify-center p-6 rounded-lg cursor-pointer transition-all group mb-4">
+            <span className="text-primary text-2xl mb-2 group-hover:scale-110 transition-transform">📸</span>
+            <span className="text-primary font-mono text-xs font-semibold">اضغط لاختيار الصور</span>
+            <span className="text-secondary font-mono text-[10px] mt-1">(يمكنك اختيار عدة صور معاً)</span>
+            <input 
+              type="file" 
+              multiple 
+              accept="image/*" 
+              onChange={handleImageUpload} 
+              disabled={analyzingImages}
+              className="hidden" 
+            />
+          </label>
 
-          <label className="text-primary text-xs font-semibold font-mono block mb-1.5">سعر البيع المتوقع للصورة ($):</label>
-          <input type="number" value={pricePerImage} onChange={(e) => setPricePerImage(Number(e.target.value))} min={0.1} step={0.1} className={inputClass} />
+          {analyzingImages && (
+            <div className="text-center py-2 animate-pulse text-accent font-mono text-xs font-semibold flex items-center justify-center gap-2">
+              <span className="animate-spin text-lg">⚙️</span> جاري تحليل الصور بالذكاء الاصطناعي...
+            </div>
+          )}
 
-          <label className="text-primary text-xs font-semibold font-mono block mb-1.5">معدل التحويل المتوقع (%):</label>
-          <input type="number" value={convRate} onChange={(e) => setConvRate(Number(e.target.value))} min={0.1} max={100} step={0.1} className={inputClass} />
-
-          <button onClick={calculateProfit} className="w-full gradient-primary text-primary-foreground py-2.5 rounded-md font-mono text-xs font-semibold box-glow-strong hover:scale-[1.02] transition-all">
-            🧮 احسب الأرباح
-          </button>
-
-          {profitResult && (
-            <div className="mt-4 bg-primary/5 border-2 border-primary rounded-lg p-4 space-y-2">
-              {[
-                { label: "الربح الشهري المتوقع", value: `$${profitResult.monthly.toFixed(2)}`, highlight: true },
-                { label: "الربح السنوي المتوقع",  value: `$${profitResult.yearly.toFixed(2)}`, highlight: true },
-                { label: "سعر كل تحميل",          value: `$${profitResult.perDownload.toFixed(2)}`, highlight: false },
-                { label: "تحميل لاسترداد التكلفة", value: `${profitResult.breakEven} تحميل`, highlight: false },
-              ].map((row, i) => (
-                <div key={i} className={`flex justify-between font-mono text-xs ${row.highlight ? "text-primary font-semibold" : "text-secondary"}`}>
-                  <span>{row.label}:</span>
-                  <span className={row.highlight ? "text-accent" : ""}>{row.value}</span>
+          {imageResults.length > 0 && (
+            <div className="flex-1 overflow-y-auto max-h-[300px] pr-2 space-y-3 custom-scrollbar">
+              {imageResults.map((res, i) => (
+                <div key={i} className="bg-primary/5 border border-primary/20 rounded-lg p-3 relative group">
+                  <button 
+                    onClick={() => setImageResults(prev => prev.filter((_, idx) => idx !== i))}
+                    className="absolute top-2 left-2 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="حذف"
+                  >
+                    🗑️
+                  </button>
+                  <p className="text-primary font-mono text-[10px] font-bold mb-1 break-all pr-6">{res.filename}</p>
+                  <p className="text-secondary font-mono text-[11px] mb-2 leading-relaxed">{res.title}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {res.keywords.slice(0, 10).map((kw, idx) => (
+                      <span key={idx} className="text-[9px] bg-primary/10 text-secondary px-1.5 py-0.5 rounded">
+                        {kw}
+                      </span>
+                    ))}
+                    {res.keywords.length > 10 && (
+                      <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold">
+                        +{res.keywords.length - 10} أكثر
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
