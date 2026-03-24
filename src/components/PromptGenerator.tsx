@@ -270,7 +270,12 @@ type DisplayPrompt = VideoPromptResult & { type?: string; title?: string; keywor
 export default function PromptGenerator() {
   const [category, setCategory] = useState("Nature");
   const [promptCount, setPromptCount] = useState(5);
-  const [prompts, setPrompts] = useState<DisplayPrompt[]>([]);
+  const [prompts, setPrompts] = useState<DisplayPrompt[]>(() => {
+    try {
+      const saved = localStorage.getItem("gemini_saved_prompts");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [loading, setLoading] = useState(false);
   const [useAI, setUseAI] = useState(() => hasAnyApiKey());
   const [advancedMode, setAdvancedMode] = useState(true);
@@ -317,6 +322,7 @@ export default function PromptGenerator() {
   const handleGenerate = async () => {
     setLoading(true);
     setPrompts([]);
+    localStorage.removeItem("gemini_saved_prompts");
 
     try {
       if (useAI && hasAnyApiKey()) {
@@ -354,6 +360,7 @@ export default function PromptGenerator() {
           const validated = allResults.filter((item) => isPromptCategoryValid(item.prompt, category));
           const finalList = (validated.length > 0 ? validated : allResults).map((item, idx) => ({ ...item, number: idx + 1 }));
           setPrompts(finalList);
+          try { localStorage.setItem("gemini_saved_prompts", JSON.stringify(finalList)); } catch {}
           trackAiMetric("gemini", "prompts", "success");
           if (validated.length !== allResults.length) {
             toast.warning(`تمت فلترة ${allResults.length - validated.length} برومبت خارج الفئة المختارة.`);
@@ -382,6 +389,7 @@ export default function PromptGenerator() {
           }
           const finalList = validated.length > 0 ? validated : (result as DisplayPrompt[]);
           setPrompts(finalList);
+          try { localStorage.setItem("gemini_saved_prompts", JSON.stringify(finalList)); } catch {}
           trackAiMetric("gemini", "prompts", "success");
           if (validated.length !== (result as DisplayPrompt[]).length) {
             toast.warning("تمت فلترة بعض البرومبتات غير المطابقة للفئة.");
@@ -390,11 +398,13 @@ export default function PromptGenerator() {
         } else {
           const result = await generateAIVideoPrompts(category, promptCount);
           setPrompts(result as DisplayPrompt[]);
+          try { localStorage.setItem("gemini_saved_prompts", JSON.stringify(result)); } catch {}
           trackAiMetric("gemini", "prompts", "success");
           toast.success(`✅ تم توليد ${promptCount} برومبت بالذكاء الاصطناعي!`);
         }
       } else {
         setPrompts(generateLocalVideoPrompts(category, promptCount) as DisplayPrompt[]);
+        try { localStorage.setItem("gemini_saved_prompts", JSON.stringify(generateLocalVideoPrompts(category, promptCount))); } catch {}
         trackAiMetric("local", "prompts", "success");
         toast.success(`تم توليد ${promptCount} برومبت محلياً`);
         if (useAI && !hasAnyApiKey()) {
@@ -429,6 +439,7 @@ export default function PromptGenerator() {
         setUseAI(false);
       }
       setPrompts(generateLocalVideoPrompts(category, promptCount) as DisplayPrompt[]);
+      try { localStorage.setItem("gemini_saved_prompts", JSON.stringify(generateLocalVideoPrompts(category, promptCount))); } catch {}
       trackAiMetric("local", "prompts", "success");
     } finally {
       setLoading(false);
@@ -689,6 +700,16 @@ export default function PromptGenerator() {
                 className="bg-card border-2 border-primary text-primary px-3 py-1.5 rounded text-xs font-semibold font-mono hover:bg-primary/10 transition-all"
               >
                 ⬇ CSV
+              </button>
+              <button
+                onClick={() => {
+                  setPrompts([]);
+                  localStorage.removeItem("gemini_saved_prompts");
+                  toast.success("تم مسح البرومبتات.");
+                }}
+                className="bg-destructive/10 border-2 border-destructive text-destructive px-3 py-1.5 rounded text-xs font-semibold font-mono hover:bg-destructive/20 transition-all"
+              >
+                ✖ مسح
               </button>
             </div>
           </div>

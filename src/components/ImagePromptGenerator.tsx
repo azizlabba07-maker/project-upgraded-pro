@@ -38,7 +38,12 @@ export default function ImagePromptGenerator() {
   const [count, setCount] = useState(10);
   const [competition, setCompetition] = useState("medium");
   const [selectedTrends, setSelectedTrends] = useState<string[]>(["AI Visuals", "Clean Backgrounds"]);
-  const [prompts, setPrompts] = useState<StockImagePrompt[]>([]);
+  const [prompts, setPrompts] = useState<StockImagePrompt[]>(() => {
+    try {
+      const saved = localStorage.getItem("claude_saved_prompts");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [loading, setLoading] = useState(false);
   const [seoLoading, setSeoLoading] = useState<number | null>(null);
   const [expandedSeo, setExpandedSeo] = useState<Record<number, { title: string; description: string; keywords: string[] }>>({});
@@ -53,9 +58,11 @@ export default function ImagePromptGenerator() {
     }
     setLoading(true);
     setPrompts([]);
+    localStorage.removeItem("claude_saved_prompts");
     try {
       const result = await generateStockPrompts(category, count, outputType, selectedTrends, competition);
       setPrompts(result);
+      try { localStorage.setItem("claude_saved_prompts", JSON.stringify(result)); } catch {}
       trackAiMetric("claude", "prompts", "success");
       toast.success(`✅ تم توليد ${result.length} برومبت بنجاح!`);
     } catch (err) {
@@ -318,6 +325,17 @@ export default function ImagePromptGenerator() {
                 className="gradient-primary text-primary-foreground px-4 py-1.5 rounded text-xs font-mono font-semibold box-glow-strong hover:scale-[1.02] transition-all"
               >
                 ⬇ تصدير .txt
+              </button>
+              <button
+                onClick={() => {
+                  setPrompts([]);
+                  setExpandedSeo({});
+                  localStorage.removeItem("claude_saved_prompts");
+                  toast.success("تم مسح البرومبتات.");
+                }}
+                className="bg-destructive/10 border-2 border-destructive text-destructive px-3 py-1.5 rounded text-xs font-semibold font-mono hover:bg-destructive/20 transition-all"
+              >
+                ✖ مسح
               </button>
             </div>
           </div>
