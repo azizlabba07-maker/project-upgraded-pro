@@ -3,6 +3,7 @@ import { marketData as staticMarketData, categories, type MarketTrend } from "@/
 import { getAIMarketAnalysis, generateAITrends, hasAnyApiKey, classifyGeminiError } from "@/lib/gemini";
 import { toast } from "sonner";
 import OneClickOpportunity from "@/components/OneClickOpportunity";
+import MarketSniper from "@/components/MarketSniper";
 import { createSourcePulse, pulseLocalTrends, fetchMarketPulseFromBackend } from "@/lib/livePulse";
 
 function DemandBadge({ demand }: { demand: string }) {
@@ -191,7 +192,7 @@ export default function MarketAnalysis() {
           <div>
             <label className="text-primary text-xs font-semibold font-mono block mb-1.5">الفرص الذهبية فقط:</label>
             <select value={goldFilter} onChange={(e) => setGoldFilter(e.target.value)} className={selectClass}>
-              <option value="">الكل</option>
+              <option value="">عرض الكل</option>
               <option value="gold">⭐ الفرص الذهبية</option>
             </select>
           </div>
@@ -357,6 +358,23 @@ export default function MarketAnalysis() {
           onClose={() => setOneClickTrend(null)}
         />
       )}
+
+      {/* Market Sniper — Collapsible */}
+      <details className="group">
+        <summary className="cursor-pointer bg-destructive/10 border-2 border-destructive rounded-lg p-4 box-glow flex items-center justify-between hover:bg-destructive/15 transition-all list-none">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🎯</span>
+            <div>
+              <h3 className="text-base font-semibold text-destructive font-mono">قناص السوق (Market Sniper)</h3>
+              <p className="text-secondary font-mono text-[10px] mt-0.5">اقنص الفرص الذهبية وصدّر حزم CSV جاهزة للرفع على Adobe Stock</p>
+            </div>
+          </div>
+          <span className="text-destructive text-sm font-mono group-open:rotate-90 transition-transform duration-200">▶</span>
+        </summary>
+        <div className="mt-3">
+          <MarketSniper />
+        </div>
+      </details>
 
       <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
         <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono">🌐 Source Pulse Monitor</h3>

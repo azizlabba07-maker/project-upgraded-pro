@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { checklistItems } from "@/data/marketData";
 import { generateAIKeywords, getTopKeywordsForDomain, hasAnyApiKey } from "@/lib/gemini";
 import { generateClaudeKeywords, hasClaudeKey } from "@/lib/claude";
+import { trackAiMetric } from "@/lib/aiMetrics";
 import { toast } from "sonner";
 
 export default function ToolsSection() {
@@ -54,14 +55,18 @@ export default function ToolsSection() {
       let result: string[];
       if (engine === "claude" && hasClaudeKey()) {
         result = await generateClaudeKeywords(topic, keywordCount);
+        trackAiMetric("claude", "keywords", "success");
         toast.success("✅ تم التوليد بـ Claude AI!");
       } else {
         try {
           result = await generateAIKeywords(topic, keywordCount);
+          trackAiMetric("gemini", "keywords", "success");
           toast.success("✅ تم التوليد بـ Gemini AI!");
         } catch {
+          trackAiMetric("gemini", "keywords", "failure");
           if (hasClaudeKey()) {
             result = await generateClaudeKeywords(topic, keywordCount);
+            trackAiMetric("claude", "keywords", "success");
             toast.success("✅ تم التحويل تلقائياً إلى Claude");
           } else {
             throw new Error("fallback-local");
@@ -77,6 +82,7 @@ export default function ToolsSection() {
         "marketing", "advertising", "template", "web", "artistic", "style",
       ];
       setKeywords(fallback.slice(0, keywordCount));
+      trackAiMetric("local", "keywords", "success");
       toast.error("تم استخدام المولد المحلي كبديل");
     } finally {
       setLoadingKw(false);
@@ -93,12 +99,15 @@ export default function ToolsSection() {
     setTopKeywords([]);
     try {
       let result = await getTopKeywordsForDomain(topic, 50);
+      trackAiMetric("gemini", "keywords", "success");
       if (result.length === 0 && hasClaudeKey()) {
         result = await generateClaudeKeywords(topic, 50);
+        trackAiMetric("claude", "keywords", "success");
       }
       setTopKeywords(result);
       toast.success(`✅ تم اكتشاف ${result.length} كلمة شائعة في مجال "${topic}"!`);
     } catch {
+      trackAiMetric("gemini", "keywords", "failure");
       toast.error("تعذر التحميل. تحقق من مفتاح API.");
     } finally {
       setLoadingTop(false);

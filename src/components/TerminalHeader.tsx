@@ -31,7 +31,7 @@ export default function TerminalHeader({ activeTab, onTabChange }: TerminalHeade
         <div className="text-center mb-8 p-8 gradient-header border-2 border-primary rounded-lg box-glow relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-l from-transparent via-primary/10 to-transparent scanline-animation pointer-events-none" />
           <h1 className="text-3xl md:text-4xl font-bold text-primary text-glow-strong relative z-10 font-arabic">
-            ⚡ STOCK MARKET INTELLIGENCE
+            ⚡ STOCK MARKET INTELLIGENCE PRO ✨
           </h1>
           <p className="text-sm text-secondary relative z-10 mt-2 font-mono">
             {">>> محلل سوق Adobe Stock الذكي | Gemini + Claude AI | v2.1 <<<"}

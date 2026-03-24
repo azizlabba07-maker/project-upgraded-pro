@@ -6,6 +6,7 @@ import {
   hasClaudeKey,
   StockImagePrompt,
 } from "@/lib/claude";
+import { trackAiMetric } from "@/lib/aiMetrics";
 import { toast } from "sonner";
 
 const CATEGORIES = [
@@ -55,8 +56,10 @@ export default function ImagePromptGenerator() {
     try {
       const result = await generateStockPrompts(category, count, outputType, selectedTrends, competition);
       setPrompts(result);
+      trackAiMetric("claude", "prompts", "success");
       toast.success(`✅ تم توليد ${result.length} برومبت بنجاح!`);
     } catch (err) {
+      trackAiMetric("claude", "prompts", "failure");
       toast.error(getClaudeErrorMessage(err));
     } finally {
       setLoading(false);
@@ -68,8 +71,10 @@ export default function ImagePromptGenerator() {
     try {
       const bundle = await generateSEOBundle(promptText);
       setExpandedSeo((prev) => ({ ...prev, [index]: bundle }));
+      trackAiMetric("claude", "analysis", "success");
       toast.success("✅ تم توليد SEO Bundle!");
     } catch (err) {
+      trackAiMetric("claude", "analysis", "failure");
       toast.error(getClaudeErrorMessage(err));
     } finally {
       setSeoLoading(null);

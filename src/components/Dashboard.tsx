@@ -3,6 +3,7 @@ import { marketData, dailyTips, seasonalEvents } from "@/data/marketData";
 import { EMERGING_TRENDS_2026 } from "@/data/trends2026";
 import { createSourcePulse, fetchMarketPulseFromBackend } from "@/lib/livePulse";
 import { generateMarketAnalytics, getTopCompetitors } from "@/lib/marketAnalytics";
+import { calcSuccessRate, getTodayAiMetrics } from "@/lib/aiMetrics";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, RadarChart, Radar, PolarGrid,
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const [analytics, setAnalytics] = useState<any[]>([]);
   const [competitors, setCompetitors] = useState<any[]>([]);
   const [pulseData, setPulseData] = useState<any[]>([]);
+  const [aiMetrics, setAiMetrics] = useState(getTodayAiMetrics());
 
   const goldOpportunities = marketData.filter((i) => i.demand === "high" && i.competition === "low").length;
   const avgProfit = Math.round(marketData.reduce((s, i) => s + i.profitability, 0) / marketData.length);
@@ -55,6 +57,13 @@ export default function Dashboard() {
       `استهدف أقل منافسة ضمن أعلى ربحية وابدأ برفع 5 أصول يومياً لمدة 7 أيام.`,
       `أنشئ حزمة SEO موحّدة للفائزين في Source Pulse (Impact الأعلى).`,
     ]);
+  }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setAiMetrics(getTodayAiMetrics());
+    }, 4000);
+    return () => window.clearInterval(id);
   }, []);
   const newTip = () => setTip(dailyTips[Math.floor(Math.random() * dailyTips.length)]);
 
@@ -114,19 +123,26 @@ export default function Dashboard() {
     );
   };
 
+  const aiRows = [
+    { key: "gemini", label: "Gemini", data: aiMetrics.engines.gemini },
+    { key: "claude", label: "Claude", data: aiMetrics.engines.claude },
+    { key: "local", label: "Local", data: aiMetrics.engines.local },
+  ];
+
   return (
     <div className="animate-fade-in space-y-5">
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[
           { value: topTrend.topic, label: "أكثر موضوع بحثاً", size: "text-sm", icon: "🔥" },
           { value: goldOpportunities, label: "فرص ذهبية", size: "text-2xl", icon: "⭐" },
           { value: `${avgProfit}%`, label: "متوسط الربحية", size: "text-2xl", icon: "💰" },
           { value: season, label: "الموسم الحالي", size: "text-lg", icon: "📅" },
+          { value: `${marketData.length}`, label: "تراندات مرصودة", size: "text-2xl", icon: "🎯" },
         ].map((stat, i) => (
-          <div key={i} className="bg-primary/5 border-2 border-primary rounded-lg p-4 text-center box-glow">
+          <div key={i} className={`border-2 rounded-lg p-4 text-center box-glow ${i === 4 ? "bg-destructive/5 border-destructive" : "bg-primary/5 border-primary"}`}>
             <div className="text-2xl mb-1">{stat.icon}</div>
-            <div className={`font-extrabold text-primary text-glow ${stat.size}`}>{stat.value}</div>
+            <div className={`font-extrabold text-glow ${stat.size} ${i === 4 ? "text-destructive" : "text-primary"}`}>{stat.value}</div>
             <div className="text-xs text-secondary mt-1 font-mono">{stat.label}</div>
           </div>
         ))}
@@ -307,6 +323,51 @@ export default function Dashboard() {
         </button>
       </div>
 
+      {/* AI performance pulse */}
+      <div className="bg-card border-2 border-accent rounded-lg p-5 box-glow-gold">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h3 className="text-base font-semibold text-accent text-glow-gold font-mono">📡 AI Performance Pulse</h3>
+          <span className="text-[10px] font-mono text-secondary">تحديث حي من جلسة اليوم</span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className="bg-accent/10 border border-accent/30 rounded-md p-3">
+            <div className="text-[10px] text-secondary font-mono">إجمالي العمليات</div>
+            <div className="text-xl font-extrabold text-accent font-mono">
+              {aiMetrics.total.success + aiMetrics.total.failure}
+            </div>
+          </div>
+          <div className="bg-primary/10 border border-primary/30 rounded-md p-3">
+            <div className="text-[10px] text-secondary font-mono">نجاح</div>
+            <div className="text-xl font-extrabold text-primary font-mono">{aiMetrics.total.success}</div>
+          </div>
+          <div className="bg-destructive/10 border border-destructive/30 rounded-md p-3">
+            <div className="text-[10px] text-secondary font-mono">فشل</div>
+            <div className="text-xl font-extrabold text-destructive font-mono">{aiMetrics.total.failure}</div>
+          </div>
+          <div className="bg-card border border-primary/30 rounded-md p-3">
+            <div className="text-[10px] text-secondary font-mono">معدل النجاح</div>
+            <div className="text-xl font-extrabold text-primary font-mono">{calcSuccessRate(aiMetrics.total)}%</div>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {aiRows.map((row) => (
+            <div key={row.key} className="bg-background/40 border border-primary/20 rounded-md p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-primary font-mono text-xs font-semibold">{row.label}</span>
+                <span className="text-[10px] font-mono text-secondary">
+                  Success Rate: {calcSuccessRate(row.data)}%
+                </span>
+              </div>
+              <div className="mt-2 text-[10px] font-mono text-secondary">
+                ✅ {row.data.success} نجاح • ❌ {row.data.failure} فشل
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Quick links */}
       <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
         <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono">🔗 اختصارات سريعة</h3>
@@ -358,15 +419,40 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* New ideas */}
-      <div className="bg-card border-2 border-accent rounded-lg p-5 box-glow-gold">
-        <h3 className="text-base font-semibold text-accent text-glow-gold mb-4 font-mono">🧠 أفكار جديدة تلقائية</h3>
-        <div className="space-y-2">
-          {ideas.map((idea) => (
-            <div key={idea} className="bg-accent/5 border border-accent/20 rounded-md p-3 text-secondary font-mono text-xs">
-              {idea}
-            </div>
-          ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* New ideas */}
+        <div className="bg-card border-2 border-accent rounded-lg p-5 box-glow-gold">
+          <h3 className="text-base font-semibold text-accent text-glow-gold mb-4 font-mono">🧠 أفكار مبتكرة</h3>
+          <div className="space-y-2">
+            {ideas.map((idea, idx) => (
+              <div key={idx} className="bg-accent/5 border border-accent/20 rounded-md p-3 text-secondary font-mono text-xs">
+                {idea}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Crystal Ball Radar */}
+        <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow relative overflow-hidden">
+          <div className="absolute inset-0 bg-primary/5 scanline-animation pointer-events-none" />
+          <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono relative z-10">🔮 رادار التراندات القادمة (Trend Radar)</h3>
+          <div className="space-y-3 relative z-10">
+            {[
+              { topic: "Sustainable Tech Lifestyles", time: "القادم: 30 يوم", prob: "94%" },
+              { topic: "Minimalist Cyberpunk UI", time: "القادم: 45 يوم", prob: "89%" },
+              { topic: "Abstract Data Visualization", time: "القادم: 60 يوم", prob: "82%" },
+            ].map((t, i) => (
+              <div key={i} className="flex items-center justify-between p-3 bg-background/50 border border-primary/20 rounded-md hover:bg-primary/10 transition-colors">
+                <div>
+                  <div className="text-primary text-xs font-mono font-bold animate-pulse-slow">{t.topic}</div>
+                  <div className="text-secondary text-[10px] font-mono mt-1">{t.time}</div>
+                </div>
+                <div className="text-accent text-xs font-mono font-bold bg-accent/20 px-2 py-1 rounded border border-accent/30 tracking-wider shadow-[0_0_10px_rgba(255,215,0,0.3)]">
+                  {t.prob}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

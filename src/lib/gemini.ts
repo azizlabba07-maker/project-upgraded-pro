@@ -631,3 +631,43 @@ Return ONLY a JSON array, no markdown.`;
   if (!jsonMatch) throw new Error("Failed to parse trends");
   return JSON.parse(jsonMatch[0]);
 }
+
+export interface TopSellerAnalysis {
+  secretSauce: string;
+  hiddenKeywords: string[];
+  smartEvolutions: {
+    title: string;
+    concept: string;
+    prompt: string;
+  }[];
+}
+
+export async function analyzeTopSeller(
+  title: string,
+  keywords: string,
+  notes: string
+): Promise<TopSellerAnalysis> {
+  const prompt = `You are an elite Adobe Stock competitor analyst. Analyze this top-selling competitor asset:
+Title/Desc: ${title}
+Keywords: ${keywords}
+Additional Notes: ${notes}
+
+Your task:
+1. "secretSauce": Explain in Arabic (2-3 sentences max) WHY this image sells so well (lighting, composition, theme).
+2. "hiddenKeywords": Provide 15 highly optimized, low-competition English keywords the seller likely used or should have used to rank #1.
+3. "smartEvolutions": Steal their core concept and evolve it into 3 UNIQUE, BETTER ideas (Blue Ocean strategy) to beat them. For each provide a short Arabic title, Arabic concept explanation, and a detailed English AI image generation prompt (following Adobe Stock guidelines: no real people, no brands, commercial style, 4k).
+
+Return ONLY a valid JSON object:
+{
+  "secretSauce": "...",
+  "hiddenKeywords": ["kw1", "kw2", ...],
+  "smartEvolutions": [
+    { "title": "...", "concept": "...", "prompt": "..." }
+  ]
+}`;
+
+  const result = await generateWithGemini(prompt, 0.85);
+  const jsonMatch = result.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("Failed to parse AI response");
+  return JSON.parse(jsonMatch[0]) as TopSellerAnalysis;
+}

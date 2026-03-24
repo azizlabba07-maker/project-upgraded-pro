@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { analyzeRejectionOrLowSales, hasAnyApiKey, classifyGeminiError, getGeminiErrorUserMessage } from "@/lib/gemini";
 import { toast } from "sonner";
+import CompetitorSpy from "@/components/CompetitorSpy";
 
 export default function StoreAnalyzer() {
   const [storeReference, setStoreReference] = useState("");
@@ -199,6 +200,23 @@ export default function StoreAnalyzer() {
           ⚠️ أضف مفتاح Gemini API من الإعدادات ⚙️ لاستخدام المحلل
         </p>
       )}
+
+      {/* Competitor Spy — Collapsible */}
+      <details className="group">
+        <summary className="cursor-pointer bg-primary/5 border-2 border-primary rounded-lg p-4 box-glow flex items-center justify-between hover:bg-primary/10 transition-all list-none">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🕵️</span>
+            <div>
+              <h3 className="text-base font-semibold text-primary font-mono">جاسوس كبار البائعين (Competitor Spy)</h3>
+              <p className="text-secondary font-mono text-[10px] mt-0.5">حلل أعمال المنافسين الناجحة واستخرج أسرارهم وطوّر أفكارهم</p>
+            </div>
+          </div>
+          <span className="text-primary text-sm font-mono group-open:rotate-90 transition-transform duration-200">▶</span>
+        </summary>
+        <div className="mt-3">
+          <CompetitorSpy />
+        </div>
+      </details>
     </div>
   );
 }

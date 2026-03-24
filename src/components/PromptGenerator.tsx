@@ -10,6 +10,7 @@ import {
 } from "@/lib/gemini";
 import { generateStockPrompts, hasClaudeKey } from "@/lib/claude";
 import { getPromptEvolutionHint } from "@/lib/promptEvolution";
+import { trackAiMetric } from "@/lib/aiMetrics";
 import { toast } from "sonner";
 
 const VIDEO_CATEGORIES = [
@@ -353,6 +354,7 @@ export default function PromptGenerator() {
           const validated = allResults.filter((item) => isPromptCategoryValid(item.prompt, category));
           const finalList = (validated.length > 0 ? validated : allResults).map((item, idx) => ({ ...item, number: idx + 1 }));
           setPrompts(finalList);
+          trackAiMetric("gemini", "prompts", "success");
           if (validated.length !== allResults.length) {
             toast.warning(`تمت فلترة ${allResults.length - validated.length} برومبت خارج الفئة المختارة.`);
           }
@@ -380,6 +382,7 @@ export default function PromptGenerator() {
           }
           const finalList = validated.length > 0 ? validated : (result as DisplayPrompt[]);
           setPrompts(finalList);
+          trackAiMetric("gemini", "prompts", "success");
           if (validated.length !== (result as DisplayPrompt[]).length) {
             toast.warning("تمت فلترة بعض البرومبتات غير المطابقة للفئة.");
           }
@@ -387,10 +390,12 @@ export default function PromptGenerator() {
         } else {
           const result = await generateAIVideoPrompts(category, promptCount);
           setPrompts(result as DisplayPrompt[]);
+          trackAiMetric("gemini", "prompts", "success");
           toast.success(`✅ تم توليد ${promptCount} برومبت بالذكاء الاصطناعي!`);
         }
       } else {
         setPrompts(generateLocalVideoPrompts(category, promptCount) as DisplayPrompt[]);
+        trackAiMetric("local", "prompts", "success");
         toast.success(`تم توليد ${promptCount} برومبت محلياً`);
         if (useAI && !hasAnyApiKey()) {
           toast.error("أضف مفتاح API من الإعدادات ⚙️ لاستخدام AI");
@@ -398,6 +403,7 @@ export default function PromptGenerator() {
         }
       }
     } catch (error) {
+      trackAiMetric("gemini", "prompts", "failure");
       const errorType = classifyGeminiError(error);
       toast.error(getGeminiErrorUserMessage(error));
       if (advancedMode && hasClaudeKey()) {
@@ -411,9 +417,11 @@ export default function PromptGenerator() {
             competition
           );
           setPrompts(claudeResult.map((p, i) => ({ ...p, number: i + 1, category: p.category || category })));
+          trackAiMetric("claude", "prompts", "success");
           toast.success("✅ تم التحويل تلقائيًا إلى Claude");
           return;
         } catch {
+          trackAiMetric("claude", "prompts", "failure");
           // Continue to local fallback.
         }
       }
@@ -421,6 +429,7 @@ export default function PromptGenerator() {
         setUseAI(false);
       }
       setPrompts(generateLocalVideoPrompts(category, promptCount) as DisplayPrompt[]);
+      trackAiMetric("local", "prompts", "success");
     } finally {
       setLoading(false);
     }

@@ -17,6 +17,7 @@ import {
   classifyGeminiError,
 } from "@/lib/gemini";
 import { getPromptEvolutionHint } from "@/lib/promptEvolution";
+import { optimizePrompt } from "@/lib/autoOptimizer";
 
 type OutputType = "image" | "video" | "both" | "greenscreen";
 type CompetitionStrategy = "low" | "medium" | "avoid-high";
@@ -247,6 +248,7 @@ export default function OneClickOpportunity({
   const [count, setCount] = useState(10);
   const [competition, setCompetition] = useState<CompetitionStrategy>(() => defaultCompetitionFromTrend(trend));
   const [selectedTrends, setSelectedTrends] = useState<string[]>(() => computeSmartTrends(trend.topic, trend.category));
+  const [strictCompliance, setStrictCompliance] = useState(true);
 
   const [analysis, setAnalysis] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -279,16 +281,27 @@ export default function OneClickOpportunity({
       }
 
       // 2) Prompts & keywords
+      const finalTrends = strictCompliance 
+        ? [...selectedTrends, "STRICT ADOBE COMPLIANCE: NO recognizable faces, NO trademarks, NO logos, NO text, abstract generic representation only"] 
+        : selectedTrends;
+
       if (hasClaudeKey()) {
         const generated = await generateStockPrompts(
           uiCategory,
           count,
           outputType,
-          selectedTrends,
+          finalTrends,
           competition
         );
-        setPrompts(generated);
-        toast.success(`تم توليد ${generated.length} برومبت بنقرة واحدة!`);
+        // Auto-optimize each prompt
+        const optimized = await Promise.all(
+          generated.map(async (p) => ({
+            ...p,
+            prompt: await optimizePrompt(p.prompt, uiCategory),
+          }))
+        );
+        setPrompts(optimized);
+        toast.success(`تم توليد وتحسين ${optimized.length} برومبت بنقرة واحدة!`);
         return;
       }
 
@@ -301,7 +314,7 @@ export default function OneClickOpportunity({
           geminiCategory,
           count,
           geminiType,
-          selectedTrends,
+          finalTrends,
           competition,
           `${trend.topic}. ${evolutionHint}`.trim()
         );
@@ -314,8 +327,15 @@ export default function OneClickOpportunity({
           title: p.title,
           keywords: p.keywords,
         }));
-        setPrompts(normalized);
-        toast.success(`تم توليد ${normalized.length} برومبت عبر Gemini Fallback!`);
+        // Auto-optimize each prompt
+        const optimized = await Promise.all(
+          normalized.map(async (p) => ({
+            ...p,
+            prompt: await optimizePrompt(p.prompt, uiCategory),
+          }))
+        );
+        setPrompts(optimized);
+        toast.success(`تم توليد وتحسين ${optimized.length} برومبت عبر Gemini!`);
         return;
       }
 
@@ -333,11 +353,18 @@ export default function OneClickOpportunity({
         outputType,
         competition,
         count,
-        selectedTrends,
+        selectedTrends: finalTrends,
         keywords: kw,
       });
-      setPrompts(generatedLocal);
-      toast.success(`تم توليد Prompts محلياً (بدون Claude)`);
+      // Auto-optimize each prompt
+      const optimizedLocal = await Promise.all(
+        generatedLocal.map(async (p) => ({
+          ...p,
+          prompt: await optimizePrompt(p.prompt, uiCategory),
+        }))
+      );
+      setPrompts(optimizedLocal);
+      toast.success(`تم توليد وتحسين Prompts محلياً!`);
     } catch (err) {
       setKeywordsLoading(false);
       const geminiType = classifyGeminiError(err);
@@ -477,6 +504,23 @@ export default function OneClickOpportunity({
               <option value="medium">منخفض-متوسط</option>
               <option value="avoid-high">تجنب المواضيع المشبعة</option>
             </select>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 cursor-pointer bg-card/50 border border-primary/20 p-2.5 rounded-md hover:bg-primary/5 transition-colors">
+              <input
+                type="checkbox"
+                checked={strictCompliance}
+                onChange={(e) => setStrictCompliance(e.target.checked)}
+                className="w-4 h-4 accent-primary"
+              />
+              <span className="text-primary text-xs font-semibold font-mono">
+                🛡️ حماية صارمة لـ Adobe Stock
+                <span className="block text-[10px] text-secondary font-normal mt-0.5">
+                  تمنع توليد وجوه، شعارات، أو نصوص لضمان قبول الصور بنسبة 100%
+                </span>
+              </span>
+            </label>
           </div>
 
           <div>
