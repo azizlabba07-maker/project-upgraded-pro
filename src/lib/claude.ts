@@ -178,6 +178,12 @@ ${generationHistory ? `\nCRITICAL MEMORY KNOWLEDGE:\n${generationHistory}\n` : "
 
 CRITICAL DIVERSITY INSTRUCTION:
 Even though you are strictly following the assigned topic, YOU MUST MAKE EVERY SINGLE PROMPT COMPLETELY UNIQUE.
+Change the lighting totally (e.g., from bright sunlight to dark moody). Change the composition. Change the camera lens.
+If you see the CRITICAL MEMORY KNOWLEDGE above, you MUST NOT repeat those scenarios. Invent new ones.
+
+ULTRA CRITICAL RULE:
+I asked for EXACTLY ${count} prompts. If you return ${count - 1} or less, the system will CRASH. 
+YOU MUST RETURN A JSON ARRAY OF EXACTLY ${count} OBJECTS. NEVER LESS. IF THE MEMORY KNOWLEDGE RESTRICTS YOU, BE MORE CREATIVE, BUT STILL OUTPUT EXACTLY ${count} PROMPTS.
 1. Change the camera angles (extreme close-up, wide shot, aerial, low angle).
 2. Change the lighting setups (cinematic, warm golden hour, moody neon, stark studio lighting).
 3. Change the specific subject matter and setting details for each of the ${count} prompts.

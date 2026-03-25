@@ -314,7 +314,16 @@ export async function generateWithGemini(prompt: string, temperature = 1.4, imag
   };
 
   if (useSearch) {
-    payloadBody.tools = [{ googleSearch: {} }];
+    payloadBody.tools = [
+      {
+        googleSearchRetrieval: {
+          dynamicRetrievalConfig: {
+            mode: "MODE_DYNAMIC",
+            dynamicThreshold: 0.3,
+          },
+        },
+      },
+    ];
   }
 
   const body = JSON.stringify(payloadBody);
@@ -347,11 +356,19 @@ export async function generateWithGemini(prompt: string, temperature = 1.4, imag
         } catch (error) {
           lastError = error;
           const msg = error instanceof Error ? error.message.toLowerCase() : "";
-          // Keep trying model/version only for unsupported model/version errors.
+          
+          if (msg.includes("api_error_400")) {
+            // If the search tool caused a 400, we fall back to no search immediately
+            if (useSearch) {
+                console.warn("Search grounding caused 400, falling back to standard generation");
+                return generateWithGemini(prompt, temperature, image, false);
+            }
+            continue; // Continue to next model on bad requests (e.g., model deprecation)
+          }
+
           if (msg.includes("not found") || msg.includes("is not supported for generatecontent")) {
             continue;
           }
-          // If this key is throttled/quota/auth-limited, try next configured key.
           if (
             msg.includes("gemini_quota_daily_exceeded") ||
             msg.includes("api_error_429") ||
@@ -489,6 +506,13 @@ ${generationHistory ? `\nCRITICAL MEMORY KNOWLEDGE:\n${generationHistory}\n` : "
 
 CRITICAL DIVERSITY INSTRUCTION:
 Even though you are strictly following the assigned topic, YOU MUST MAKE EVERY SINGLE PROMPT COMPLETELY UNIQUE.
+Change the lighting totally (e.g., from bright sunlight to dark moody). Change the composition. Change the camera lens (e.g., macro vs wide-angle).
+If you see the CRITICAL MEMORY KNOWLEDGE above, you MUST NOT repeat those scenarios. Invent new ones.
+
+ULTRA CRITICAL RULE:
+I asked for EXACTLY ${count} prompts. If you return ${count - 1} or less, the system will CRASH. 
+YOU MUST RETURN A JSON ARRAY OF EXACTLY ${count} OBJECTS. NEVER LESS. IF THE MEMORY KNOWLEDGE RESTRICTS YOU, BE MORE CREATIVE, BUT STILL OUTPUT EXACTLY ${count} PROMPTS.
+
 1. Change the camera angles (extreme close-up, wide shot, aerial, low angle).
 2. Change the lighting setups (cinematic, warm golden hour, moody neon, stark studio lighting).
 3. Change the specific subject matter and setting details for each of the ${count} prompts.
