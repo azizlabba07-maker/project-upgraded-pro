@@ -197,11 +197,12 @@ ${trendsStr}
 DIVERSITY: Each prompt must have a completely unique subject, environment, and visual angle. No two prompts alike.
 
 Return ONLY a valid JSON array, no markdown, no explanation:
+CRUCIAL: The array MUST contain EXACTLY ${count} distinct objects. Do not stop at 1.
 [
   {
     "number": 1,
     "category": "${category}",
-    "type": "image",
+    "type": "${outputType === 'video' ? 'video' : 'image'}",
     "demand": "low",
     "prompt": "FULL DETAILED PROMPT. Include all structural elements. Minimum 60 words.",
     "title": "Short SEO title for Adobe Stock (max 70 chars)",

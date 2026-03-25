@@ -489,8 +489,9 @@ FRAMEWORK: [Subject from ${category}] + [Environment] + [Lighting] + [Camera/Com
 - End each: no humans, no faces, no hands, no text, no logos, fictional AI-generated, commercial royalty-free stock
 - PROHIBITED: artist names, real people, brands, IP
 
-Return ONLY valid JSON array:
-[{"number":1,"category":"${category}","type":"image","demand":"low","prompt":"FULL DETAILED PROMPT 60+ words","title":"SEO title max 70 chars","keywords":["kw1","kw2","kw3","kw4","kw5"]}]`;
+Return ONLY a valid JSON array matching this format exactly. 
+CRUCIAL: The array MUST contain EXACTLY ${count} distinct objects. Do not stop at 1.
+[{"number":1,"category":"${category}","type":"${outputType === 'video' ? 'video' : 'image'}","demand":"low","prompt":"FULL DETAILED PROMPT 60+ words","title":"SEO title max 70 chars","keywords":["kw1","kw2","kw3","kw4","kw5"]}]`;
 
   const result = await generateWithGemini(prompt, 0.8);
   const jsonMatch = result.match(/\[[\s\S]*\]/);
