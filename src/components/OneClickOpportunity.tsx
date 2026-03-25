@@ -16,8 +16,10 @@ import {
   getGeminiErrorUserMessage,
   classifyGeminiError,
 } from "@/lib/gemini";
+import { hasOpenAIKey } from "@/lib/openai";
 import { getPromptEvolutionHint } from "@/lib/promptEvolution";
 import { optimizePrompt } from "@/lib/autoOptimizer";
+import { dispatchMarketAnalysis, dispatchPromptGeneration, type UnifiedStockPrompt } from "@/lib/aiDispatcher";
 
 type OutputType = "image" | "video" | "both" | "greenscreen";
 type CompetitionStrategy = "low" | "medium" | "avoid-high";
@@ -271,11 +273,14 @@ export default function OneClickOpportunity({
 
     try {
       // 1) Analysis
-      if (hasAnyApiKey()) {
-        setAnalysis("جاري تحليل السوق بالذكاء الاصطناعي...");
-        setAnalysis(await getAIMarketAnalysis(trend.topic));
-      } else if (hasClaudeKey()) {
-        setAnalysis(await getClaudeMarketAnalysis(trend.topic));
+      if (hasAnyApiKey() || hasClaudeKey() || hasOpenAIKey()) {
+        try {
+          setAnalysis("جاري تحليل السوق بالذكاء الاصطناعي...");
+          const aiRes = await dispatchMarketAnalysis(trend.topic);
+          setAnalysis(aiRes.analysis);
+        } catch {
+          setAnalysis(localAnalysis);
+        }
       } else {
         setAnalysis(localAnalysis);
       }
@@ -285,91 +290,53 @@ export default function OneClickOpportunity({
         ? [...selectedTrends, "STRICT ADOBE COMPLIANCE: NO recognizable faces, NO trademarks, NO logos, NO text, abstract generic representation only"] 
         : selectedTrends;
 
-      if (hasClaudeKey()) {
-        const generated = await generateStockPrompts(
+      try {
+        const { prompts: rawPrompts, engineUsed } = await dispatchPromptGeneration(
           uiCategory,
           count,
           outputType,
           finalTrends,
-          competition
-        );
-        // Auto-optimize each prompt
-        const optimized = await Promise.all(
-          generated.map(async (p) => ({
-            ...p,
-            prompt: await optimizePrompt(p.prompt, uiCategory),
-          }))
-        );
-        setPrompts(optimized);
-        toast.success(`تم توليد وتحسين ${optimized.length} برومبت بنقرة واحدة!`);
-        return;
-      }
-
-      // 2-b) Claude unavailable => Gemini prompts fallback before local fallback.
-      if (hasAnyApiKey() && outputType !== "greenscreen") {
-        const geminiCategory = mapTrendCategoryToGeminiCategory(trend.category);
-        const geminiType = outputType === "both" ? "both" : outputType;
-        const evolutionHint = getPromptEvolutionHint(trend.category);
-        const generated = await generateGeminiStockPrompts(
-          geminiCategory,
-          count,
-          geminiType,
-          finalTrends,
           competition,
-          `${trend.topic}. ${evolutionHint}`.trim()
+          `${trend.topic}. ${getPromptEvolutionHint(trend.category)}`.trim()
         );
-        const normalized: StockImagePrompt[] = generated.map((p, i) => ({
-          number: i + 1,
-          category: uiCategory,
-          type: p.type,
-          demand: p.demand,
-          prompt: p.prompt,
-          title: p.title,
-          keywords: p.keywords,
-        }));
+
         // Auto-optimize each prompt
         const optimized = await Promise.all(
-          normalized.map(async (p) => ({
+          rawPrompts.map(async (p) => ({
             ...p,
             prompt: await optimizePrompt(p.prompt, uiCategory),
           }))
         );
-        setPrompts(optimized);
-        toast.success(`تم توليد وتحسين ${optimized.length} برومبت عبر Gemini!`);
-        return;
+        // UnifiedStockPrompt is compatible with StockImagePrompt
+        setPrompts(optimized as StockImagePrompt[]);
+        toast.success(`تم التوليد بنجاح عبر (${engineUsed.toUpperCase()})`);
+      } catch (promptErr) {
+        // If AI generation entirely fails, fallback to pure local generation
+        console.warn("AI generation failed or no keys, falling back to local...", promptErr);
+        setKeywordsLoading(true);
+        const kw = pickLocalKeywordsFallback(49);
+        setKeywordsLoading(false);
+
+        const generatedLocal = localGeneratePrompts({
+          trend,
+          uiCategory,
+          outputType,
+          competition,
+          count,
+          selectedTrends: finalTrends,
+          keywords: kw,
+        });
+        const optimizedLocal = await Promise.all(
+          generatedLocal.map(async (p) => ({
+            ...p,
+            prompt: await optimizePrompt(p.prompt, uiCategory),
+          }))
+        );
+        setPrompts(optimizedLocal);
+        toast.success("تم التوليد والتحسين محلياً! (Fallback)");
       }
-
-      // 2-c) Last fallback: local generation.
-      setKeywordsLoading(true);
-      const kw =
-        hasAnyApiKey()
-          ? await generateAIKeywords(trend.topic, Math.max(20, Math.min(49, count * 5)))
-          : pickLocalKeywordsFallback(49);
-      setKeywordsLoading(false);
-
-      const generatedLocal = localGeneratePrompts({
-        trend,
-        uiCategory,
-        outputType,
-        competition,
-        count,
-        selectedTrends: finalTrends,
-        keywords: kw,
-      });
-      // Auto-optimize each prompt
-      const optimizedLocal = await Promise.all(
-        generatedLocal.map(async (p) => ({
-          ...p,
-          prompt: await optimizePrompt(p.prompt, uiCategory),
-        }))
-      );
-      setPrompts(optimizedLocal);
-      toast.success(`تم توليد وتحسين Prompts محلياً!`);
     } catch (err) {
-      setKeywordsLoading(false);
-      const geminiType = classifyGeminiError(err);
-      toast.error(getGeminiErrorUserMessage(err) || `خطأ (${geminiType}) في التوليد`);
-      // Last resort: show local analysis and keep prompts empty.
+      toast.error("حدث خطأ غير متوقع.");
       setAnalysis(localAnalysis);
     } finally {
       setLoading(false);

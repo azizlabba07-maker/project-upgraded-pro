@@ -1,4 +1,4 @@
-import type { MarketTrend } from "./marketData";
+import type { MarketTrend } from "../data/marketData";
 
 /**
  * تحليلات متقدمة للسوق - تحديث تلقائي وذكي
@@ -75,16 +75,18 @@ export const COMPETITOR_ANALYSIS: CompetitorAnalysis[] = [
 ];
 
 export function calculateOpportunityScore(trend: MarketTrend): number {
-  const searchScore = Math.min(trend.searches / 10000, 50); // Max 50 points
-  const profitScore = trend.profitability * 0.3; // Max 30 points
-  const competitionScore = (100 - trend.competition) * 0.2; // Max 20 points
+  const searchScore = Math.min((trend.searches || 5000) / 1000, 50); // Max 50 points
+  const profitScore = (trend.profitability / 100) * 30; // Max 30 points
+  const compValue = trend.competition === 'high' ? 80 : trend.competition === 'medium' ? 50 : 20;
+  const competitionScore = ((100 - compValue) / 100) * 20; // Max 20 points
 
-  return Math.round(searchScore + profitScore + competitionScore);
+  return Math.min(100, Math.round(searchScore + profitScore + competitionScore));
 }
 
 export function predictTrendPeak(trend: MarketTrend): string {
   const baseDate = new Date();
-  const monthsToAdd = Math.max(1, Math.min(6, trend.competition / 20));
+  const compValue = trend.competition === 'high' ? 80 : trend.competition === 'medium' ? 50 : 20;
+  const monthsToAdd = Math.max(1, Math.min(6, Math.floor(compValue / 20)));
   baseDate.setMonth(baseDate.getMonth() + monthsToAdd);
 
   return baseDate.toLocaleDateString('ar-SA', {
@@ -95,11 +97,11 @@ export function predictTrendPeak(trend: MarketTrend): string {
 }
 
 export function assessRiskLevel(trend: MarketTrend): "low" | "medium" | "high" {
-  const competition = trend.competition;
+  const compValue = trend.competition === 'high' ? 80 : trend.competition === 'medium' ? 50 : 20;
   const profitability = trend.profitability;
 
-  if (competition < 30 && profitability > 80) return "low";
-  if (competition < 60 && profitability > 60) return "medium";
+  if (compValue < 30 && profitability > 80) return "low";
+  if (compValue < 60 && profitability > 60) return "medium";
   return "high";
 }
 
@@ -107,15 +109,17 @@ export function estimateTimeToMarket(trend: MarketTrend): number {
   // Estimated days based on complexity and competition
   const baseTime = 7; // أسبوع أساسي
   const complexityFactor = trend.category === "Technology" ? 1.5 : 1;
-  const competitionFactor = trend.competition / 100;
+  const compValue = trend.competition === 'high' ? 80 : trend.competition === 'medium' ? 50 : 20;
+  const competitionFactor = compValue / 100;
 
   return Math.round(baseTime * complexityFactor * (1 + competitionFactor));
 }
 
 export function calculateViralPotential(trend: MarketTrend): number {
   // Based on search volume and uniqueness
-  const searchFactor = Math.min(trend.searches / 5000, 50);
-  const uniquenessFactor = (100 - trend.competition) * 0.5;
+  const searchFactor = Math.min((trend.searches || 0) / 2000, 50);
+  const compValue = trend.competition === 'high' ? 80 : trend.competition === 'medium' ? 50 : 20;
+  const uniquenessFactor = ((100 - compValue) / 100) * 50;
 
   return Math.round(searchFactor + uniquenessFactor);
 }
@@ -123,9 +127,9 @@ export function calculateViralPotential(trend: MarketTrend): number {
 export function generateMarketAnalytics(trend: MarketTrend): MarketAnalytics {
   return {
     trend,
-    growthRate: Math.round((trend.searches / 1000) * (Math.random() * 0.5 + 0.75)),
-    seasonalFactor: Math.round(Math.random() * 40 + 60), // 60-100%
-    competitorDensity: trend.competition,
+    growthRate: Math.round(((trend.searches || 1000) / 50000) * 100),
+    seasonalFactor: Math.round(75 + ((trend.searches % 100) / 4)),
+    competitorDensity: trend.competition === 'high' ? 85 : trend.competition === 'medium' ? 50 : 20,
     emergingKeywords: generateEmergingKeywords(trend),
     predictedPeak: predictTrendPeak(trend),
     riskLevel: assessRiskLevel(trend),

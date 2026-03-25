@@ -22,42 +22,70 @@ interface TrendItem {
   searches: number;
 }
 
-function parseGoogleTrendsRSS(xml: string): string[] {
-  const items: string[] = [];
-  const itemRegex = /<item>[\s\S]*?<title><!\[CDATA\[(.*?)\]\]><\/title>[\s\S]*?<\/item>/gi;
-  let m;
-  while ((m = itemRegex.exec(xml)) !== null) {
-    const title = m[1]?.replace(/^Daily Search Trends:\s*/i, "").trim() || "";
-    if (title && title.length < 80) items.push(title);
+function parseGoogleTrendsRSS(xml: string): {topic: string, traffic: number}[] {
+  const items: {topic: string, traffic: number}[] = [];
+  const parts = xml.split("</item>");
+  for (const part of parts) {
+    if (!part.includes("<item>")) continue;
+    const titleMatch = part.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/i);
+    const trafficMatch = part.match(/<ht:approx_traffic>([^<]+)<\/ht:approx_traffic>/i);
+    
+    if (titleMatch && trafficMatch) {
+      const title = titleMatch[1].replace(/^Daily Search Trends:\s*/i, "").trim();
+      const trafficStr = trafficMatch[1].replace(/,/g, "").replace(/\+/, "").trim();
+      const traffic = parseInt(trafficStr, 10) || 5000;
+      if (title && title.length < 80) items.push({ topic: title, traffic });
+    }
   }
   return items.slice(0, 20);
 }
 
-function mapToTrendItems(topics: string[]): TrendItem[] {
+function mapToTrendItems(parsedItems: {topic: string, traffic: number}[]): TrendItem[] {
   const categories = ["AI", "Sustainability", "Technology", "Business", "Science", "Nature", "Design", "Wellness", "Food"];
-  const seed = Date.now() % 1e6;
-  const rnd = () => {
-    const x = Math.sin(seed * 9999) * 10000;
-    return x - Math.floor(x);
-  };
 
-  if (topics.length === 0) {
+  if (parsedItems.length === 0) {
     return [
-      { topic: "AI and Machine Learning", demand: "high", competition: "high", profitability: 87, category: "AI", searches: 14000 },
-      { topic: "Sustainability and Green Energy", demand: "high", competition: "medium", profitability: 89, category: "Sustainability", searches: 11000 },
-      { topic: "Remote Work and Home Office", demand: "high", competition: "medium", profitability: 86, category: "Technology", searches: 10000 },
+      { topic: "AI and Machine Learning", demand: "high", competition: "high", profitability: 87, category: "AI", searches: 200000 },
+      { topic: "Sustainability and Green Energy", demand: "high", competition: "medium", profitability: 89, category: "Sustainability", searches: 150000 },
+      { topic: "Remote Work and Home Office", demand: "high", competition: "medium", profitability: 86, category: "Technology", searches: 100000 },
     ];
   }
 
-  return topics.slice(0, 15).map((t, i) => {
+  const maxTraffic = Math.max(...parsedItems.map(i => i.traffic), 1);
+
+  return parsedItems.slice(0, 15).map((item, i) => {
     const cat = categories[i % categories.length];
-    const demandRoll = rnd();
-    const demand: TrendItem["demand"] = demandRoll > 0.6 ? "high" : demandRoll > 0.3 ? "medium" : "low";
-    const compRoll = rnd();
-    const competition: TrendItem["competition"] = compRoll > 0.6 ? "high" : compRoll > 0.3 ? "medium" : "low";
-    const profitability = Math.min(99, Math.max(55, 70 + (demand === "high" ? 15 : demand === "medium" ? 5 : -5) + (competition === "low" ? 10 : competition === "medium" ? 0 : -8)));
-    const searches = 5000 + Math.round(rnd() * 12000);
-    return { topic: t, demand, competition, profitability, category: cat, searches };
+    
+    // Deterministic Demand based on real Traffic
+    const normalizedTraffic = item.traffic / maxTraffic;
+    let demand: TrendItem["demand"] = "low";
+    if (item.traffic >= 100000 || normalizedTraffic >= 0.7) demand = "high";
+    else if (item.traffic >= 20000 || normalizedTraffic >= 0.3) demand = "medium";
+    
+    // Competition heuristic based on topic breadth (word count)
+    let competition: TrendItem["competition"] = "medium";
+    const words = item.topic.split(" ").length;
+    if (words <= 2 && demand === "high") competition = "high";
+    else if (words >= 4) competition = "low";
+    
+    // Profitability Algorithm
+    let profitability = 65; 
+    if (demand === "high") profitability += 20;
+    else if (demand === "medium") profitability += 10;
+    
+    if (competition === "low") profitability += 14;
+    else if (competition === "high") profitability -= 10;
+    
+    profitability = Math.min(99, Math.max(50, profitability));
+    
+    return { 
+      topic: item.topic, 
+      demand, 
+      competition, 
+      profitability, 
+      category: cat, 
+      searches: item.traffic 
+    };
   });
 }
 
@@ -67,7 +95,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    let topics: string[] = [];
+    let parsedItems: {topic: string, traffic: number}[] = [];
 
     try {
       const res = await fetch(TRENDS_RSS_URL, {
@@ -75,13 +103,13 @@ Deno.serve(async (req) => {
       });
       if (res.ok) {
         const xml = await res.text();
-        topics = parseGoogleTrendsRSS(xml);
+        parsedItems = parseGoogleTrendsRSS(xml);
       }
     } catch {
       // Fallback: no external fetch
     }
 
-    const trends = mapToTrendItems(topics);
+    const trends = mapToTrendItems(parsedItems);
     let geo = "US";
     if (req.method === "POST") {
       try {
@@ -98,7 +126,7 @@ Deno.serve(async (req) => {
         success: true,
         geo,
         trends,
-        source: topics.length > 0 ? "google_trends_rss" : "fallback",
+        source: parsedItems.length > 0 ? "google_trends_rss" : "fallback",
         fetchedAt: new Date().toISOString(),
       }),
       {

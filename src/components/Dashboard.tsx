@@ -313,12 +313,19 @@ export default function Dashboard() {
             return (
               <div key={i} className="py-2 border-b border-primary/20">
                 <div className="flex items-center justify-between text-secondary font-mono text-xs mb-1">
-                  <span>
+                  <span className="flex-1 truncate mr-2">
                     <span className="text-primary font-bold">{i + 1}.</span>{" "}
                     {item.topic}
-                    {isGold && <span className="ml-2 text-accent text-[9px]">⭐</span>}
+                    {isGold ? (
+                      <span className="ml-2 text-accent text-[10px] bg-accent/20 px-1.5 py-0.5 rounded border border-accent/30 tracking-wide font-extrabold shadow-[0_0_8px_rgba(255,215,0,0.4)] inline-block">🔥 أنشئ 15 صورة</span>
+                    ) : item.profitability > 80 ? (
+                      <span className="ml-2 text-primary text-[9px] bg-primary/20 px-1.5 py-0.5 rounded border border-primary/30 tracking-wide inline-block">⭐ ممتازة</span>
+                    ) : null}
                   </span>
-                  <span className="text-primary font-semibold">{item.searches.toLocaleString()}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-accent font-semibold bg-accent/10 px-1.5 py-0.5 rounded border border-accent/20 text-[10px]">Score: {item.profitability}</span>
+                    <span className="text-primary font-semibold">{item.searches.toLocaleString()}</span>
+                  </div>
                 </div>
                 <div className="h-1 bg-primary/10 rounded-full overflow-hidden">
                   <div

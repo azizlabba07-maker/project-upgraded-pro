@@ -9,6 +9,7 @@ import {
   validateGeminiApiKey,
 } from "@/lib/gemini";
 import { getClaudeApiKey, setClaudeApiKey, validateClaudeKey, isClaudeProxyEnabled } from "@/lib/claude";
+import { getOpenAIApiKey, setOpenAIApiKey, validateOpenAIApiKey } from "@/lib/openai";
 import { toast } from "sonner";
 
 export default function ApiKeySettings() {
@@ -25,6 +26,11 @@ export default function ApiKeySettings() {
   const [savingClaude, setSavingClaude] = useState(false);
   const [claudeResult, setClaudeResult] = useState<{ ok: boolean; message: string } | null>(null);
   const proxyEnabled = isClaudeProxyEnabled();
+
+  const [openaiKey, setOpenAIKeyState] = useState(getOpenAIApiKey());
+  const [showOpenAI, setShowOpenAI] = useState(false);
+  const [savingOpenAI, setSavingOpenAI] = useState(false);
+  const [openaiResult, setOpenAIResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   const notifyKeyUpdated = (hasKey: boolean) => {
     window.dispatchEvent(new CustomEvent("gemini-key-updated", { detail: { hasKey } }));
@@ -71,6 +77,18 @@ export default function ApiKeySettings() {
       if (!v.ok) { toast.error(v.message); return; }
       setClaudeApiKey(trimmed); toast.success("✅ تم حفظ مفتاح Claude API!");
     } finally { setSavingClaude(false); }
+  };
+
+  const handleSaveOpenAI = async () => {
+    const trimmed = openaiKey.trim();
+    if (!trimmed) { setOpenAIApiKey(""); setOpenAIKeyState(""); setOpenAIResult(null); toast.success("تم إزالة مفتاح OpenAI."); return; }
+    setSavingOpenAI(true);
+    try {
+      const v = await validateOpenAIApiKey(trimmed);
+      setOpenAIResult(v);
+      if (!v.ok) { toast.error(v.message); return; }
+      setOpenAIApiKey(trimmed); toast.success("✅ تم حفظ مفتاح OpenAI API!");
+    } finally { setSavingOpenAI(false); }
   };
 
   const inputClass = "bg-card border-2 border-primary text-primary p-2.5 rounded-md font-mono text-xs focus:outline-none focus:box-glow-strong w-full";
@@ -206,6 +224,28 @@ export default function ApiKeySettings() {
         </div>
       </div>
 
+      {/* OpenAI Key */}
+      <div className="bg-card border-2 border-[#10a37f] rounded-lg p-5 box-glow space-y-4" style={{ boxShadow: '0 0 15px rgba(16, 163, 127, 0.2)' }}>
+        <h3 className="text-base font-semibold text-[#10a37f] font-mono" style={{ textShadow: '0 0 10px rgba(16, 163, 127, 0.4)' }}>🧠 OpenAI API Key</h3>
+        <div className="bg-[#10a37f]/5 border border-[#10a37f]/30 rounded-md p-4 space-y-2">
+          <p className="text-secondary font-mono text-xs">مطلوب لـ: البديل القوي (Fallback) في حالة تعطل Claude لتوليد البرومبتات.</p>
+          <ol className="text-secondary font-mono text-[11px] list-decimal list-inside space-y-1">
+            <li>افتح <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-[#10a37f] underline">OpenAI Platform</a></li>
+            <li>قم بتعبئة رصيد حسابك (مطلوب للـ API)</li>
+            <li>قم بإنشاء "Secret Key" جديد والصقه هنا</li>
+          </ol>
+        </div>
+        <div className="flex gap-2">
+          <input type={showOpenAI ? "text" : "password"} value={openaiKey} onChange={(e) => setOpenAIKeyState(e.target.value)} placeholder="sk-proj-..." className={inputClass.replace('border-primary', 'border-[#10a37f]').replace('text-primary', 'text-[#10a37f]')} dir="ltr" />
+          <button onClick={() => setShowOpenAI(!showOpenAI)} className="bg-card border-2 border-[#10a37f] text-[#10a37f] px-3 rounded-md text-xs font-mono hover:bg-[#10a37f]/10 transition-all shrink-0">{showOpenAI ? "🙈" : "👁️"}</button>
+        </div>
+        {openaiResult && <div className={`rounded-md p-2.5 font-mono text-xs border ${openaiResult.ok ? "bg-[#10a37f]/10 border-[#10a37f]/30 text-[#10a37f]" : "bg-destructive/10 border-destructive/30 text-destructive"}`}>{openaiResult.message}</div>}
+        <div className="flex gap-3">
+          <button onClick={handleSaveOpenAI} disabled={savingOpenAI || !openaiKey.trim()} className="flex-1 bg-[#10a37f] text-white py-2.5 rounded-md font-mono text-xs font-semibold hover:opacity-90 transition-all disabled:opacity-40" style={{ boxShadow: '0 0 15px rgba(16, 163, 127, 0.4)' }}>{savingOpenAI ? "⏳ جارِ الحفظ..." : "💾 حفظ OpenAI Key"}</button>
+          {getOpenAIApiKey() && <button onClick={() => { setOpenAIKeyState(""); setOpenAIApiKey(""); setOpenAIResult(null); toast.success("تم الإزالة."); }} className="bg-card border-2 border-destructive text-destructive px-4 py-2.5 rounded-md font-mono text-xs font-semibold hover:bg-destructive/10 transition-all">🗑️</button>}
+        </div>
+      </div>
+
       {/* Status */}
       <div className="bg-card border-2 border-primary rounded-lg p-4 box-glow">
         <h4 className="text-sm font-semibold text-primary font-mono mb-3">📊 حالة المفاتيح</h4>
@@ -217,6 +257,10 @@ export default function ApiKeySettings() {
           <div className="flex items-center gap-2">
             <span className={(proxyEnabled || getClaudeApiKey()) ? "text-accent" : "text-destructive"}>{(proxyEnabled || getClaudeApiKey()) ? "✅" : "⚠️"}</span>
             <span className="text-secondary">Claude: {proxyEnabled ? "Proxy mode مفعّل — Backend آمن" : getClaudeApiKey() ? "مفعّل — المولد المتقدم، SEO Bundle" : "غير مفعّل"}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={getOpenAIApiKey() ? "text-accent" : "text-destructive"}>{getOpenAIApiKey() ? "✅" : "⚠️"}</span>
+            <span className="text-secondary">OpenAI: {getOpenAIApiKey() ? "مفعّل — بديل موثوق (Fallback)" : "غير مفعّل"}</span>
           </div>
         </div>
       </div>
