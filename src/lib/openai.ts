@@ -123,11 +123,15 @@ export async function generateOpenAIStockPrompts(
     ? `USER TITLE/TOPIC TO FOLLOW STRICTLY: "${topicHint.trim()}". Every prompt must stay aligned with this title/category.`
     : "";
 
+  const randomStyles = ["Cinematic", "Documentary", "Editorial", "Ultra-modern", "Moody/Dramatic", "Bright/Airy", "Cyberpunk/Neon", "Minimalist", "High-contrast", "Vintage/Retro"];
+  const forcedStyle = randomStyles[Math.floor(Math.random() * randomStyles.length)];
+  const forcedCamera = ["Drone/Aerial", "Macro/Close-up", "Wide-angle", "Eye-level tracking", "Low angle dynamic"][Math.floor(Math.random() * 5)];
+
   const system = `You are an expert Adobe Stock prompt engineer and market analyst. You create commercially successful, sales-optimized stock content prompts. You MUST enforce full Adobe Stock Generative AI compliance in every prompt. Ensure high diversity and unique styles.`;
 
   const user = `Generate exactly ${count} Adobe Stock prompts for category: "${category}"
 
-UNIQUENESS SEED: ${seed}
+UNIQUENESS SEED: ${seed} | MANDATORY STYLE INFLUENCE: "${forcedStyle}" | MANDATORY CAMERA INFLUENCE: "${forcedCamera}"
 OUTPUT TYPE: ${typeMap[outputType] || typeMap["image"]}
 COMPETITION STRATEGY: Focus on ${competitionMap[competition] || competitionMap["medium"]}.
 ${topicConstraint}
@@ -138,6 +142,7 @@ Even though you are strictly following the assigned topic, YOU MUST MAKE EVERY S
 2. Change the lighting setups (cinematic, warm golden hour, moody neon, stark studio lighting).
 3. Change the specific subject matter and setting details for each of the ${count} prompts.
 NO TWO PROMPTS CAN BE IDENTICAL OR TOO SIMILAR. YOU MUST INVENT DIFFERENT VISUAL STORIES FOR EVERY PROMPT.
+WARNING: YOU MUST RETURN EXACTLY ${count} PROMPTS. DO NOT RETURN 1 PROMPT IF ${count} ARE REQUESTED. I WILL FAIL YOUR TASK IF THE ARRAY LENGTH IS NOT EXACTLY ${count}.
 
 ${ADOBE_AI_PROMPT_RULES}
 
@@ -157,9 +162,10 @@ PROHIBITED IN PROMPT/KEYWORDS: artist names, real people, fictional characters, 
 ${trendsStr}
 
 DIVERSITY: Each prompt must have a completely unique subject, environment, and visual angle. No two prompts alike. Make it truly dynamic and market-driven.
+EVERY SINGLE PROMPT in the array MUST be entirely different from the others!
 
 Return ONLY a valid JSON array matching this format exactly.
-CRUCIAL: The array MUST contain EXACTLY ${count} distinct objects. Do not stop at 1.
+CRUCIAL: The array MUST contain EXACTLY ${count} distinct objects. Do not stop at less than ${count}.
 [
   {
     "number": 1,

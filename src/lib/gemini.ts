@@ -463,13 +463,17 @@ export async function generateGeminiStockPrompts(
     ? `USER TITLE/TOPIC TO FOLLOW STRICTLY: "${topicHint.trim()}". Every prompt must stay aligned with this title and category.`
     : "";
 
+  const randomStyles = ["Cinematic", "Documentary", "Editorial", "Ultra-modern", "Moody/Dramatic", "Bright/Airy", "Cyberpunk/Neon", "Minimalist", "High-contrast", "Vintage/Retro"];
+  const forcedStyle = randomStyles[Math.floor(Math.random() * randomStyles.length)];
+  const forcedCamera = ["Drone/Aerial", "Macro/Close-up", "Wide-angle", "Eye-level tracking", "Low angle dynamic"][Math.floor(Math.random() * 5)];
+
   const prompt = `You are an expert Adobe Stock prompt engineer. Generate exactly ${count} prompts.
 
 ${strictRules}
 
 REQUIRED CATEGORY: "${category}" — EVERY prompt MUST be about this topic ONLY.
 
-UNIQUENESS SEED: ${seed}
+UNIQUENESS SEED: ${seed} | MANDATORY STYLE INFLUENCE: "${forcedStyle}" | MANDATORY CAMERA INFLUENCE: "${forcedCamera}"
 OUTPUT TYPE: ${typeReq}
 COMPETITION: ${compReq}
 ${trendsStr}
@@ -481,6 +485,7 @@ Even though you are strictly following the assigned topic, YOU MUST MAKE EVERY S
 2. Change the lighting setups (cinematic, warm golden hour, moody neon, stark studio lighting).
 3. Change the specific subject matter and setting details for each of the ${count} prompts.
 NO TWO PROMPTS CAN BE IDENTICAL OR TOO SIMILAR. YOU MUST INVENT DIFFERENT VISUAL STORIES FOR EVERY PROMPT.
+WARNING: YOU MUST RETURN EXACTLY ${count} PROMPTS. DO NOT RETURN 1 PROMPT IF ${count} ARE REQUESTED. I WILL FAIL YOUR TASK IF THE ARRAY LENGTH IS NOT EXACTLY ${count}.
 
 ${ADOBE_AI_PROMPT_RULES}
 
@@ -488,9 +493,10 @@ FRAMEWORK: [Subject from ${category}] + [Environment] + [Lighting] + [Camera/Com
 - sRGB, 4MP min, 4K for video, sharp focus
 - End each: no humans, no faces, no hands, no text, no logos, fictional AI-generated, commercial royalty-free stock
 - PROHIBITED: artist names, real people, brands, IP
+- EVERY SINGLE PROMPT in the array MUST be entirely different from the others!
 
 Return ONLY a valid JSON array matching this format exactly. 
-CRUCIAL: The array MUST contain EXACTLY ${count} distinct objects. Do not stop at 1.
+CRUCIAL: The array MUST contain EXACTLY ${count} distinct objects. Do not stop at less than ${count}.
 [{"number":1,"category":"${category}","type":"${outputType === 'video' ? 'video' : 'image'}","demand":"low","prompt":"FULL DETAILED PROMPT 60+ words","title":"SEO title max 70 chars","keywords":["kw1","kw2","kw3","kw4","kw5"]}]`;
 
   const result = await generateWithGemini(prompt, 0.8);
