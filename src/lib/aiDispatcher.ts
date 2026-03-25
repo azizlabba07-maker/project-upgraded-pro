@@ -27,14 +27,15 @@ export async function dispatchPromptGeneration(
   outputType: "image" | "video" | "both" | "greenscreen",
   trends: string[],
   competition: string,
-  topicHint?: string
+  topicHint?: string,
+  generationHistory?: string
 ): Promise<DispatchResult> {
   const errors: string[] = [];
 
   // 1. Try Claude
   if (hasClaudeKey()) {
     try {
-      const prompts = await generateClaudePrompts(category, count, outputType, trends, competition);
+      const prompts = await generateClaudePrompts(category, count, outputType, trends, competition, generationHistory);
       if (prompts && prompts.length > 0) {
         return { prompts: prompts as UnifiedStockPrompt[], engineUsed: "claude" };
       }
@@ -47,7 +48,7 @@ export async function dispatchPromptGeneration(
   // 2. Try OpenAI
   if (hasOpenAIKey()) {
     try {
-      const prompts = await generateOpenAIStockPrompts(category, count, outputType, trends, competition, topicHint);
+      const prompts = await generateOpenAIStockPrompts(category, count, outputType, trends, competition, topicHint, generationHistory);
       if (prompts && prompts.length > 0) {
         return { prompts: prompts as UnifiedStockPrompt[], engineUsed: "openai" };
       }
@@ -62,7 +63,7 @@ export async function dispatchPromptGeneration(
     try {
       // Gemini expects 'both' instead of 'greenscreen' in its strict type, but let's cast if needed.
       const geminiType = outputType === "greenscreen" ? "image" : outputType;
-      const prompts = await generateGeminiStockPrompts(category, count, geminiType, trends, competition, topicHint);
+      const prompts = await generateGeminiStockPrompts(category, count, geminiType, trends, competition, topicHint, generationHistory);
       if (prompts && prompts.length > 0) {
         // Map types back
         const unified = prompts.map(p => ({

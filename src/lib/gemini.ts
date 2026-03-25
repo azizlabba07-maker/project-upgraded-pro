@@ -291,7 +291,7 @@ export async function validateGeminiApiKey(key: string): Promise<{ ok: boolean; 
   }
 }
 
-export async function generateWithGemini(prompt: string, temperature = 1.4, image?: { base64: string; mimeType: string }): Promise<string> {
+export async function generateWithGemini(prompt: string, temperature = 1.4, image?: { base64: string; mimeType: string }, useSearch = false): Promise<string> {
   const storedKeys = readStoredGeminiApiKeys();
   const envKey = (import.meta.env.VITE_GEMINI_API_KEY || "").trim();
   const apiKeysBase = storedKeys.length > 0 ? storedKeys : (envKey ? [envKey] : []);
@@ -308,10 +308,16 @@ export async function generateWithGemini(prompt: string, temperature = 1.4, imag
     });
   }
 
-  const body = JSON.stringify({
+  const payloadBody: any = {
     contents: [{ parts }],
     generationConfig: { temperature, topP: temperature > 1 ? 0.99 : 0.95, maxOutputTokens: 8192 },
-  });
+  };
+
+  if (useSearch) {
+    payloadBody.tools = [{ googleSearch: {} }];
+  }
+
+  const body = JSON.stringify(payloadBody);
 
   let lastError: unknown = new Error("Unknown Gemini error");
   let quotaLimitedKeys = 0;
@@ -445,7 +451,8 @@ export async function generateGeminiStockPrompts(
   outputType: "image" | "video" | "both",
   trends: string[],
   competition: string,
-  topicHint?: string
+  topicHint?: string,
+  generationHistory?: string
 ): Promise<GeminiStockPrompt[]> {
   const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const strictRules = CATEGORY_STRICT_RULES.replace(/\{CATEGORY\}/g, category);
@@ -478,6 +485,7 @@ OUTPUT TYPE: ${typeReq}
 COMPETITION: ${compReq}
 ${trendsStr}
 ${topicConstraint}
+${generationHistory ? `\nCRITICAL MEMORY KNOWLEDGE:\n${generationHistory}\n` : ""}
 
 CRITICAL DIVERSITY INSTRUCTION:
 Even though you are strictly following the assigned topic, YOU MUST MAKE EVERY SINGLE PROMPT COMPLETELY UNIQUE.
@@ -615,13 +623,15 @@ ${extraStoreContext}
 }
 
 export async function getAIMarketAnalysis(topic: string): Promise<string> {
-  return generateWithGemini(`أنت محلل سوق Adobe Stock محترف. قدم تحليل مختصر لموضوع "${topic}" يشمل:
-1. حالة الطلب الحالي
-2. مستوى المنافسة
-3. أفضل أنواع المحتوى
-4. نصائح للتميز
-5. توقعات مستقبلية
-اكتب بالعربية، أقل من 200 كلمة.`);
+  return generateWithGemini(`You are an elite Adobe Stock market analyst. Using Google Search, retrieve the LIVE data and search trends for the topic "${topic}".
+Provide a concise Arabic analysis covering:
+1. Current LIVE demand based on web searches (give real numbers or estimates you found online today)
+2. Live competition level on stock photography platforms
+3. The most profitable sub-niches inside this topic right now
+4. Tips to excel
+5. Near future expectations based on current news
+
+Write in Arabic, under 200 words. Keep it strictly focused on the real-time data you found.`, 0.7, undefined, true);
 }
 
 export async function generateAITrends(): Promise<Array<{
@@ -634,9 +644,12 @@ export async function generateAITrends(): Promise<Array<{
 }>> {
   const seed = `TRENDS-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-  const prompt = `You are an Adobe Stock market analyst. Generate 15 CURRENT trending topics for stock content in 2025-2026.
+  const prompt = `You are a Live Market Analyst for Adobe Stock. 
+CRITICAL: SEARCH THE WEB NOW using the Google Search tool. Fetch the LIVE trending topics, news, and search volume spikes happening TODAY.
 
 Seed for uniqueness: ${seed}
+
+Look up top trending visual concepts, graphic search trends, or high-volume keywords on Google right now. Based on real LIVE data you just found, generate 15 CURRENT trending topics for stock content.
 
 For each topic provide:
 - topic: English name (short, 2-4 words)
@@ -644,13 +657,13 @@ For each topic provide:
 - competition: "high", "medium", or "low"  
 - profitability: number 50-100
 - category: one of "AI", "Sustainability", "Work", "Wellness", "Diversity", "Design", "Nature", "Food", "Business", "Technology", "Science"
-- searches: estimated monthly searches 3000-15000
+- searches: Write a realistic estimate of monthly searches based on your live web search data (e.g. 5000, 150000, 12500)
 
-Focus on REAL current trends: AI, sustainability, remote work, health, emerging tech, etc.
+Focus strictly on the REAL data from today. Do not hallucinate.
 
 Return ONLY a JSON array, no markdown.`;
 
-  const result = await generateWithGemini(prompt);
+  const result = await generateWithGemini(prompt, 0.7, undefined, true);
   const jsonMatch = result.match(/\[[\s\S]*\]/);
   if (!jsonMatch) throw new Error("Failed to parse trends");
   return JSON.parse(jsonMatch[0]);

@@ -141,7 +141,8 @@ export async function generateStockPrompts(
   count: number,
   outputType: "image" | "video" | "both" | "greenscreen",
   trends: string[],
-  competition: string
+  competition: string,
+  generationHistory?: string
 ): Promise<StockImagePrompt[]> {
   const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -173,6 +174,7 @@ UNIQUENESS SEED: ${seed} | MANDATORY STYLE INFLUENCE: "${forcedStyle}" | MANDATO
 OUTPUT TYPE: ${typeMap[outputType]}
 
 COMPETITION STRATEGY: Focus on ${competitionMap[competition]}.
+${generationHistory ? `\nCRITICAL MEMORY KNOWLEDGE:\n${generationHistory}\n` : ""}
 
 CRITICAL DIVERSITY INSTRUCTION:
 Even though you are strictly following the assigned topic, YOU MUST MAKE EVERY SINGLE PROMPT COMPLETELY UNIQUE.

@@ -101,7 +101,8 @@ export async function generateOpenAIStockPrompts(
   outputType: "image" | "video" | "both" | "greenscreen",
   trends: string[],
   competition: string,
-  topicHint?: string
+  topicHint?: string,
+  generationHistory?: string
 ): Promise<OpenAIStockPrompt[]> {
   const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -135,6 +136,7 @@ UNIQUENESS SEED: ${seed} | MANDATORY STYLE INFLUENCE: "${forcedStyle}" | MANDATO
 OUTPUT TYPE: ${typeMap[outputType] || typeMap["image"]}
 COMPETITION STRATEGY: Focus on ${competitionMap[competition] || competitionMap["medium"]}.
 ${topicConstraint}
+${generationHistory ? `\nCRITICAL MEMORY KNOWLEDGE:\n${generationHistory}\n` : ""}
 
 CRITICAL DIVERSITY INSTRUCTION:
 Even though you are strictly following the assigned topic, YOU MUST MAKE EVERY SINGLE PROMPT COMPLETELY UNIQUE.

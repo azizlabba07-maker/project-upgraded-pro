@@ -20,6 +20,7 @@ import { hasOpenAIKey } from "@/lib/openai";
 import { getPromptEvolutionHint } from "@/lib/promptEvolution";
 import { optimizePrompt } from "@/lib/autoOptimizer";
 import { dispatchMarketAnalysis, dispatchPromptGeneration, type UnifiedStockPrompt } from "@/lib/aiDispatcher";
+import { getPromptMemory, saveToPromptMemory } from "@/lib/promptMemory";
 
 type OutputType = "image" | "video" | "both" | "greenscreen";
 type CompetitionStrategy = "low" | "medium" | "avoid-high";
@@ -318,6 +319,8 @@ export default function OneClickOpportunity({
         ? [...selectedTrends, "STRICT ADOBE COMPLIANCE: NO recognizable faces, NO trademarks, NO logos, NO text, abstract generic representation only"] 
         : selectedTrends;
 
+      const historyContext = getPromptMemory(trend.category);
+
       try {
         const { prompts: rawPrompts, engineUsed } = await dispatchPromptGeneration(
           uiCategory,
@@ -325,12 +328,23 @@ export default function OneClickOpportunity({
           outputType,
           finalTrends,
           competition,
-          `${trend.topic}. ${getPromptEvolutionHint(trend.category)}`.trim()
+          `${trend.topic}. ${getPromptEvolutionHint(trend.category)}`.trim(),
+          historyContext
         );
 
         // Prompts generated via dispatchPromptGeneration are ALREADY AI-optimized and highly diverse.
         // We intentionally bypass autoOptimizer so we do not homogenize them or lose video metadata.
         setPrompts(rawPrompts as StockImagePrompt[]);
+        
+        // Save subjects into memory to fuel the evolution engine tomorrow
+        try {
+          const generatedSubjects = rawPrompts.map((p) => {
+             // Extract subject roughly (first 60 chars) to let AI know what we did
+             return p.prompt.substring(0, 60);
+          });
+          saveToPromptMemory(trend.category, generatedSubjects);
+        } catch(e) {}
+
         toast.success(`تم التوليد بنجاح عبر (${engineUsed.toUpperCase()})`);
       } catch (promptErr) {
         // If AI generation entirely fails, fallback to pure local generation
