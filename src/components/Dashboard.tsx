@@ -5,6 +5,8 @@ import { createSourcePulse, pulseLocalTrends } from "@/lib/livePulse";
 import { generateAITrends, hasAnyApiKey } from "@/lib/gemini";
 import { toast } from "sonner";
 import { calcSuccessRate, getTodayAiMetrics } from "@/lib/aiMetrics";
+import DailyFeed from "@/components/DailyFeed";
+import OneClickOpportunity from "@/components/OneClickOpportunity";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, RadarChart, Radar, PolarGrid,
@@ -38,6 +40,7 @@ export default function Dashboard() {
   const [competitors, setCompetitors] = useState<any[]>([]);
   const [pulseData, setPulseData] = useState<any[]>([]);
   const [aiMetrics, setAiMetrics] = useState(getTodayAiMetrics());
+  const [selectedTrendForGeneration, setSelectedTrendForGeneration] = useState<MarketTrend | null>(null);
 
   const goldOpportunities = marketData.filter((i) => i.demand === "high" && i.competition === "low").length;
   const avgProfit = Math.round(marketData.reduce((s, i) => s + i.profitability, 0) / marketData.length);
@@ -150,6 +153,23 @@ export default function Dashboard() {
     { key: "local", label: "Local", data: aiMetrics.engines.local },
   ];
 
+  if (selectedTrendForGeneration) {
+    return (
+      <div className="animate-fade-in space-y-5">
+        <button
+          onClick={() => setSelectedTrendForGeneration(null)}
+          className="bg-card border-2 border-primary text-primary px-4 py-2 rounded-md text-xs font-mono font-bold hover:bg-primary/10 transition-all flex items-center gap-2 box-glow"
+        >
+          <span>←</span> العودة للوحة القيادة
+        </button>
+        <OneClickOpportunity
+          trend={selectedTrendForGeneration}
+          onClose={() => setSelectedTrendForGeneration(null)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="animate-fade-in space-y-5">
       {/* Action Header */}
@@ -166,6 +186,8 @@ export default function Dashboard() {
           {refreshing ? "⏳ جاري التحديث..." : "🔄 التحديث بالذكاء الاصطناعي"}
         </button>
       </div>
+
+      <DailyFeed marketData={marketData} onSelectTrend={setSelectedTrendForGeneration} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -317,7 +339,7 @@ export default function Dashboard() {
                     <span className="text-primary font-bold">{i + 1}.</span>{" "}
                     {item.topic}
                     {isGold ? (
-                      <span className="ml-2 text-accent text-[10px] bg-accent/20 px-1.5 py-0.5 rounded border border-accent/30 tracking-wide font-extrabold shadow-[0_0_8px_rgba(255,215,0,0.4)] inline-block">🔥 أنشئ 15 صورة</span>
+                      <button onClick={() => setSelectedTrendForGeneration(item)} className="ml-2 text-accent text-[10px] bg-accent/20 px-2 py-0.5 rounded border border-accent/30 tracking-wide font-extrabold shadow-[0_0_8px_rgba(255,215,0,0.4)] inline-block hover:scale-[1.05] hover:bg-accent/40 transition-all">🔥 أنشئ 15 صورة</button>
                     ) : item.profitability > 80 ? (
                       <span className="ml-2 text-primary text-[9px] bg-primary/20 px-1.5 py-0.5 rounded border border-primary/30 tracking-wide inline-block">⭐ ممتازة</span>
                     ) : null}
