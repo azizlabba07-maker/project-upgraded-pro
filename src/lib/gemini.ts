@@ -475,6 +475,13 @@ COMPETITION: ${compReq}
 ${trendsStr}
 ${topicConstraint}
 
+CRITICAL DIVERSITY INSTRUCTION:
+Even though you are strictly following the assigned topic, YOU MUST MAKE EVERY SINGLE PROMPT COMPLETELY UNIQUE.
+1. Change the camera angles (extreme close-up, wide shot, aerial, low angle).
+2. Change the lighting setups (cinematic, warm golden hour, moody neon, stark studio lighting).
+3. Change the specific subject matter and setting details for each of the ${count} prompts.
+NO TWO PROMPTS CAN BE IDENTICAL OR TOO SIMILAR. YOU MUST INVENT DIFFERENT VISUAL STORIES FOR EVERY PROMPT.
+
 ${ADOBE_AI_PROMPT_RULES}
 
 FRAMEWORK: [Subject from ${category}] + [Environment] + [Lighting] + [Camera/Composition] + [Motion if video] + [Style] + [Commercial] + [Copy space]
