@@ -83,8 +83,8 @@ export default function Dashboard() {
       const aiTrends = await generateAITrends();
       setMarketData(aiTrends as MarketTrend[]);
       toast.success("🔄 تم تحديث التراندات بنجاح في لوحة القيادة!");
-    } catch {
-      toast.error("تعذر التحديث بالذكاء الاصطناعي. تأكد من صحة المفتاح.");
+    } catch (err: any) {
+      toast.error(err.message ? `خطأ: ${err.message}` : "تعذر التحديث بالذكاء الاصطناعي.");
     } finally {
       setRefreshing(false);
     }

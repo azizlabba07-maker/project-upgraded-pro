@@ -144,8 +144,8 @@ Change the lighting totally (e.g., from bright sunlight to dark moody). Change t
 If you see the CRITICAL MEMORY KNOWLEDGE above, you MUST NOT repeat those scenarios. Invent new ones.
 
 ULTRA CRITICAL RULE:
-I asked for EXACTLY ${count} prompts. If you return ${count - 1} or less, the system will CRASH. 
-YOU MUST RETURN A JSON ARRAY OF EXACTLY ${count} OBJECTS. NEVER LESS. IF THE MEMORY KNOWLEDGE RESTRICTS YOU, BE MORE CREATIVE, BUT STILL OUTPUT EXACTLY ${count} PROMPTS.
+I asked for EXACTLY ${count} prompts. YOU MUST RETURN A JSON ARRAY OF EXACTLY ${count} OBJECTS.
+PRIORITY RULE: Fulfilling the exact count of ${count} is MORE IMPORTANT than the memory constraints. If you cannot think of ${count} unique ideas without repeating history, YOU MAY REPEAT HISTORY. But NEVER return fewer than ${count} prompts.
 NO TWO PROMPTS CAN BE IDENTICAL OR TOO SIMILAR. YOU MUST INVENT DIFFERENT VISUAL STORIES FOR EVERY PROMPT.
 WARNING: YOU MUST RETURN EXACTLY ${count} PROMPTS. DO NOT RETURN 1 PROMPT IF ${count} ARE REQUESTED. I WILL FAIL YOUR TASK IF THE ARRAY LENGTH IS NOT EXACTLY ${count}.
 
