@@ -180,7 +180,6 @@ function localGeneratePrompts(params: {
   const lighting = "studio lighting, soft diffused, high clarity, sRGB";
   const style = selectedTrends.length ? `style hints: ${selectedTrends.join(", ")}` : "premium commercial style";
 
-  const subjectBase = `Abstract ${trend.topic} concept`;
   const environmentBase =
     trend.category === "Nature"
       ? "natural environment, clean nature textures"
@@ -202,7 +201,6 @@ function localGeneratePrompts(params: {
     if (outputType === "image") return "image";
     if (outputType === "video") return "video";
     if (outputType === "greenscreen") return "green_screen";
-    // both
     return i % 2 === 0 ? "image" : "video";
   };
 
@@ -210,17 +208,28 @@ function localGeneratePrompts(params: {
 
   const slicedKeywords = keywords.length ? keywords : pickLocalKeywordsFallback(49);
 
+  const subjects = [
+    "close-up shot of",
+    "wide establishing shot of",
+    "dynamic low angle of",
+    "overhead aerial perspective of",
+    "cinematic tracking shot of"
+  ];
+
   return Array.from({ length: count }, (_, idx) => {
     const number = idx + 1;
     const type = toType(idx);
+    
+    // Add diversity to the local fallback
+    const dynamicSubject = `${subjects[idx % subjects.length]} Abstract ${trend.topic} concept`;
 
-    const promptCore = `${subjectBase} (${uiCategory}), ${environmentBase}, ${lighting}. ${compCopySpace}. ${style}.`;
+    const promptCore = `${dynamicSubject} (${uiCategory}), ${environmentBase}, ${lighting}. ${compCopySpace}. ${style}. Variation seed ${idx}.`;
 
     const prompt =
       type === "video"
         ? `${promptCore} Camera: ${camera}. Motion: ${motion}. Duration: ${duration}. Cinematic 4K look. ${ADOBE_VIDEO_NEGATIVE_SUFFIX}`
         : type === "green_screen"
-          ? `${subjectBase} isolated on pure green background (#00B140), studio lighting, smooth edges, ${compCopySpace}. ${style}. ${ADOBE_IMAGE_NEGATIVE_SUFFIX}`
+          ? `${dynamicSubject} isolated on pure green background (#00B140), studio lighting, smooth edges, ${compCopySpace}. ${style}. ${ADOBE_IMAGE_NEGATIVE_SUFFIX}`
           : `${promptCore} Ultra clean studio shot, sharp focus, 4K, ${ADOBE_IMAGE_NEGATIVE_SUFFIX}`;
 
     // For local generation: title derived from prompt type + topic.
@@ -300,15 +309,9 @@ export default function OneClickOpportunity({
           `${trend.topic}. ${getPromptEvolutionHint(trend.category)}`.trim()
         );
 
-        // Auto-optimize each prompt
-        const optimized = await Promise.all(
-          rawPrompts.map(async (p) => ({
-            ...p,
-            prompt: await optimizePrompt(p.prompt, uiCategory),
-          }))
-        );
-        // UnifiedStockPrompt is compatible with StockImagePrompt
-        setPrompts(optimized as StockImagePrompt[]);
+        // Prompts generated via dispatchPromptGeneration are ALREADY AI-optimized and highly diverse.
+        // We intentionally bypass autoOptimizer so we do not homogenize them or lose video metadata.
+        setPrompts(rawPrompts as StockImagePrompt[]);
         toast.success(`تم التوليد بنجاح عبر (${engineUsed.toUpperCase()})`);
       } catch (promptErr) {
         // If AI generation entirely fails, fallback to pure local generation
