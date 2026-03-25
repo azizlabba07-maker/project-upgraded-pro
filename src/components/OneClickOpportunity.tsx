@@ -177,8 +177,7 @@ function localGeneratePrompts(params: {
 }): StockImagePrompt[] {
   const { trend, uiCategory, outputType, competition, count, selectedTrends, keywords } = params;
 
-  const lighting = "studio lighting, soft diffused, high clarity, sRGB";
-  const style = selectedTrends.length ? `style hints: ${selectedTrends.join(", ")}` : "premium commercial style";
+  const styleBase = selectedTrends.length ? `style hints: ${selectedTrends.join(", ")}` : "premium commercial style";
 
   const environmentBase =
     trend.category === "Nature"
@@ -192,9 +191,7 @@ function localGeneratePrompts(params: {
             : "modern studio background, clean commercial composition";
 
   const compCopySpace = "copy space on right side, negative space for overlays";
-
   const duration = "20 seconds";
-  const camera = "slow pan + smooth tracking";
   const motion = competition === "avoid-high" ? "normal speed" : "subtle cinematic motion";
 
   const toType = (i: number): StockImagePrompt["type"] => {
@@ -213,26 +210,48 @@ function localGeneratePrompts(params: {
     "wide establishing shot of",
     "dynamic low angle of",
     "overhead aerial perspective of",
-    "cinematic tracking shot of"
+    "cinematic tracking shot of",
+    "minimalist abstract composition of",
+    "ultra-detailed macro shot of"
+  ];
+
+  const lightingOptions = [
+    "studio lighting, soft diffused, high clarity, sRGB",
+    "cinematic rim lighting, dark moody atmosphere",
+    "bright minimalist flat light, pure background",
+    "dramatic contrasting shadows, highly detailed",
+    "warm golden hour lighting, soft glow",
+    "neon cyberpunk tones, futuristic glow"
+  ];
+
+  const cameraOptions = [
+    "slow pan + smooth tracking",
+    "dynamic dolly zoom",
+    "static wide angle shot",
+    "slow orbit",
+    "subtle tilt up"
   ];
 
   return Array.from({ length: count }, (_, idx) => {
     const number = idx + 1;
     const type = toType(idx);
     
-    // Add diversity to the local fallback
-    const dynamicSubject = `${subjects[idx % subjects.length]} Abstract ${trend.topic} concept`;
+    const randomSubject = subjects[Math.floor(Math.random() * subjects.length)];
+    const randomLighting = lightingOptions[Math.floor(Math.random() * lightingOptions.length)];
+    const randomCamera = cameraOptions[Math.floor(Math.random() * cameraOptions.length)];
+    const randomSeed = Math.random().toString(36).substring(2, 7);
+    
+    const dynamicSubject = `${randomSubject} Abstract ${trend.topic} concept`;
 
-    const promptCore = `${dynamicSubject} (${uiCategory}), ${environmentBase}, ${lighting}. ${compCopySpace}. ${style}. Variation seed ${idx}.`;
+    const promptCore = `${dynamicSubject} (${uiCategory}), ${environmentBase}, ${randomLighting}. ${compCopySpace}. ${styleBase}. Variation id: ${randomSeed}.`;
 
     const prompt =
       type === "video"
-        ? `${promptCore} Camera: ${camera}. Motion: ${motion}. Duration: ${duration}. Cinematic 4K look. ${ADOBE_VIDEO_NEGATIVE_SUFFIX}`
+        ? `${promptCore} Camera: ${randomCamera}. Motion: ${motion}. Duration: ${duration}. Cinematic 4K look. ${ADOBE_VIDEO_NEGATIVE_SUFFIX}`
         : type === "green_screen"
-          ? `${dynamicSubject} isolated on pure green background (#00B140), studio lighting, smooth edges, ${compCopySpace}. ${style}. ${ADOBE_IMAGE_NEGATIVE_SUFFIX}`
+          ? `${dynamicSubject} isolated on pure green background (#00B140), ${randomLighting}, smooth edges, ${compCopySpace}. ${styleBase}. ${ADOBE_IMAGE_NEGATIVE_SUFFIX}`
           : `${promptCore} Ultra clean studio shot, sharp focus, 4K, ${ADOBE_IMAGE_NEGATIVE_SUFFIX}`;
 
-    // For local generation: title derived from prompt type + topic.
     const title = `${uiCategory} - ${trend.topic}`.slice(0, 70);
 
     const kwChunk = slicedKeywords.slice(idx * 5, idx * 5 + 10);
