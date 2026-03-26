@@ -1,5 +1,6 @@
 const tabs = [
   { id: "market",     label: "📊 تحليل السوق" },
+  { id: "opportunity",label: "🧠 محرك الفرص" },
   { id: "generator",  label: "🤖 المولد الموحد (Gemini + Claude)" },
   { id: "dashboard",  label: "📈 لوحة القيادة" },
   { id: "tools",      label: "🛠️ أدوات" },
