@@ -3,6 +3,7 @@ import { runOpportunityPipeline, type OpportunityEngineResult } from "@/lib/oppo
 import { hasAnyApiKey, getGeminiErrorUserMessage } from "@/lib/gemini";
 import { toast } from "sonner";
 import { categories } from "@/data/marketData";
+import MarketSniper from "@/components/MarketSniper";
 
 export default function OpportunityEngine() {
   const [topic, setTopic] = useState("");
@@ -230,6 +231,23 @@ export default function OpportunityEngine() {
 
         </div>
       )}
+
+      {/* Market Sniper — Collapsible */}
+      <details className="group mt-8">
+        <summary className="cursor-pointer bg-destructive/10 border-2 border-destructive rounded-lg p-4 box-glow flex items-center justify-between hover:bg-destructive/15 transition-all list-none">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🎯</span>
+            <div>
+              <h3 className="text-base font-semibold text-destructive font-mono">قناص السوق (Market Sniper)</h3>
+              <p className="text-secondary font-mono text-[10px] mt-0.5">اقنص الفرص الذهبية وصدّر حزم CSV جاهزة للرفع على Adobe Stock</p>
+            </div>
+          </div>
+          <span className="text-destructive text-sm font-mono group-open:rotate-90 transition-transform duration-200">▶</span>
+        </summary>
+        <div className="mt-3">
+          <MarketSniper />
+        </div>
+      </details>
     </div>
   );
 }
