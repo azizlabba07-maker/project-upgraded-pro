@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { checklistItems } from "@/data/marketData";
 import { generateAIKeywords, getTopKeywordsForDomain, hasAnyApiKey, analyzeImageForStock, type ImageAnalysisResult } from "@/lib/gemini";
 import { generateClaudeKeywords, hasClaudeKey } from "@/lib/claude";
 import { trackAiMetric } from "@/lib/aiMetrics";
@@ -26,15 +25,9 @@ export default function ToolsSection() {
   const [topKeywords, setTopKeywords] = useState<string[]>([]);
   const [loadingTop, setLoadingTop] = useState(false);
 
-  // ── Checklist ──
-  const [checked, setChecked] = useState<boolean[]>(new Array(checklistItems.length).fill(false));
-  const [showChecklist, setShowChecklist] = useState(false);
+  // ── Quick Notes / Prompt Saver ──
   const [quickNote, setQuickNote] = useState("");
   const [savedNotes, setSavedNotes] = useState<{ id: string, text: string }[]>([]);
-
-  // ── Title Generator ──
-  const [titleDesc, setTitleDesc]       = useState("");
-  const [generatedTitles, setGeneratedTitles] = useState<string[]>([]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -170,16 +163,6 @@ export default function ToolsSection() {
     toast.success("تم النسخ (سطر لكل كلمة)!");
   };
 
-  const toggleCheck = (i: number) => {
-    setChecked((prev) => { const n = [...prev]; n[i] = !n[i]; return n; });
-  };
-
-  const resetChecklist = () => setChecked(new Array(checklistItems.length).fill(false));
-
-  const checkedCount = checked.filter(Boolean).length;
-  const percentage = Math.round((checkedCount / checklistItems.length) * 100);
-  const isReady = percentage === 100;
-
   useEffect(() => {
     try {
       setQuickNote(localStorage.getItem(NOTES_STORAGE_KEY) || "");
@@ -225,19 +208,6 @@ export default function ToolsSection() {
     }
   };
 
-  // Quick title generator (local, no API needed)
-  const generateTitles = () => {
-    if (!titleDesc.trim()) { toast.error("أدخل وصفاً للصورة"); return; }
-    const prefixes = ["Professional", "Modern", "Abstract", "Creative", "Minimal", "Dynamic"];
-    const suffixes = ["Background", "Concept", "Design", "Illustration", "Vector", "Template"];
-    const titles = Array.from({ length: 5 }, () => {
-      const p = prefixes[Math.floor(Math.random() * prefixes.length)];
-      const s = suffixes[Math.floor(Math.random() * suffixes.length)];
-      return `${p} ${titleDesc} ${s}`;
-    });
-    setGeneratedTitles(titles);
-  };
-
   const inputClass  = "bg-card border-2 border-primary text-primary p-2.5 rounded-md font-mono text-xs focus:outline-none focus:box-glow-strong w-full mb-3";
   const selectClass = inputClass;
 
@@ -259,7 +229,7 @@ export default function ToolsSection() {
           </div>
           
           <p className="text-secondary font-mono text-[11px] mb-4">
-            ارفع صورك هنا وسيقوم الذكاء الاصطناعي بكتابة العناوين والكلمات المفتاحية لها تلقائياً.
+            ارفع صورك هنا وسيقوم الذكاء الاصطناعي بتحليل الأنماط، ومحاكاة الصور المجمعة (Screenshot)، وكتابة العنوان والـ Keywords، وبناء برومبت قوي محقون بألوان تراندية جاهز للتوليد!
           </p>
 
           <label className="border-2 border-dashed border-primary/50 hover:border-primary bg-primary/5 flex flex-col items-center justify-center p-6 rounded-lg cursor-pointer transition-all group mb-4">
@@ -294,16 +264,28 @@ export default function ToolsSection() {
                     🗑️
                   </button>
                   <p className="text-primary font-mono text-[10px] font-bold mb-1 break-all pr-6">{res.filename}</p>
-                  <p className="text-secondary font-mono text-[11px] mb-2 leading-relaxed">{res.title}</p>
+                  <p className="text-secondary font-mono text-[11px] mb-3 leading-relaxed">{res.title}</p>
+                  
+                  {/* NEW PROMPT FIELD */}
+                  <div className="bg-accent/5 border left border-accent/20 p-2.5 rounded mb-3 flex flex-col gap-1.5 shadow-sm">
+                     <span className="text-accent font-mono text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+                       🎨 الألوان الموصى بها: <span className="bg-accent/20 text-accent px-1.5 py-0.5 rounded">{res.colorPalette}</span>
+                     </span>
+                     <p className="text-secondary font-mono text-[10px] italic leading-relaxed">{res.prompt}</p>
+                     <button onClick={() => { navigator.clipboard.writeText(res.prompt); toast.success("تم نسخ البرومبت!"); }} className="self-end text-[9px] gradient-primary text-primary-foreground px-3 py-1 rounded font-mono font-bold hover:scale-105 transition-all mt-1 flex items-center gap-1 shadow-glow cursor-pointer">
+                        نسخ البرومبت 📋
+                     </button>
+                  </div>
+
                   <div className="flex flex-wrap gap-1">
                     {res.keywords.slice(0, 10).map((kw, idx) => (
-                      <span key={idx} className="text-[9px] bg-primary/10 text-secondary px-1.5 py-0.5 rounded">
+                      <span key={idx} className="text-[9px] bg-primary/10 border border-primary/10 text-secondary px-1.5 py-0.5 rounded">
                         {kw}
                       </span>
                     ))}
                     {res.keywords.length > 10 && (
-                      <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold">
-                        +{res.keywords.length - 10} أكثر
+                      <span className="text-[9px] bg-primary/20 text-primary border border-primary/30 px-1.5 py-0.5 rounded font-bold">
+                        +{res.keywords.length - 10}
                       </span>
                     )}
                   </div>
@@ -446,94 +428,7 @@ export default function ToolsSection() {
         )}
       </div>
 
-      {/* ── Quick Title Generator ── */}
-      <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
-        <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono">✍️ مولد العناوين السريع</h3>
-        <div className="flex gap-3 flex-wrap">
-          <input
-            type="text"
-            value={titleDesc}
-            onChange={(e) => setTitleDesc(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && generateTitles()}
-            placeholder="صف محتوى الصورة بالإنجليزية... مثال: neural network"
-            className="flex-1 min-w-[240px] bg-card border-2 border-primary text-primary p-2.5 rounded-md font-mono text-xs focus:outline-none focus:box-glow-strong"
-          />
-          <button onClick={generateTitles} className="gradient-primary text-primary-foreground px-5 py-2.5 rounded-md font-mono text-xs font-semibold box-glow-strong hover:scale-[1.02] transition-all">
-            ✨ توليد عناوين
-          </button>
-        </div>
-        {generatedTitles.length > 0 && (
-          <div className="mt-4 space-y-2">
-            {generatedTitles.map((title, i) => (
-              <div key={i} className="flex items-center justify-between gap-3 bg-primary/5 border border-primary/20 rounded-md px-3 py-2">
-                <span className="font-mono text-xs text-secondary flex-1">{title}</span>
-                <button
-                  onClick={() => { navigator.clipboard.writeText(title); toast.success("تم النسخ!"); }}
-                  className="shrink-0 text-[10px] px-2 py-1 border border-primary/40 text-primary rounded font-mono hover:bg-primary/10 transition-all"
-                >
-                  نسخ
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* ── Pre-Upload Checklist (collapsible) ── */}
-      <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-          <button
-            onClick={() => setShowChecklist((v) => !v)}
-            className="flex items-center gap-2 text-base font-semibold text-primary text-glow font-mono"
-          >
-            <span>{showChecklist ? "▾" : "▸"}</span>
-            <span>✅ قائمة فحص ما قبل الرفع</span>
-          </button>
-          <div className="flex items-center gap-3">
-            {isReady && <span className="text-primary text-xs font-mono font-semibold animate-pulse-glow">🚀 جاهز للرفع!</span>}
-            <button onClick={resetChecklist} className="text-[10px] px-3 py-1.5 border border-destructive/40 text-destructive rounded font-mono hover:bg-destructive/10 transition-all">
-              ↺ إعادة تعيين
-            </button>
-          </div>
-        </div>
-
-        {showChecklist && (
-          <>
-            {/* Progress bar */}
-            <div className="mb-4">
-              <div className="flex justify-between text-[10px] font-mono text-secondary mb-1">
-                <span>{checkedCount}/{checklistItems.length} عنصر</span>
-                <span className="text-primary font-semibold">{percentage}%</span>
-              </div>
-              <div className="h-2 bg-primary/10 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${isReady ? "bg-accent" : "bg-primary/70"}`}
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {checklistItems.map((item, i) => (
-                <div
-                  key={i}
-                  onClick={() => toggleCheck(i)}
-                  className={`flex items-center gap-3 p-3 rounded-md cursor-pointer transition-all font-mono text-xs ${
-                    checked[i] ? "bg-primary/5 opacity-50" : "bg-primary/5 hover:bg-primary/10"
-                  }`}
-                >
-                  <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
-                    checked[i] ? "bg-primary border-primary" : "border-primary/50"
-                  }`}>
-                    {checked[i] && <span className="text-background text-[8px] font-bold">✓</span>}
-                  </div>
-                  <label className={`flex-1 cursor-pointer text-secondary ${checked[i] ? "line-through" : ""}`}>{item}</label>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
 
       {/* ── Quick Notes / Prompt Vault ── */}
       <div className="bg-card border-2 border-accent rounded-lg p-5 box-glow-gold">

@@ -770,25 +770,32 @@ export interface ImageAnalysisResult {
   filename: string;
   title: string;
   keywords: string[];
+  prompt: string;        // The new AI generated text-to-image prompt
+  colorPalette: string;  // The suggested trending colors
 }
 
 export async function analyzeImageForStock(
   file: File,
   base64Data: string
 ): Promise<ImageAnalysisResult> {
-  const prompt = `You are an expert Adobe Stock contributor and SEO specialist. Analyze this image and provide:
-1. A highly descriptive, commercially appealing English title (max 70 chars). Focus on the main subject, action, lighting, and mood.
-2. 49 highly relevant English keywords. Start with the most important subjects, then actions, concepts, styles, and colors.
+  const prompt = `You are an elite Adobe Stock Vision Analyst and Prompt Engineer.
+Analyze the provided image completely.
+Note: The user might upload a SINGLE image, OR a SCREENSHOT containing MULTIPLE images (a grid from Adobe Stock).
+If it is a grid, extract the DOMINANT, MOST PROFITABLE pattern/theme connecting them.
 
-RULES:
-- DO NOT use forbidden words: artist names, real people, trademarked brands (e.g., Apple, Nike, Disney), "style of", "inspired by".
-- No mentions of "AI generated", "Midjourney", etc.
-- Keywords must be single words or short phrases.
+YOUR TASK:
+Generate a complete, ready-to-sell metadata and generation package.
+1. Return EXACTLY 50 highly relevant, comma-separated keywords representing the image(s). Ensure NO trademarks or real people names.
+2. Return a short SEO optimized Title (max 70 characters).
+3. Return a highly detailed Text-to-Image PROMPT (Midjourney/Firefly style) to recreate or enhance this concept.
+4. Return a "colorPalette" suggesting trending colors to be used (e.g. "Neon Cyberpunk", "Muted Pastels", "Earthy Boho"). These colors MUST be seamlessly integrated into the generated PROMPT as well.
 
-Return ONLY a valid JSON object in this exact format:
+MUST return a raw JSON object EXACTLY like this (NO Markdown, NO backticks):
 {
-  "title": "...",
-  "keywords": ["kw1", "kw2", "..."]
+  "title": "SEO Optimized Product Title",
+  "keywords": ["kw1", "kw2", "kw3"],
+  "prompt": "Here goes the highly detailed, professional prompt infused with the suggested trending colors. No humans or real brands.",
+  "colorPalette": "Trending Color Theme Name"
 }`;
 
   const result = await generateWithGemini(prompt, 0.4, {
@@ -796,7 +803,13 @@ Return ONLY a valid JSON object in this exact format:
     mimeType: file.type
   });
   
-  const parsed = extractAndParseJSON<{ title: string; keywords: string[] }>(result, { title: "", keywords: [] });
+  const parsed = extractAndParseJSON<{ title: string; keywords: string[], prompt: string, colorPalette: string }>(result, { 
+    title: "Untitled Stock Element", 
+    keywords: ["stock", "illustration", "vector"],
+    prompt: "A beautiful stock illustration concept, bright colors",
+    colorPalette: "Vibrant"
+  });
+
   if (!parsed.title && !parsed.keywords.length) throw new Error("Failed to parse Image Analysis AI response");
   
   // Clean keywords
@@ -807,6 +820,8 @@ Return ONLY a valid JSON object in this exact format:
   return {
     filename: file.name,
     title: parsed.title,
-    keywords: cleanKeywords
+    keywords: cleanKeywords,
+    prompt: sanitizePromptOrKeywords(parsed.prompt),
+    colorPalette: parsed.colorPalette,
   };
 }
