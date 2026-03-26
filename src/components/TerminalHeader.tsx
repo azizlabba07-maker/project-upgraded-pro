@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import AuthModal from "./AuthModal";
 import { checkAuthStatus, supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import ThemeSwitcher from "./ThemeSwitcher";
 
 const tabs = [
   { id: "market",     label: "📊 تحليل السوق" },
@@ -63,6 +64,7 @@ export default function TerminalHeader({ activeTab, onTabChange }: TerminalHeade
               ☁️ تفعيل السحابة (Login)
             </button>
           )}
+          <ThemeSwitcher />
         </div>
       </div>
 
