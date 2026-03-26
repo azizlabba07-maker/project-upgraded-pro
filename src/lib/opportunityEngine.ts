@@ -1,5 +1,6 @@
 import { generateWithGemini } from "./gemini";
 import { ADOBE_AI_PROMPT_RULES } from "./adobeStockCompliance";
+import { extractAndParseJSON, withCache, sanitizePromptOrKeywords, sanitizeStringArray } from "@/lib/sanitizer";
 
 export interface OpportunityEngineResult {
   topic: string;
@@ -57,14 +58,17 @@ JSON Format Required:
   "title": "SEO Optimized Title"
 }`;
 
-  const resultText = await generateWithGemini(prompt, 0.7);
-  
-  // Clean up any potential markdown formatting
-  const jsonMatch = resultText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error("Failed to parse Opportunity Engine AI response.");
-  }
-  
-  const parsed = JSON.parse(jsonMatch[0]) as OpportunityEngineResult;
-  return parsed;
+  return withCache(`opportunity_engine_${topic}_${category}`, 24 * 60 * 60 * 1000, async () => {
+    const resultText = await generateWithGemini(prompt, 0.7);
+    const parsed = extractAndParseJSON<OpportunityEngineResult>(resultText, null as any);
+    if (!parsed) {
+        throw new Error("Failed to parse Opportunity Engine AI response.");
+    }
+    
+    parsed.optimizedPrompt = sanitizePromptOrKeywords(parsed.optimizedPrompt);
+    if (parsed.keywords) {
+        parsed.keywords = sanitizeStringArray(parsed.keywords);
+    }
+    return parsed;
+  });
 }

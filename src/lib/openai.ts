@@ -1,4 +1,5 @@
 import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX, ADOBE_IMAGE_NEGATIVE_SUFFIX } from "@/lib/adobeStockCompliance";
+import { extractAndParseJSON, withCache, sanitizePromptOrKeywords, sanitizeStringArray } from "@/lib/sanitizer";
 
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
 const OPENAI_MODEL = "gpt-4o-mini"; // Fast, cheap, and very smart option
@@ -184,22 +185,22 @@ CRUCIAL: The array MUST contain EXACTLY ${count} distinct objects. Do not stop a
 ]`;
 
   const raw = await callOpenAI(user, system, 6000);
-  const match = raw.match(/\[[\s\S]*\]/);
-  if (!match) throw new Error("Could not parse OpenAI response as JSON array");
-  
-  const parsed = JSON.parse(match[0]) as OpenAIStockPrompt[];
+  const parsed = extractAndParseJSON<OpenAIStockPrompt[]>(raw, []);
+  if (!parsed || parsed.length === 0) throw new Error("Could not parse OpenAI response as JSON array");
   
   // Normalize type
   return parsed.map((p, i) => ({
     ...p,
     number: i + 1,
     category,
+    prompt: sanitizePromptOrKeywords(p.prompt),
+    keywords: p.keywords ? sanitizeStringArray(p.keywords) : [],
     type: p.type === "green_screen" ? "green_screen" : (p.type === "video" ? "video" : "image")
   }));
 }
 
 export async function getOpenAIMarketAnalysis(topic: string): Promise<string> {
-  return callOpenAI(
+  return withCache(`openai_market_analysis_${topic}`, 12 * 60 * 60 * 1000, () => callOpenAI(
     `أنت محلل سوق Adobe Stock محترف. قدم تحليل مختصر لموضوع "${topic}" يشمل:
 1. حالة الطلب الحالي في 2026
 2. مستوى المنافسة وأبرز المنافسين
@@ -209,5 +210,5 @@ export async function getOpenAIMarketAnalysis(topic: string): Promise<string> {
 اكتب بالعربية، موجز ومفيد، أقل من 200 كلمة.`,
     "You are a helpful AI market analyst for Adobe Stock.",
     1500
-  );
+  ));
 }

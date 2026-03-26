@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { marketData as initialMarketData, dailyTips, seasonalEvents, type MarketTrend } from "@/data/marketData";
 import { EMERGING_TRENDS_2026 } from "@/data/trends2026";
 import { createSourcePulse, pulseLocalTrends } from "@/lib/livePulse";
@@ -42,9 +42,9 @@ export default function Dashboard() {
   const [aiMetrics, setAiMetrics] = useState(getTodayAiMetrics());
   const [selectedTrendForGeneration, setSelectedTrendForGeneration] = useState<MarketTrend | null>(null);
 
-  const goldOpportunities = marketData.filter((i) => i.demand === "high" && i.competition === "low").length;
-  const avgProfit = Math.round(marketData.reduce((s, i) => s + i.profitability, 0) / marketData.length);
-  const topTrend = marketData.reduce((max, i) => (i.searches > max.searches ? i : max));
+  const goldOpportunities = useMemo(() => marketData.filter((i) => i.demand === "high" && i.competition === "low").length, [marketData]);
+  const avgProfit = useMemo(() => Math.round(marketData.reduce((s, i) => s + i.profitability, 0) / (marketData.length || 1)), [marketData]);
+  const topTrend = useMemo(() => marketData.length > 0 ? marketData.reduce((max, i) => (i.searches > max.searches ? i : max)) : { topic: "" }, [marketData]);
   const now = new Date();
   const month = now.getMonth();
   const season =
@@ -52,8 +52,8 @@ export default function Dashboard() {
     month >= 5 && month <= 7 ? "الصيف ☀️" :
     month >= 8 && month <= 10 ? "الخريف 🍂" : "الشتاء ❄️";
 
-  const top10 = [...marketData].sort((a, b) => b.searches - a.searches).slice(0, 10);
-  const sourcePulse = createSourcePulse(marketData);
+  const top10 = useMemo(() => [...marketData].sort((a, b) => b.searches - a.searches).slice(0, 10), [marketData]);
+  const sourcePulse = useMemo(() => createSourcePulse(marketData), [marketData]);
 
   useEffect(() => {
     setTip(dailyTips[Math.floor(Math.random() * dailyTips.length)]);
@@ -69,7 +69,7 @@ export default function Dashboard() {
     const id = window.setInterval(() => {
       setAiMetrics(getTodayAiMetrics());
       setMarketData(prev => pulseLocalTrends(prev));
-    }, 4000);
+    }, 15000); // Changed from 4000 to 15000 to save CPU while still feeling live
     return () => window.clearInterval(id);
   }, []);
 
@@ -91,47 +91,46 @@ export default function Dashboard() {
   };
   const newTip = () => setTip(dailyTips[Math.floor(Math.random() * dailyTips.length)]);
 
-  // ── Chart data ──
-  const barData = top10.map((item) => ({
+  // ── Chart data memoized ──
+  const barData = useMemo(() => top10.map((item) => ({
     name: item.topic.length > 14 ? item.topic.slice(0, 14) + "…" : item.topic,
     searches: item.searches,
     profit: item.profitability,
-  }));
+  })), [top10]);
 
-  // Demand breakdown for pie
-  const demandCounts = {
-    high: marketData.filter((i) => i.demand === "high").length,
-    medium: marketData.filter((i) => i.demand === "medium").length,
-    low: marketData.filter((i) => i.demand === "low").length,
-  };
-  const pieData = [
-    { name: "طلب مرتفع", value: demandCounts.high, color: "#00ff88" },
-    { name: "طلب متوسط", value: demandCounts.medium, color: "#ffd700" },
-    { name: "طلب منخفض", value: demandCounts.low, color: "#ff6b6b" },
-  ];
+  const pieData = useMemo(() => {
+    const high = marketData.filter((i) => i.demand === "high").length;
+    const medium = marketData.filter((i) => i.demand === "medium").length;
+    const low = marketData.filter((i) => i.demand === "low").length;
+    return [
+      { name: "طلب مرتفع", value: high, color: "#00ff88" },
+      { name: "طلب متوسط", value: medium, color: "#ffd700" },
+      { name: "طلب منخفض", value: low, color: "#ff6b6b" },
+    ];
+  }, [marketData]);
 
-  // Competition breakdown for second pie
-  const compCounts = {
-    low: marketData.filter((i) => i.competition === "low").length,
-    medium: marketData.filter((i) => i.competition === "medium").length,
-    high: marketData.filter((i) => i.competition === "high").length,
-  };
-  const compPieData = [
-    { name: "منافسة قليلة", value: compCounts.low, color: "#00ff88" },
-    { name: "منافسة متوسطة", value: compCounts.medium, color: "#ffd700" },
-    { name: "منافسة شرسة", value: compCounts.high, color: "#ff6b6b" },
-  ];
+  const compPieData = useMemo(() => {
+    const low = marketData.filter((i) => i.competition === "low").length;
+    const medium = marketData.filter((i) => i.competition === "medium").length;
+    const high = marketData.filter((i) => i.competition === "high").length;
+    return [
+      { name: "منافسة قليلة", value: low, color: "#00ff88" },
+      { name: "منافسة متوسطة", value: medium, color: "#ffd700" },
+      { name: "منافسة شرسة", value: high, color: "#ff6b6b" },
+    ];
+  }, [marketData]);
 
-  // Category profitability radar
-  const categoryMap: Record<string, number[]> = {};
-  marketData.forEach((item) => {
-    if (!categoryMap[item.category]) categoryMap[item.category] = [];
-    categoryMap[item.category].push(item.profitability);
-  });
-  const radarData = Object.entries(categoryMap).map(([cat, vals]) => ({
-    category: cat,
-    avgProfit: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
-  }));
+  const radarData = useMemo(() => {
+    const categoryMap: Record<string, number[]> = {};
+    marketData.forEach((item) => {
+      if (!categoryMap[item.category]) categoryMap[item.category] = [];
+      categoryMap[item.category].push(item.profitability);
+    });
+    return Object.entries(categoryMap).map(([cat, vals]) => ({
+      category: cat,
+      avgProfit: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
+    }));
+  }, [marketData]);
 
   const TICK_STYLE = { fill: "#70d0ff", fontFamily: "monospace", fontSize: 10 };
 
@@ -176,7 +175,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between bg-card border-2 border-primary rounded-lg p-4 box-glow">
         <div>
           <h2 className="text-lg font-bold text-primary font-mono">لوحة القيادة</h2>
-          <p className="text-xs text-secondary font-mono mt-1">يتم تحديث البيانات محلياً كل 4 ثوانٍ</p>
+          <p className="text-xs text-secondary font-mono mt-1">يتم تحديث البيانات محلياً كل 15 ثانية</p>
         </div>
         <button
           onClick={handleRefreshTrends}

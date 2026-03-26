@@ -1,4 +1,5 @@
 import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX } from "@/lib/adobeStockCompliance";
+import { extractAndParseJSON, withCache, sanitizePromptOrKeywords, sanitizeStringArray } from "@/lib/sanitizer";
 
 const GEMINI_STORAGE_KEY = "gemini_api_key";
 const GEMINI_STORAGE_KEYS = "gemini_api_keys";
@@ -445,10 +446,14 @@ TECHNICAL:
 Return ONLY valid JSON array, no markdown: [{"number":1,"category":"${category}","prompt":"FULL PROMPT HERE"}]`;
 
   const result = await generateWithGemini(prompt, 0.85);
-  const jsonMatch = result.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) throw new Error("Failed to parse AI response");
-  const parsed = JSON.parse(jsonMatch[0]) as VideoPromptResult[];
-  return parsed.map((p, i) => ({ ...p, number: i + 1, category }));
+  const parsed = extractAndParseJSON<VideoPromptResult[]>(result, []);
+  if (!parsed || parsed.length === 0) throw new Error("Failed to parse AI response");
+  return parsed.map((p, i) => ({ 
+    ...p, 
+    number: i + 1, 
+    category,
+    prompt: sanitizePromptOrKeywords(p.prompt)
+  }));
 }
 
 /** Gemini version of Claude's StockImagePrompt - full structure like Claude */
@@ -532,10 +537,15 @@ CRUCIAL: The array MUST contain EXACTLY ${count} distinct objects. Do not stop a
 [{"number":1,"category":"${category}","type":"${outputType === 'video' ? 'video' : 'image'}","demand":"low","prompt":"FULL DETAILED PROMPT 60+ words","title":"SEO title max 70 chars","keywords":["kw1","kw2","kw3","kw4","kw5"]}]`;
 
   const result = await generateWithGemini(prompt, 0.8);
-  const jsonMatch = result.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) throw new Error("Failed to parse AI response");
-  const parsed = JSON.parse(jsonMatch[0]) as GeminiStockPrompt[];
-  return parsed.slice(0, count).map((p, i) => ({ ...p, number: i + 1, category }));
+  const parsed = extractAndParseJSON<GeminiStockPrompt[]>(result, []);
+  if (!parsed || parsed.length === 0) throw new Error("Failed to parse AI response");
+  return parsed.slice(0, count).map((p, i) => ({ 
+    ...p, 
+    number: i + 1, 
+    category,
+    prompt: sanitizePromptOrKeywords(p.prompt),
+    keywords: p.keywords ? sanitizeStringArray(p.keywords) : []
+  }));
 }
 
 function escapeRegex(value: string): string {
@@ -559,11 +569,13 @@ Rules:
 
 One keyword per line, no numbering.`;
 
-  const result = await generateWithGemini(prompt, 0.85);
+  const result = await withCache(`gemini_keywords_${topic}_${count}`, 24 * 60 * 60 * 1000, async () => {
+    return await generateWithGemini(prompt, 0.85);
+  });
   const escapedTopic = escapeRegex(topic.trim());
   const topicPrefixRegex = new RegExp(`^${escapedTopic}\\s*[:\\-–—|,]*\\s*`, "i");
 
-  return Array.from(
+  const keywords = Array.from(
     new Map(
       result.split("\n")
         .map((k) => k.replace(/^[\d\.\-\*\•]+\s*/, "").trim())
@@ -572,6 +584,7 @@ One keyword per line, no numbering.`;
         .map((k) => [k.toLowerCase(), k] as [string, string])
     ).values()
   ).slice(0, count);
+  return sanitizeStringArray(keywords);
 }
 
 /** اكتشاف أكثر الكلمات المفتاحية استعمالاً في مجال معيّن */
@@ -587,10 +600,12 @@ RULES:
 - Each keyword on its own line, no numbering, no duplicates
 
 Return ONLY the keywords, one per line.`;
-  const result = await generateWithGemini(prompt, 0.7);
+  const result = await withCache(`gemini_topkw_${domain}_${limit}`, 24 * 60 * 60 * 1000, async () => {
+    return await generateWithGemini(prompt, 0.7);
+  });
   const escaped = escapeRegex(domain.trim());
   const prefixRegex = new RegExp(`^${escaped}\\s*[:\\-–—|,]*\\s*`, "i");
-  return Array.from(
+  const keywords = Array.from(
     new Map(
       result.split("\n")
         .map((k) => k.replace(/^[\d\.\-\*\•]+\s*/, "").trim())
@@ -599,6 +614,7 @@ Return ONLY the keywords, one per line.`;
         .map((k) => [k.toLowerCase(), k] as [string, string])
     ).values()
   ).slice(0, limit);
+  return sanitizeStringArray(keywords);
 }
 
 /** تحليل المحتوى المرفوض أو منخفض المبيعات - اقتراح تحسينات */
@@ -647,7 +663,7 @@ ${extraStoreContext}
 }
 
 export async function getAIMarketAnalysis(topic: string): Promise<string> {
-  return generateWithGemini(`You are an elite Adobe Stock market analyst. Using Google Search, retrieve the LIVE data and search trends for the topic "${topic}".
+  return withCache(`gemini_market_analysis_${topic}`, 12 * 60 * 60 * 1000, () => generateWithGemini(`You are an elite Adobe Stock market analyst. Using Google Search, retrieve the LIVE data and search trends for the topic "${topic}".
 Provide a concise Arabic analysis covering:
 1. Current LIVE demand based on web searches (give real numbers or estimates you found online today)
 2. Live competition level on stock photography platforms
@@ -655,7 +671,7 @@ Provide a concise Arabic analysis covering:
 4. Tips to excel
 5. Near future expectations based on current news
 
-Write in Arabic, under 200 words. Keep it strictly focused on the real-time data you found.`, 0.7, undefined, true);
+Write in Arabic, under 200 words. Keep it strictly focused on the real-time data you found.`, 0.7, undefined, true));
 }
 
 export async function generateAITrends(): Promise<Array<{
@@ -687,10 +703,16 @@ Focus strictly on the REAL data from today. Do not hallucinate.
 
 Return ONLY a JSON array, no markdown.`;
 
-  const result = await generateWithGemini(prompt, 0.7, undefined, true);
-  const jsonMatch = result.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) throw new Error("Failed to parse trends");
-  return JSON.parse(jsonMatch[0]);
+  return withCache("gemini_live_trends", 6 * 60 * 60 * 1000, async () => {
+    const result = await generateWithGemini(prompt, 0.7, undefined, true);
+    const parsed = extractAndParseJSON<Array<{
+      topic: string; demand: "high" | "medium" | "low";
+      competition: "high" | "medium" | "low"; profitability: number;
+      category: string; searches: number;
+    }>>(result, []);
+    if (!parsed || parsed.length === 0) throw new Error("Failed to parse trends");
+    return parsed;
+  });
 }
 
 export interface TopSellerAnalysis {
@@ -728,9 +750,18 @@ Return ONLY a valid JSON object:
 }`;
 
   const result = await generateWithGemini(prompt, 0.85);
-  const jsonMatch = result.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Failed to parse AI response");
-  return JSON.parse(jsonMatch[0]) as TopSellerAnalysis;
+  const parsed = extractAndParseJSON<TopSellerAnalysis>(result, null as any);
+  if (!parsed) throw new Error("Failed to parse AI response");
+  if (parsed.smartEvolutions) {
+    parsed.smartEvolutions = parsed.smartEvolutions.map(ev => ({
+        ...ev,
+        prompt: sanitizePromptOrKeywords(ev.prompt)
+    }));
+  }
+  if (parsed.hiddenKeywords) {
+    parsed.hiddenKeywords = sanitizeStringArray(parsed.hiddenKeywords);
+  }
+  return parsed;
 }
 
 export interface ImageAnalysisResult {
@@ -763,15 +794,12 @@ Return ONLY a valid JSON object in this exact format:
     mimeType: file.type
   });
   
-  const jsonMatch = result.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Failed to parse Image Analysis AI response");
-  
-  const parsed = JSON.parse(jsonMatch[0]) as { title: string; keywords: string[] };
+  const parsed = extractAndParseJSON<{ title: string; keywords: string[] }>(result, { title: "", keywords: [] });
+  if (!parsed.title && !parsed.keywords.length) throw new Error("Failed to parse Image Analysis AI response");
   
   // Clean keywords
-  const cleanKeywords = parsed.keywords
+  const cleanKeywords = sanitizeStringArray(parsed.keywords)
     .map(k => k.trim().toLowerCase())
-    .filter(k => k.length > 1)
     .slice(0, 49);
 
   return {
