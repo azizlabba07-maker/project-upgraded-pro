@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 type Theme = "default" | "theme-blue" | "theme-purple" | "theme-gold" | "theme-red";
-type BgTheme = "bg-default" | "bg-black" | "bg-navy" | "bg-charcoal";
+type BgTheme = "bg-default" | "bg-black" | "bg-navy" | "bg-charcoal" | "bg-white";
 
 const themes: { id: Theme; label: string; color: string }[] = [
   { id: "default", label: "ماتريكس (أخضر)", color: "#00ff88" },
@@ -16,6 +16,7 @@ const bgThemes: { id: BgTheme; label: string; color: string }[] = [
   { id: "bg-black", label: "أسود داكن (OLED)", color: "#050505" },
   { id: "bg-navy", label: "أزرق كحلي", color: "#0d1b2a" },
   { id: "bg-charcoal", label: "رمادي فحمي", color: "#17171a" },
+  { id: "bg-white", label: "سحابي (أبيض)", color: "#ffffff" },
 ];
 
 export default function ThemeSwitcher() {
