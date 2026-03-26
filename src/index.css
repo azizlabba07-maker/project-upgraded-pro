@@ -101,6 +101,22 @@
     --accent: 45 100% 55%;
     --terminal-glow: 0 100% 65%;
   }
+
+  /* --- Background Themes --- */
+  .bg-black {
+    --background: 0 0% 2%;
+    --card: 0 0% 6%;
+  }
+
+  .bg-navy {
+    --background: 220 50% 10%;
+    --card: 220 50% 14%;
+  }
+
+  .bg-charcoal {
+    --background: 240 10% 10%;
+    --card: 240 10% 14%;
+  }
 }
 
 @layer base {
