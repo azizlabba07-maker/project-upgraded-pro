@@ -162,60 +162,68 @@
   }
 
   .box-glow {
-    box-shadow: 0 8px 32px 0 hsl(var(--primary) / 0.15),
-                inset 0 1px 1px 0 hsl(var(--primary) / 0.4),
-                inset 0 -1px 2px 0 hsl(0 0% 0% / 0.6);
-    background: linear-gradient(160deg, hsl(var(--card) / 0.95) 0%, hsl(var(--background) / 0.95) 100%);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid hsl(var(--primary) / 0.2);
+    box-shadow: 0 15px 35px -5px hsl(0 0% 0% / 0.5),
+                inset 0 1px 1px 0 hsl(150 100% 100% / 0.3),
+                inset 0 -1px 2px 0 hsl(0 0% 0% / 0.4);
+    background: linear-gradient(135deg, hsl(var(--card) / 0.6) 0%, hsl(var(--background) / 0.4) 100%);
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    border: 1px solid hsl(var(--primary) / 0.15);
     border-top: 1px solid hsl(var(--primary) / 0.4);
-    border-bottom: 2px solid hsl(0 0% 0% / 0.7);
+    border-bottom: 2px solid hsl(0 0% 0% / 0.3);
+    border-radius: 1rem;
   }
 
   /* Light mode box overrides */
   :root.bg-white .box-glow {
-    box-shadow: 0 6px 20px 0 hsl(var(--primary) / 0.1),
-                inset 0 1px 1px 0 hsla(0,0%,100%,0.8),
+    box-shadow: 0 20px 40px -10px hsl(0 0% 0% / 0.15),
+                inset 0 2px 2px 0 hsla(0,0%,100%,0.9),
                 inset 0 -1px 2px 0 hsl(0 0% 0% / 0.05);
-    background: linear-gradient(160deg, hsl(var(--card) / 0.9) 0%, hsl(var(--background) / 0.9) 100%);
-    border: 1px solid hsl(var(--primary) / 0.15);
-    border-bottom: 1px solid hsl(0 0% 0% / 0.1);
+    background: linear-gradient(135deg, hsla(0,0%,100%,0.7) 0%, hsla(0,0%,100%,0.3) 100%);
+    border: 1px solid hsl(var(--primary) / 0.1);
+    border-top: 1px solid hsla(0,0%,100%,0.9);
+    border-bottom: 1px solid hsl(0 0% 0% / 0.05);
   }
 
   .box-glow-hover {
-    box-shadow: 0 12px 40px 0 hsl(var(--primary) / 0.3),
-                inset 0 1px 2px 0 hsl(var(--primary) / 0.5),
-                inset 0 -1px 3px 0 hsl(0 0% 0% / 0.7);
-    transform: translateY(-2px);
+    box-shadow: 0 20px 45px -5px hsl(var(--primary) / 0.3),
+                inset 0 1px 2px 0 hsl(150 100% 100% / 0.5),
+                inset 0 -1px 3px 0 hsl(0 0% 0% / 0.5);
+    transform: translateY(-4px) scale(1.01);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   }
 
   .box-glow-strong {
-    box-shadow: 0 10px 40px 0 hsl(var(--primary) / 0.25),
-                inset 0 1px 2px 0 hsl(var(--primary) / 0.6),
-                inset 0 -1px 3px 0 hsl(0 0% 0% / 0.8);
-    background: linear-gradient(160deg, hsl(var(--card) / 0.98) 0%, hsl(var(--primary) / 0.08) 100%);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 25px 50px -12px hsl(var(--primary) / 0.3),
+                inset 0 1.5px 2px 0 hsl(150 100% 100% / 0.6),
+                inset 0 -2px 4px 0 hsl(0 0% 0% / 0.6);
+    background: linear-gradient(135deg, hsla(0,0%,100%,0.08) 0%, hsla(var(--primary)/20%) 100%);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
     border: 1px solid hsl(var(--primary) / 0.3);
-    border-top: 1px solid hsl(var(--primary) / 0.7);
-    border-bottom: 2px solid hsl(0 0% 0% / 0.9);
+    border-top: 1.5px solid hsl(150 100% 100% / 0.5);
+    border-bottom: 2px solid hsl(0 0% 0% / 0.5);
+    border-radius: 1.25rem;
   }
 
   .box-glow-gold {
-    box-shadow: 0 8px 32px 0 hsl(var(--cyber-gold) / 0.15),
-                inset 0 1px 1px 0 hsl(var(--cyber-gold) / 0.4),
-                inset 0 -1px 2px 0 hsl(0 0% 0% / 0.6);
-    background: linear-gradient(160deg, hsl(var(--card) / 0.95) 0%, hsl(var(--cyber-gold) / 0.05) 100%);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid hsl(var(--cyber-gold) / 0.2);
-    border-top: 1px solid hsl(var(--cyber-gold) / 0.5);
-    border-bottom: 2px solid hsl(0 0% 0% / 0.7);
+    box-shadow: 0 20px 40px -10px hsl(var(--cyber-gold) / 0.3),
+                inset 0 1px 2px 0 hsl(var(--cyber-gold) / 0.5),
+                inset 0 -1px 3px 0 hsl(0 0% 0% / 0.4);
+    background: linear-gradient(135deg, hsl(var(--card) / 0.7) 0%, hsl(var(--cyber-gold) / 0.1) 100%);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border: 1px solid hsl(var(--cyber-gold) / 0.3);
+    border-top: 1.5px solid hsl(var(--cyber-gold) / 0.6);
+    border-radius: 1rem;
   }
 
+  /* 3D Pill Button (like the gradient slider in the image) */
   .gradient-primary {
     background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--cyber-blue)) 100%);
+    box-shadow: 0 4px 15px hsl(var(--primary) / 0.4),
+                inset 0 2px 2px hsl(150 100% 100% / 0.4);
+    border: 1px solid hsl(var(--primary) / 0.6);
   }
 
   .gradient-header {
