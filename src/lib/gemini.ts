@@ -619,49 +619,30 @@ Return ONLY the keywords, one per line.`;
   return sanitizeStringArray(keywords);
 }
 
-/** تحليل المحتوى المرفوض أو منخفض المبيعات - اقتراح تحسينات */
-export async function analyzeRejectionOrLowSales(
-  title: string,
-  description: string,
-  keywords: string[],
-  rejectionReason?: string,
-  storeContext?: {
-    storeReference?: string;
-    soldSummary?: string;
-    rejectedSummary?: string;
-    keywordFocus?: string;
-    notes?: string;
-  }
+export async function analyzeStoreScreenshot(
+  file: File,
+  base64Data: string,
+  extraNotes?: string
 ): Promise<string> {
-  const kwStr = keywords?.join(", ") || "(لا توجد)";
-  const rejectNote = rejectionReason ? `سبب الرفض المذكور: ${rejectionReason}.` : "المحتوى مرفوض أو مبيعاته منخفضة.";
-  const extraStoreContext = storeContext ? `
+  const notePrompt = extraNotes ? `\nملاحظات إضافية من المستخدم: ${extraNotes}` : "";
+  const prompt = `أنت خبير Adobe Stock يساعد المساهمين في تحسين مبيعاتهم.
+المستخدم قام برفع لقطة شاشة (Screenshot) لعمل مرفوض أو لمتجره أو لبطاقة تصميم منخفضة المبيعات.
+حلل الصورة بدقة وأعطني رأيك الخبير.
 
-سياق المتجر (Adobe Stock):
-- رابط/اسم الحساب: ${storeContext.storeReference?.trim() || "(غير محدد)"}
-- ما تم بيعه/الأداء: ${storeContext.soldSummary?.trim() || "(غير محدد)"}
-- ملخص الرفض السابق: ${storeContext.rejectedSummary?.trim() || "(غير محدد)"}
-- مجال الكلمات المفتاحية المطلوب تحليله: ${storeContext.keywordFocus?.trim() || "(غير محدد)"}
-- ملاحظات إضافية: ${storeContext.notes?.trim() || "(لا توجد)"}
-` : "";
-  return generateWithGemini(`أنت خبير Adobe Stock يساعد المساهمين في تحسين محتواهم.
-
-المساهم يريد تحليل المحتوى التالي:
-- Title: ${title}
-- Description: ${description}
-- Keywords: ${kwStr}
-
-${rejectNote}
-${extraStoreContext}
+${notePrompt}
 
 قدم تحليلاً بالعربية يشمل:
-1. أسباب محتملة للرفض أو قلة المبيعات
-2. كلمات مفتاحية قد تكون مشكلة (علامات تجارية، أشخاص، حقوق ملكية)
-3. اقتراحات لتحسين العنوان والوصف
-4. كلمات مفتاحية بديلة مقترحة (25-49 كلمة مناسبة لـ Adobe Stock)
-5. نصائح لزيادة فرص القبول والمبيعات
+1. أسباب محتملة للرفض أو لقلة المبيعات (بناءً على تقييمك البصري للعمل مقارنة بمعايير Adobe Stock).
+2. ما إذا كان هناك أخطاء واضحة تمنع القبول (علامات تجارية، نصوص، أشخاص واقعيين منشئين بـ AI، تشوهات، إضاءة سيئة).
+3. اقتراحات قوية للنسخ القادمة لتحقيق مبيعات أفضل.
+4. كلمات مفتاحية مقترحة لهذا العمل.
 
-اكتب بشكل واضح ومنظم، أقل من 400 كلمة.`, 0.75);
+اكتب بشكل واضح، احترافي ومنظم.`;
+
+  return generateWithGemini(prompt, 0.75, {
+    base64: base64Data,
+    mimeType: file.type
+  });
 }
 
 export async function getAIMarketAnalysis(topic: string): Promise<string> {
@@ -727,22 +708,22 @@ export interface TopSellerAnalysis {
   }[];
 }
 
-export async function analyzeTopSeller(
-  title: string,
-  keywords: string,
-  notes: string
+export async function analyzeCompetitorSpyImage(
+  file: File,
+  base64Data: string,
+  notes?: string
 ): Promise<TopSellerAnalysis> {
-  const prompt = `You are an elite Adobe Stock competitor analyst. Analyze this top-selling competitor asset:
-Title/Desc: ${title}
-Keywords: ${keywords}
-Additional Notes: ${notes}
+  const noteContext = notes ? `\nAdditional Notes from user: ${notes}` : "";
+  const prompt = `You are an elite Adobe Stock competitor analyst. The user uploaded an image of a top-selling competitor asset or a screenshot of their portfolio.
+Analyze this visual reference deeply:
+${noteContext}
 
 Your task:
-1. "secretSauce": Explain in Arabic (2-3 sentences max) WHY this image sells so well (lighting, composition, theme).
-2. "hiddenKeywords": Provide 15 highly optimized, low-competition English keywords the seller likely used or should have used to rank #1.
-3. "smartEvolutions": Steal their core concept and evolve it into 3 UNIQUE, BETTER ideas (Blue Ocean strategy) to beat them. For each provide a short Arabic title, Arabic concept explanation, and a detailed English AI image generation prompt (following Adobe Stock guidelines: no real people, no brands, commercial style, 4k).
+1. "secretSauce": Explain in Arabic (2-3 sentences max) WHY this specific visual style sells so well (lighting, composition, theme).
+2. "hiddenKeywords": Provide 15 highly optimized, low-competition English keywords the seller likely used or should use to rank #1.
+3. "smartEvolutions": Steal the core visual concept shown in the image and evolve it into 3 UNIQUE, BETTER ideas (Blue Ocean strategy) to beat them. For each provide a short Arabic title, Arabic concept explanation, and a detailed English AI image generation prompt (following Adobe Stock guidelines: no real people, no brands, commercial style, 4k).
 
-Return ONLY a valid JSON object:
+Return ONLY a valid JSON object EXACTLY matching this interface:
 {
   "secretSauce": "...",
   "hiddenKeywords": ["kw1", "kw2", ...],
@@ -751,7 +732,11 @@ Return ONLY a valid JSON object:
   ]
 }`;
 
-  const result = await generateWithGemini(prompt, 0.85);
+  const result = await generateWithGemini(prompt, 0.85, {
+    base64: base64Data,
+    mimeType: file.type
+  });
+  
   const parsed = extractAndParseJSON<TopSellerAnalysis>(result, null as any);
   if (!parsed) throw new Error("Failed to parse AI response");
   if (parsed.smartEvolutions) {

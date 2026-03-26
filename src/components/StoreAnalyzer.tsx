@@ -1,61 +1,52 @@
 import { useState } from "react";
-import { analyzeRejectionOrLowSales, hasAnyApiKey, classifyGeminiError, getGeminiErrorUserMessage } from "@/lib/gemini";
+import { analyzeStoreScreenshot, hasAnyApiKey, classifyGeminiError, getGeminiErrorUserMessage } from "@/lib/gemini";
 import { toast } from "sonner";
 import CompetitorSpy from "@/components/CompetitorSpy";
 
 export default function StoreAnalyzer() {
-  const [storeReference, setStoreReference] = useState("");
-  const [soldSummary, setSoldSummary] = useState("");
-  const [rejectedSummary, setRejectedSummary] = useState("");
-  const [keywordFocus, setKeywordFocus] = useState("");
   const [extraNotes, setExtraNotes] = useState("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [keywordsRaw, setKeywordsRaw] = useState("");
-  const [rejectionReason, setRejectionReason] = useState("");
   const [analysis, setAnalysis] = useState("");
   const [loading, setLoading] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const keywords = keywordsRaw
-    .split(/[,\n]+/)
-    .map((k) => k.trim())
-    .filter(Boolean);
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error("عذراً، حجم الصورة يجب أن لا يتجاوز 4 ميجابايت");
+      return;
+    }
+
+    setSelectedFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setImagePreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const clearImage = () => {
+    setSelectedFile(null);
+    setImagePreview(null);
+    setAnalysis("");
+  };
 
   const handleAnalyze = async () => {
     if (!hasAnyApiKey()) {
       toast.error("أضف مفتاح Gemini API من الإعدادات ⚙️");
       return;
     }
-    if (
-      !title.trim() &&
-      !description.trim() &&
-      keywords.length === 0 &&
-      !storeReference.trim() &&
-      !soldSummary.trim() &&
-      !rejectedSummary.trim() &&
-      !keywordFocus.trim()
-    ) {
-      toast.error("أدخل بيانات المحتوى أو بيانات المتجر للتحليل");
+    if (!selectedFile || !imagePreview) {
+      toast.error("ارفع لقطة شاشة للمتجر أو للعمل المرفوض أولاً");
       return;
     }
+
     setLoading(true);
     setAnalysis("");
     try {
-      const result = await analyzeRejectionOrLowSales(
-        title.trim() || "(غير محدد)",
-        description.trim() || "(غير محدد)",
-        keywords,
-        rejectionReason.trim() || undefined,
-        {
-          storeReference: storeReference.trim() || undefined,
-          soldSummary: soldSummary.trim() || undefined,
-          rejectedSummary: rejectedSummary.trim() || undefined,
-          keywordFocus: keywordFocus.trim() || undefined,
-          notes: extraNotes.trim() || undefined,
-        }
-      );
+      const result = await analyzeStoreScreenshot(selectedFile, imagePreview, extraNotes);
       setAnalysis(result);
-      toast.success("✅ تم التحليل بنجاح!");
+      toast.success("✅ تم التحليل البصري بنجاح!");
     } catch (error) {
       const errType = classifyGeminiError(error);
       toast.error(getGeminiErrorUserMessage(error));
@@ -72,114 +63,46 @@ export default function StoreAnalyzer() {
     <div className="animate-fade-in space-y-5">
       <div className="bg-card border-2 border-accent rounded-lg p-5 box-glow-gold">
         <h3 className="text-base font-semibold text-accent text-glow-gold mb-2 font-mono">
-          🔍 محلل الرفض وقلة المبيعات
+          👁️ محلل المتجر والمبيعات (Vision AI)
         </h3>
         <p className="text-secondary font-mono text-[11px] mb-4">
-          الصق محتوى الصورة/الفيديو المرفوض أو منخفض المبيعات. سيحلل الذكاء الاصطناعي الأسباب ويقترح تحسينات للعنوان والوصف والكلمات المفتاحية.
+          ارفع لقطة شاشة (Screenshot) لبطاقة عمل مرفوض أو صفحة مبيعات المتجر الخاصة بك. سيقوم الذكاء الاصطناعي "برؤية" المشكلة واقتراح الحلول.
         </p>
 
         <div className="space-y-4">
-          <div className="bg-primary/5 border border-primary/20 rounded-md p-3 space-y-3">
-            <h4 className="text-primary font-mono text-xs font-semibold">🏪 بيانات متجرك على Adobe Stock (اختياري)</h4>
-            <div>
-              <label className={labelClass}>رابط الحساب أو اسم المتجر:</label>
-              <input
-                type="text"
-                value={storeReference}
-                onChange={(e) => setStoreReference(e.target.value)}
-                placeholder="مثال: https://stock.adobe.com/contributor/... أو اسم الحساب"
-                className={inputClass}
-              />
+          {!imagePreview ? (
+            <label className="border-2 border-dashed border-accent/50 hover:border-accent bg-accent/5 flex flex-col items-center justify-center p-8 rounded-lg cursor-pointer transition-all group">
+              <span className="text-accent text-3xl mb-3 group-hover:scale-110 transition-transform">📸📸</span>
+              <span className="text-accent font-mono text-xs font-semibold">اضغط لرفع لقطة الشاشة</span>
+              <span className="text-secondary font-mono text-[10px] mt-1">(صورة لعمل أو عدة أعمال، أو إحصائيات)</span>
+              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+            </label>
+          ) : (
+            <div className="relative rounded-lg overflow-hidden border border-accent/30 bg-background/50 p-2">
+              <button onClick={clearImage} className="absolute top-4 left-4 bg-destructive/80 text-white rounded-full p-2 py-1 text-[10px] hover:bg-destructive hover:scale-110 transition-all z-10 shadow-lg" title="إزالة الصورة">
+                🗑️ إزالة
+              </button>
+              <img src={imagePreview} alt="Screenshot preview" className="max-h-64 object-contain mx-auto rounded" />
             </div>
-            <div>
-              <label className={labelClass}>ما تم بيعه أو الأداء الحالي:</label>
-              <textarea
-                value={soldSummary}
-                onChange={(e) => setSoldSummary(e.target.value)}
-                placeholder="مثال: مبيعات جيدة في خلفيات الأعمال - انخفاض في الطبيعة..."
-                className={`${inputClass} min-h-[60px]`}
-                rows={2}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>ملخص أسباب الرفض السابقة:</label>
-              <textarea
-                value={rejectedSummary}
-                onChange={(e) => setRejectedSummary(e.target.value)}
-                placeholder="مثال: مشاكل Trademark / جودة تقنية / تكرار..."
-                className={`${inputClass} min-h-[60px]`}
-                rows={2}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>مجال الكلمات المفتاحية المطلوب تحليله:</label>
-              <input
-                type="text"
-                value={keywordFocus}
-                onChange={(e) => setKeywordFocus(e.target.value)}
-                placeholder="مثال: cooking, business, ai backgrounds"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>ملاحظات إضافية:</label>
-              <textarea
-                value={extraNotes}
-                onChange={(e) => setExtraNotes(e.target.value)}
-                placeholder="أي تفاصيل إضافية تساعد في التحليل..."
-                className={`${inputClass} min-h-[60px]`}
-                rows={2}
-              />
-            </div>
-          </div>
+          )}
 
           <div>
-            <label className={labelClass}>العنوان (Title):</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="مثال: Professional chef cooking in modern kitchen"
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>الوصف (Description):</label>
+            <label className={labelClass}>ملاحظات إضافية أو سؤال محدد يخص الصورة (اختياري):</label>
             <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="وصف المحتوى..."
-              className={`${inputClass} min-h-[80px]`}
-              rows={3}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>الكلمات المفتاحية (مفصولة بفاصلة أو سطر جديد):</label>
-            <textarea
-              value={keywordsRaw}
-              onChange={(e) => setKeywordsRaw(e.target.value)}
-              placeholder="chef, cooking, kitchen, food, professional..."
-              className={`${inputClass} min-h-[70px]`}
-              rows={3}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>سبب الرفض (إن وُجد):</label>
-            <input
-              type="text"
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              placeholder="مثال: Property release required, Trademark..."
-              className={inputClass}
+              value={extraNotes}
+              onChange={(e) => setExtraNotes(e.target.value)}
+              placeholder="مثال: هذا التصميم تم رفضه بسبب الجودة التقنية، هل يمكنك اكتشاف الخلل البصري؟"
+              className={`${inputClass} min-h-[60px]`}
+              rows={2}
             />
           </div>
 
           <button
             onClick={handleAnalyze}
-            disabled={loading}
+            disabled={loading || !selectedFile}
             className="w-full gradient-primary text-primary-foreground py-3 rounded-md font-mono text-sm font-semibold box-glow-strong hover:scale-[1.02] transition-all disabled:opacity-50"
           >
-            {loading ? "⏳ جاري التحليل..." : "🧠 حلل وأقترح تحسينات"}
+            {loading ? "⏳ جاري فحص الصورة واستخراج الأسباب..." : "👁️ ابدأ التحليل البصري لحل المشكلة"}
           </button>
         </div>
       </div>
@@ -187,7 +110,7 @@ export default function StoreAnalyzer() {
       {analysis && (
         <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow animate-fade-in">
           <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono">
-            📋 نتيجة التحليل
+            📋 تقرير الذكاء الاصطناعي
           </h3>
           <div className="text-secondary font-arabic text-sm leading-relaxed whitespace-pre-wrap">
             {analysis}
@@ -197,7 +120,7 @@ export default function StoreAnalyzer() {
 
       {!hasAnyApiKey() && (
         <p className="text-destructive font-mono text-xs text-center">
-          ⚠️ أضف مفتاح Gemini API من الإعدادات ⚙️ لاستخدام المحلل
+          ⚠️ أضف مفتاح Gemini API من الإعدادات ⚙️ لاستخدام المحلل البصري
         </p>
       )}
 
@@ -207,8 +130,8 @@ export default function StoreAnalyzer() {
           <div className="flex items-center gap-3">
             <span className="text-2xl">🕵️</span>
             <div>
-              <h3 className="text-base font-semibold text-primary font-mono">جاسوس كبار البائعين (Competitor Spy)</h3>
-              <p className="text-secondary font-mono text-[10px] mt-0.5">حلل أعمال المنافسين الناجحة واستخرج أسرارهم وطوّر أفكارهم</p>
+              <h3 className="text-base font-semibold text-primary font-mono">جاسوس كبار البائعين البصري (Competitor Spy AI)</h3>
+              <p className="text-secondary font-mono text-[10px] mt-0.5">الآن بالذكاء الاصطناعي البصري: ارفع صورة لأجل استخراج برومبت أفضل منها!</p>
             </div>
           </div>
           <span className="text-primary text-sm font-mono group-open:rotate-90 transition-transform duration-200">▶</span>
