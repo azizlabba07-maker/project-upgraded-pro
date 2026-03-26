@@ -3,6 +3,7 @@ import { checklistItems } from "@/data/marketData";
 import { generateAIKeywords, getTopKeywordsForDomain, hasAnyApiKey, analyzeImageForStock, type ImageAnalysisResult } from "@/lib/gemini";
 import { generateClaudeKeywords, hasClaudeKey } from "@/lib/claude";
 import { trackAiMetric } from "@/lib/aiMetrics";
+import { saveNote, getNotes, deleteNote } from "@/lib/storage";
 import { toast } from "sonner";
 
 export default function ToolsSection() {
@@ -29,7 +30,7 @@ export default function ToolsSection() {
   const [checked, setChecked] = useState<boolean[]>(new Array(checklistItems.length).fill(false));
   const [showChecklist, setShowChecklist] = useState(false);
   const [quickNote, setQuickNote] = useState("");
-  const [savedNotes, setSavedNotes] = useState<string[]>([]);
+  const [savedNotes, setSavedNotes] = useState<{ id: string, text: string }[]>([]);
 
   // ── Title Generator ──
   const [titleDesc, setTitleDesc]       = useState("");
@@ -182,8 +183,7 @@ export default function ToolsSection() {
   useEffect(() => {
     try {
       setQuickNote(localStorage.getItem(NOTES_STORAGE_KEY) || "");
-      const saved = localStorage.getItem(NOTES_ARCHIVE_STORAGE_KEY);
-      setSavedNotes(saved ? JSON.parse(saved) : []);
+      getNotes().then(notes => setSavedNotes(notes));
     } catch {
       setQuickNote("");
       setSavedNotes([]);
@@ -196,30 +196,33 @@ export default function ToolsSection() {
     } catch {}
   }, [quickNote]);
 
-  const saveCurrentNote = () => {
+  const saveCurrentNote = async () => {
     const trimmed = quickNote.trim();
     if (!trimmed) {
       toast.error("اكتب ملاحظة أو برومبت أولاً");
       return;
     }
-    if (savedNotes.includes(trimmed)) {
+    if (savedNotes.some(n => n.text === trimmed)) {
       toast.error("هذا النص محفوظ بالفعل");
       return;
     }
-    const next = [trimmed, ...savedNotes].slice(0, 20);
-    setSavedNotes(next);
-    try {
-      localStorage.setItem(NOTES_ARCHIVE_STORAGE_KEY, JSON.stringify(next));
-    } catch {}
-    toast.success("تم حفظ النص في المذكرة");
+    const success = await saveNote(trimmed);
+    if (success) {
+      toast.success("تم حفظ النص في المذكرة");
+      getNotes().then(notes => setSavedNotes(notes));
+    } else {
+      toast.error("حدث خطأ أثناء حفظ الملاحظة");
+    }
   };
 
-  const deleteSavedNote = (index: number) => {
-    const next = savedNotes.filter((_, i) => i !== index);
-    setSavedNotes(next);
-    try {
-      localStorage.setItem(NOTES_ARCHIVE_STORAGE_KEY, JSON.stringify(next));
-    } catch {}
+  const handleDeleteNote = async (id: string, text: string) => {
+    const success = await deleteNote(id, text);
+    if (success) {
+      setSavedNotes(prev => prev.filter(n => n.id !== id));
+      toast.success("تم الحذف بنجاح");
+    } else {
+      toast.error("حدث خطأ أثناء الحذف");
+    }
   };
 
   // Quick title generator (local, no API needed)
@@ -566,12 +569,12 @@ export default function ToolsSection() {
           <div className="mt-4 space-y-2">
             <p className="text-primary font-mono text-[10px] font-semibold">النصوص المحفوظة ({savedNotes.length})</p>
             {savedNotes.map((note, index) => (
-              <div key={`${note.slice(0, 20)}-${index}`} className="bg-accent/5 border border-accent/30 rounded-md p-3">
-                <div className="text-secondary font-mono text-[11px] whitespace-pre-wrap">{note}</div>
+              <div key={`${note.id}-${index}`} className="bg-accent/5 border border-accent/30 rounded-md p-3">
+                <div className="text-secondary font-mono text-[11px] whitespace-pre-wrap">{note.text}</div>
                 <div className="flex gap-2 mt-2">
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(note);
+                      navigator.clipboard.writeText(note.text);
                       toast.success("تم نسخ النص");
                     }}
                     className="text-[10px] px-2 py-1 border border-accent/40 text-accent rounded font-mono hover:bg-accent/10 transition-all"
@@ -579,13 +582,13 @@ export default function ToolsSection() {
                     📋 نسخ
                   </button>
                   <button
-                    onClick={() => setQuickNote(note)}
+                    onClick={() => setQuickNote(note.text)}
                     className="text-[10px] px-2 py-1 border border-primary/40 text-primary rounded font-mono hover:bg-primary/10 transition-all"
                   >
                     ✏️ تحميل للخانة
                   </button>
                   <button
-                    onClick={() => deleteSavedNote(index)}
+                    onClick={() => handleDeleteNote(note.id, note.text)}
                     className="text-[10px] px-2 py-1 border border-destructive/40 text-destructive rounded font-mono hover:bg-destructive/10 transition-all"
                   >
                     🗑️ حذف

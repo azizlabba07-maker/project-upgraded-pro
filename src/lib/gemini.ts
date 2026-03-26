@@ -1,4 +1,6 @@
-import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX } from "@/lib/adobeStockCompliance";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { supabase, checkAuthStatus } from "./supabase";
+import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX, ADOBE_IMAGE_NEGATIVE_SUFFIX } from "./adobeStockCompliance";
 import { extractAndParseJSON, withCache, sanitizePromptOrKeywords, sanitizeStringArray } from "@/lib/sanitizer";
 
 const GEMINI_STORAGE_KEY = "gemini_api_key";

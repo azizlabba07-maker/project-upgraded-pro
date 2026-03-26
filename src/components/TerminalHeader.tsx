@@ -1,3 +1,8 @@
+import { useState, useEffect } from "react";
+import AuthModal from "./AuthModal";
+import { checkAuthStatus, supabase } from "@/lib/supabase";
+import { toast } from "sonner";
+
 const tabs = [
   { id: "market",     label: "📊 تحليل السوق" },
   { id: "opportunity",label: "🧠 محرك الفرص" },
@@ -15,6 +20,26 @@ interface TerminalHeaderProps {
 }
 
 export default function TerminalHeader({ activeTab, onTabChange }: TerminalHeaderProps) {
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    checkAuthStatus().then(res => setUser(res.user));
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+        await supabase.auth.signOut();
+        toast.success("تم تسجيل الخروج بنجاح. أنت الآن في وضع الزائر 🏠");
+    } catch (e) {
+        toast.error("حدث خطأ أثناء تسجيل الخروج");
+    }
+  };
   return (
     <>
       <div className="sticky top-0 z-50 bg-muted border-b-2 border-primary px-5 py-3 flex items-center gap-3 box-glow-strong">
@@ -23,8 +48,21 @@ export default function TerminalHeader({ activeTab, onTabChange }: TerminalHeade
           <div className="w-3 h-3 rounded-full bg-cyber-yellow" />
           <div className="w-3 h-3 rounded-full bg-primary" />
         </div>
-        <div className="flex-1 text-center text-xs text-primary text-glow font-mono">
-          $ stock_market_intelligence --v2.1 --gemini --claude --portfolio
+        <div className="flex-1 text-center text-xs text-primary text-glow font-mono flex items-center justify-center gap-4">
+          <span>$ stock_market_intelligence --v3.0 --hybrid-cloud</span>
+          {user ? (
+            <div className="flex items-center gap-3 ml-auto mr-4 text-[10px] bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+              <span className="text-secondary">👤 {user.email}</span>
+              <button onClick={handleLogout} className="text-destructive hover:text-destructive/80 font-bold transition-colors">تسجيل الخروج</button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setIsAuthOpen(true)}
+              className="ml-auto mr-4 text-[10px] px-3 py-1 rounded-full bg-accent/20 border border-accent/40 text-accent font-bold hover:bg-accent/30 transition-all box-glow-gold"
+            >
+              ☁️ تفعيل السحابة (Login)
+            </button>
+          )}
         </div>
       </div>
 
@@ -55,6 +93,12 @@ export default function TerminalHeader({ activeTab, onTabChange }: TerminalHeade
           ))}
         </div>
       </div>
+
+      <AuthModal 
+        isOpen={isAuthOpen} 
+        onClose={() => setIsAuthOpen(false)} 
+        onSuccess={() => setIsAuthOpen(false)} 
+      />
     </>
   );
 }

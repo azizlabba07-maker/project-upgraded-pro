@@ -1,5 +1,6 @@
 import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX, ADOBE_IMAGE_NEGATIVE_SUFFIX } from "@/lib/adobeStockCompliance";
 import { extractAndParseJSON, withCache, sanitizePromptOrKeywords, sanitizeStringArray } from "@/lib/sanitizer";
+import { supabase, checkAuthStatus } from "./supabase";
 
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
 const OPENAI_MODEL = "gpt-4o-mini"; // Fast, cheap, and very smart option
@@ -28,6 +29,22 @@ export function hasOpenAIKey(): boolean {
 }
 
 async function callOpenAI(userPrompt: string, systemPrompt?: string, maxTokens = 4096): Promise<string> {
+  const { isGuest, user } = await checkAuthStatus();
+
+  // 1. App-level backend proxy for authenticated users (Secure)
+  if (!isGuest && user) {
+    try {
+      const { data, error } = await supabase.functions.invoke("openai-proxy", {
+        body: { userPrompt, systemPrompt, maxTokens },
+      });
+      if (error) throw error;
+      return data.result;
+    } catch (e) {
+      console.warn("Edge Function proxy failed, falling back to local key if available:", e);
+    }
+  }
+
+  // 2. Direct browser connection for guests
   const key = getOpenAIApiKey();
   if (!key) throw new Error("NO_OPENAI_KEY: Add your OpenAI API key in Settings");
 
