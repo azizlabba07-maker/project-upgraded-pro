@@ -31,7 +31,8 @@ STEP 1: INTENT EXPANSION (AnswerThePublic analog)
 Analyze the topic and generate the top 3 most profitable, commercial, and highly-searched visual questions or concepts people are looking for regarding this topic. 
 
 STEP 2: MARKET SCORING (Ahrefs analog)
-Estimate the current Demand (low/medium/high) and Competition (low/medium/high) for this topic on Adobe Stock.
+Using Google Search, pull the absolute latest live data and trends about this topic.
+Estimate the current realistic Demand (low/medium/high) and Competition (low/medium/high) for this topic on Adobe Stock based on real search trend volume.
 Calculate an "Opportunity Score" from 0 to 100 based on this (high demand + low competition = high score).
 
 STEP 3: PROMPT MUTATION ENGINE
@@ -58,8 +59,8 @@ JSON Format Required:
   "title": "SEO Optimized Title"
 }`;
 
-  return withCache(`opportunity_engine_${topic}_${category}`, 24 * 60 * 60 * 1000, async () => {
-    const resultText = await generateWithGemini(prompt, 0.7);
+  return withCache(`opportunity_engine_${topic}_${category}_live`, 24 * 60 * 60 * 1000, async () => {
+    const resultText = await generateWithGemini(prompt, 0.7, undefined, true);
     const parsed = extractAndParseJSON<OpportunityEngineResult>(resultText, null as any);
     if (!parsed) {
         throw new Error("Failed to parse Opportunity Engine AI response.");

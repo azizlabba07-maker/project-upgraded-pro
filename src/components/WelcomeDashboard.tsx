@@ -7,7 +7,19 @@ import { getCurrentSeason, formatDateAr } from "@/lib/shared";
 export default function WelcomeDashboard() {
   const { setActivePage, hasAnyKey, setGoldOpportunityCount } = useApp();
   const [greeting, setGreeting] = useState("");
-  const [marketData] = useState<MarketTrend[]>(staticMarketData);
+  const [marketData, setMarketData] = useState<MarketTrend[]>(staticMarketData);
+
+  useEffect(() => {
+    try {
+      const cachedStr = localStorage.getItem("gemini_live_trends");
+      if (cachedStr) {
+        const parsed = JSON.parse(cachedStr);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMarketData(parsed);
+        }
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     const hour = new Date().getHours();

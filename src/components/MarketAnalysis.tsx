@@ -62,6 +62,18 @@ export default function MarketAnalysis() {
   const [trends, setTrends] = useState<MarketTrend[]>(staticMarketData);
   const [categoryFilter, setCategoryFilter] = useState("");
   const [demandFilter, setDemandFilter] = useState("");
+
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem("gemini_live_trends");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setTrends(parsed);
+        }
+      }
+    } catch {}
+  }, []);
   const [competitionFilter, setCompetitionFilter] = useState("");
   const [goldFilter, setGoldFilter] = useState("");
   const [aiAnalysis, setAiAnalysis] = useState("");

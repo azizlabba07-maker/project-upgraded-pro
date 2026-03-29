@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { marketData as staticData, type MarketTrend } from "@/data/marketData";
 import { EMERGING_TRENDS_2026 } from "@/data/trends2026";
 import { useApp } from "@/contexts/AppContext";
@@ -27,7 +27,7 @@ function computeNiches(data: MarketTrend[]): NicheInfo[] {
       category: t.category,
       marketSize: Math.min(100, Math.round((t.searches / 150))),
       competition: t.competition,
-      growth: Math.round(Math.random() * 40 + (t.profitability > 80 ? 20 : 0)),
+      growth: Math.round(t.profitability > 80 ? 30 + (t.profitability % 10) : t.profitability > 60 ? 15 + (t.searches % 5) : 5),
       opportunity: Math.min(100, opportunity),
       trending: t.demand === "high" && t.profitability > 75,
     };
@@ -40,8 +40,21 @@ export default function NicheExplorer() {
   const [compFilter, setCompFilter] = useState("");
   const [catFilter, setCatFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [baseData, setBaseData] = useState<MarketTrend[]>(staticData);
 
-  const niches = useMemo(() => computeNiches(staticData), []);
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem("gemini_live_trends");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setBaseData(parsed);
+        }
+      }
+    } catch {}
+  }, []);
+
+  const niches = useMemo(() => computeNiches(baseData), [baseData]);
   const categories = [...new Set(niches.map((n) => n.category))];
 
   const filtered = useMemo(() => {
