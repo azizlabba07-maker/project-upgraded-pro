@@ -2,7 +2,7 @@ import { Suspense, lazy } from "react";
 import { useApp } from "@/contexts/AppContext";
 import AppShell from "@/components/layout/AppShell";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { SkeletonPage } from "@/components/ui/Skeleton";
+import { SkeletonPage } from "@/components/ui/skeleton";
 
 // Lazy load pages for better performance
 const WelcomeDashboard = lazy(() => import("@/components/WelcomeDashboard"));
