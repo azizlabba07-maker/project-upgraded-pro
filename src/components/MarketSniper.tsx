@@ -1,13 +1,9 @@
-import { useState, useMemo } from "react";
-import { marketData as staticMarketData, type MarketTrend } from "@/data/marketData";
-import {
-  generateGeminiStockPrompts,
-  generateAIKeywords,
-  hasAnyApiKey,
-  classifyGeminiError,
-  getGeminiErrorUserMessage,
-} from "@/lib/gemini";
-import { optimizePrompt } from "@/lib/autoOptimizer";
+import { useState, useMemo, useEffect } from "react";
+import { type MarketTrend } from "@/data/marketData";
+import { hasAnyApiKey, generateAITrends } from "@/lib/gemini";
+import { hasClaudeKey } from "@/lib/claude";
+import { hasOpenAIKey } from "@/lib/openai";
+import { dispatchPromptGeneration } from "@/lib/aiDispatcher";
 import { toast } from "sonner";
 
 interface SniperPackage {
@@ -26,38 +22,76 @@ function getOpportunityScore(item: MarketTrend): number {
   return Math.round(demandW * 0.4 + compW * 0.35 + Math.min(100, item.profitability) * 0.25);
 }
 
-export default function MarketSniper() {
+export default function MarketSniper({ liveMarketData }: { liveMarketData?: MarketTrend[] }) {
   const [packages, setPackages] = useState<SniperPackage[]>([]);
   const [loading, setLoading] = useState(false);
   const [sniperCount, setSniperCount] = useState(0);
+  const [realTrends, setRealTrends] = useState<MarketTrend[]>([]);
+  const [isDataReal, setIsDataReal] = useState(false);
+
+  useEffect(() => {
+    // Attempt to load cached real trends.
+    if (liveMarketData && liveMarketData.length > 0) {
+      setRealTrends(liveMarketData);
+      setIsDataReal(true);
+      return;
+    }
+    const loadReal = async () => {
+      try {
+        const cachedStr = localStorage.getItem("gemini_live_trends");
+        if (cachedStr) {
+          const parsedStr = JSON.parse(cachedStr);
+          if (parsedStr && parsedStr.value && Array.isArray(parsedStr.value)) {
+             setRealTrends(parsedStr.value);
+             setIsDataReal(true);
+             return;
+          }
+        }
+      } catch (e) {}
+    };
+    loadReal();
+  }, [liveMarketData]);
 
   // Find golden opportunities automatically
   const goldenTargets = useMemo(() => {
-    return [...staticMarketData]
+    return [...realTrends]
       .filter((t) => t.demand === "high" && t.competition === "low")
       .sort((a, b) => getOpportunityScore(b) - getOpportunityScore(a));
-  }, []);
+  }, [realTrends]);
 
   const handleSnipe = async () => {
-    if (!hasAnyApiKey()) {
-      toast.error("أضف مفتاح Gemini API من الإعدادات ⚙️");
-      return;
-    }
-    if (goldenTargets.length === 0) {
-      toast.error("لا توجد فرص ذهبية حالياً. جرب تحديث التراندات أولاً.");
+    const hasAnyKey = hasAnyApiKey() || hasClaudeKey() || hasOpenAIKey();
+    if (!hasAnyKey) {
+      toast.error("أضف مفتاح API من الإعدادات ⚙️");
       return;
     }
 
     setLoading(true);
     setPackages([]);
     const results: SniperPackage[] = [];
+    let targetsToUse = goldenTargets;
 
     try {
-      for (const target of goldenTargets.slice(0, 5)) {
+      if (!isDataReal || targetsToUse.length === 0) {
+        toast.info("🔍 جاري سحب بيانات السوق الحقيقية أولاً...");
+        const aiTrends = await generateAITrends();
+        setRealTrends(aiTrends as MarketTrend[]);
+        setIsDataReal(true);
+        targetsToUse = [...(aiTrends as MarketTrend[])]
+          .filter((t) => t.demand === "high" && t.competition === "low")
+          .sort((a, b) => getOpportunityScore(b) - getOpportunityScore(a));
+        
+        if (targetsToUse.length === 0) {
+           toast.error("لا توجد فرص ذهبية (متدنية المنافسة) اليوم في السوق الحي. حاول لاحقاً.");
+           setLoading(false);
+           return;
+        }
+      }
+      for (const target of targetsToUse.slice(0, 5)) {
         toast.info(`🎯 قنص: ${target.topic}...`);
 
-        // Generate prompt, title, and keywords in a SINGLE API call
-        const prompts = await generateGeminiStockPrompts(
+        // Use unified dispatcher for multi-engine fallback
+        const { prompts, engineUsed } = await dispatchPromptGeneration(
           target.category,
           1,
           "image",
@@ -67,11 +101,8 @@ export default function MarketSniper() {
         );
 
         const rawPrompt = prompts[0]?.prompt || `Professional ${target.topic} concept, studio lighting, clean commercial composition, 4K, sRGB, copy space, no text, no logos, no faces`;
-
-        // Skip secondary optimization API call to save quota - V1 is already highly optimized!
         const optimized = rawPrompt;
 
-        // Use keywords already generated in the first API call, fallback if missing
         let keywords: string[] = prompts[0]?.keywords || [];
         if (keywords.length === 0) {
           keywords = target.topic.toLowerCase().split(/\s+/).concat([
@@ -97,7 +128,7 @@ export default function MarketSniper() {
       setSniperCount((c) => c + results.length);
       toast.success(`🎯 تم قنص ${results.length} فرص ذهبية بنجاح!`);
     } catch (error) {
-      toast.error(getGeminiErrorUserMessage(error));
+      toast.error(error instanceof Error ? error.message : "حدث خطأ");
     } finally {
       setLoading(false);
     }
@@ -220,9 +251,9 @@ ${p.notes}`;
       </div>
 
       {/* Golden Target List */}
-      {goldenTargets.length > 0 && (
+      {goldenTargets.length > 0 ? (
         <div className="bg-card border-2 border-accent rounded-lg p-5 box-glow-gold">
-          <h3 className="text-sm font-semibold text-accent text-glow-gold mb-3 font-mono">⭐ الأهداف الذهبية المرصودة حالياً</h3>
+          <h3 className="text-sm font-semibold text-accent text-glow-gold mb-3 font-mono">⭐ الأهداف الذهبية المرصودة حالياً (تراندات حية)</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {goldenTargets.map((t, i) => (
               <div key={i} className="bg-accent/5 border border-accent/20 rounded-md p-2.5 flex items-center justify-between">
@@ -234,6 +265,10 @@ ${p.notes}`;
               </div>
             ))}
           </div>
+        </div>
+      ) : (
+        <div className="bg-card border border-primary/20 rounded-lg p-5 text-center">
+            <p className="text-secondary font-mono text-xs">لا توجد بيانات حية مرصودة حالياً. اضغط أطلق النار للسحب المباشر من الإنترنت.</p>
         </div>
       )}
 

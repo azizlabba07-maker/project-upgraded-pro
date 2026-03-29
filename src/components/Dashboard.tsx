@@ -3,6 +3,7 @@ import { marketData as initialMarketData, dailyTips, seasonalEvents, type Market
 import { EMERGING_TRENDS_2026 } from "@/data/trends2026";
 import { createSourcePulse, pulseLocalTrends } from "@/lib/livePulse";
 import { generateAITrends, hasAnyApiKey } from "@/lib/gemini";
+import { clearAllCache } from "@/lib/sanitizer";
 import { toast } from "sonner";
 import { calcSuccessRate, getTodayAiMetrics } from "@/lib/aiMetrics";
 import DailyFeed from "@/components/DailyFeed";
@@ -41,6 +42,7 @@ export default function Dashboard() {
   const [pulseData, setPulseData] = useState<any[]>([]);
   const [aiMetrics, setAiMetrics] = useState(getTodayAiMetrics());
   const [selectedTrendForGeneration, setSelectedTrendForGeneration] = useState<MarketTrend | null>(null);
+  const [trendRadar, setTrendRadar] = useState<Array<{topic: string; time: string; prob: string}>>([]);
 
   const goldOpportunities = useMemo(() => marketData.filter((i) => i.demand === "high" && i.competition === "low").length, [marketData]);
   const avgProfit = useMemo(() => Math.round(marketData.reduce((s, i) => s + i.profitability, 0) / (marketData.length || 1)), [marketData]);
@@ -58,18 +60,56 @@ export default function Dashboard() {
   useEffect(() => {
     setTip(dailyTips[Math.floor(Math.random() * dailyTips.length)]);
     setIdeas([
-      `حوّل "${top10[0]?.topic || "Top Topic"}" إلى 3 إصدارات: صورة + فيديو + Green Screen.`,
-      `ابنِ سلسلة 10 أصول في فئة ${top10[0]?.category || "Technology"} مع Copy Space ثابت.`,
-      `استهدف أقل منافسة ضمن أعلى ربحية وابدأ برفع 5 أصول يومياً لمدة 7 أيام.`,
-      `أنشئ حزمة SEO موحّدة للفائزين في Source Pulse (Impact الأعلى).`,
+      `ابحث عن الزوايا غير المطروقة في الفئة التقنية (Blue Ocean).`,
+      `أنشئ سلسلة من الأصول مع مساحة فارغة (Copy Space) كبيرة لتسهيل دمج النصوص التصميمية.`,
+      `استهدف الكلمات المفتاحية ذات المنافسة القليلة لضمان ظهور أعمالك الأولى.`,
+      `ادمج عناصر واقعية مع خلفيات معزولة (Green Screen) لزيادة المبيعات.`,
     ]);
+
+    const loadRealData = async () => {
+      // 1. Try to load cached or live data from AI if key exists
+      if (hasAnyApiKey()) {
+        try {
+          const aiTrends = await generateAITrends();
+          if (aiTrends && aiTrends.length > 0) {
+            setMarketData(aiTrends as MarketTrend[]);
+            updateRadar(aiTrends as MarketTrend[]);
+            return;
+          }
+        } catch (e) {
+          console.warn("Could not fetch real trends on load, falling back to static", e);
+        }
+      }
+      
+      // 2. Fallback to static if no AI or failed
+      updateRadar(initialMarketData);
+    };
+
+    const updateRadar = (data: MarketTrend[]) => {
+      const goldenOps = [...data]
+        .filter(t => t.demand === "high" && t.competition === "low")
+        .sort((a, b) => b.profitability - a.profitability)
+        .slice(0, 3);
+      const highDemand = [...data]
+        .filter(t => t.demand === "high")
+        .sort((a, b) => b.searches - a.searches);
+
+      const radarItems = goldenOps.length >= 3 ? goldenOps : highDemand.slice(0, 3);
+      setTrendRadar(radarItems.map((t, i) => ({
+        topic: t.topic,
+        time: `متوقع قريبًا`,
+        prob: `${Math.min(98, t.profitability + 5)}%`,
+      })));
+    };
+
+    loadRealData();
   }, []);
 
   useEffect(() => {
+    // Just refresh the AI metrics periodically. We removed the fake local pulse for the market data.
     const id = window.setInterval(() => {
       setAiMetrics(getTodayAiMetrics());
-      setMarketData(prev => pulseLocalTrends(prev));
-    }, 15000); // Changed from 4000 to 15000 to save CPU while still feeling live
+    }, 15000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -80,9 +120,27 @@ export default function Dashboard() {
     }
     setRefreshing(true);
     try {
+      // Clear old cache first
+      clearAllCache();
       const aiTrends = await generateAITrends();
       setMarketData(aiTrends as MarketTrend[]);
-      toast.success("🔄 تم تحديث التراندات بنجاح في لوحة القيادة!");
+
+      // Update Trend Radar with fresh data
+      const goldenOps = [...(aiTrends as MarketTrend[])]
+        .filter(t => t.demand === "high" && t.competition === "low")
+        .sort((a, b) => b.profitability - a.profitability)
+        .slice(0, 3);
+      const highDemand = [...(aiTrends as MarketTrend[])]
+        .filter(t => t.demand === "high")
+        .sort((a, b) => b.searches - a.searches);
+      const radarItems = goldenOps.length >= 3 ? goldenOps : highDemand.slice(0, 3);
+      setTrendRadar(radarItems.map((t, i) => ({
+        topic: t.topic,
+        time: `القادم: ${(i + 1) * 15} يوم`,
+        prob: `${Math.min(98, t.profitability + 5)}%`,
+      })));
+
+      toast.success("🔄 تم تحديث التراندات بنجاح من بيانات حية!");
     } catch (err: any) {
       toast.error(err.message ? `خطأ: ${err.message}` : "تعذر التحديث بالذكاء الاصطناعي.");
     } finally {
@@ -147,9 +205,10 @@ export default function Dashboard() {
   };
 
   const aiRows = [
-    { key: "gemini", label: "Gemini", data: aiMetrics.engines.gemini },
-    { key: "claude", label: "Claude", data: aiMetrics.engines.claude },
-    { key: "local", label: "Local", data: aiMetrics.engines.local },
+    { key: "gemini", label: "Gemini 💎", data: aiMetrics.engines.gemini },
+    { key: "claude", label: "Claude 🟣", data: aiMetrics.engines.claude },
+    { key: "openai", label: "OpenAI 🟢", data: aiMetrics.engines.openai },
+    { key: "local", label: "Local ⚙️", data: aiMetrics.engines.local },
   ];
 
   if (selectedTrendForGeneration) {
@@ -182,7 +241,17 @@ export default function Dashboard() {
           disabled={refreshing}
           className="gradient-primary text-primary-foreground px-4 py-2 rounded-md font-mono text-xs font-semibold hover:scale-105 transition-all disabled:opacity-50 flex items-center gap-2"
         >
-          {refreshing ? "⏳ جاري التحديث..." : "🔄 التحديث بالذكاء الاصطناعي"}
+          {refreshing ? "⏳ جاري التحديث..." : "🔄 تحديث حي من الإنترنت"}
+        </button>
+        <button
+          onClick={() => {
+            const count = clearAllCache();
+            setMarketData(initialMarketData);
+            toast.success(`🗑️ تم مسح ${count} عنصر مخبأ!`);
+          }}
+          className="bg-card border-2 border-destructive/50 text-destructive px-3 py-2 rounded-md font-mono text-xs font-semibold hover:bg-destructive/10 transition-all"
+        >
+          🗑️ مسح الكاش
         </button>
       </div>
 
@@ -501,11 +570,9 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-primary/5 scanline-animation pointer-events-none" />
           <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono relative z-10">🔮 رادار التراندات القادمة (Trend Radar)</h3>
           <div className="space-y-3 relative z-10">
-            {[
-              { topic: "Sustainable Tech Lifestyles", time: "القادم: 30 يوم", prob: "94%" },
-              { topic: "Minimalist Cyberpunk UI", time: "القادم: 45 يوم", prob: "89%" },
-              { topic: "Abstract Data Visualization", time: "القادم: 60 يوم", prob: "82%" },
-            ].map((t, i) => (
+            {(trendRadar.length > 0 ? trendRadar : [
+              { topic: "جاري تحميل التراندات...", time: "--", prob: "--" },
+            ]).map((t, i) => (
               <div key={i} className="flex items-center justify-between p-3 bg-background/50 border border-primary/20 rounded-md hover:bg-primary/10 transition-colors">
                 <div>
                   <div className="text-primary text-xs font-mono font-bold animate-pulse-slow">{t.topic}</div>

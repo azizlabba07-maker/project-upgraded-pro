@@ -1,11 +1,11 @@
 // Local-first memory system to allow the prompt generator to evolve concepts daily
 
 const MEMORY_KEY_PREFIX = "stock_prompt_memory_";
-const MAX_MEMORY_LIMIT = 20;
+const MAX_MEMORY_LIMIT = 50; // Increased limit for better long-term uniqueness
 
 export interface PromptMemoryEntry {
   category: string;
-  topic: string;
+  topic: string; // The specific subject or prompt snapshot
   date: number;
 }
 
@@ -15,15 +15,15 @@ export function saveToPromptMemory(category: string, topics: string[]): void {
     const existingRaw = localStorage.getItem(key);
     let memory: PromptMemoryEntry[] = existingRaw ? JSON.parse(existingRaw) : [];
 
-    // Add new ones
     const now = Date.now();
     topics.forEach((t) => {
-      memory.push({ category, topic: t, date: now });
+      // Don't save duplicates
+      if (!memory.find(m => m.topic === t)) {
+        memory.push({ category, topic: t, date: now });
+      }
     });
 
-    // Keep only the most recent N items
     memory = memory.sort((a, b) => b.date - a.date).slice(0, MAX_MEMORY_LIMIT);
-
     localStorage.setItem(key, JSON.stringify(memory));
   } catch (e) {
     console.warn("Could not save to prompt memory", e);
@@ -39,8 +39,8 @@ export function getPromptMemory(category: string): string {
     const memory: PromptMemoryEntry[] = JSON.parse(existingRaw);
     if (memory.length === 0) return "";
 
-    const pastTopics = memory.map(m => m.topic).join(", ");
-    return `PAST GENERATIONS GENERATED RECENTLY: [ ${pastTopics} ]. YOU MUST AVOID REPEATING THESE EXACT SCENARIOS/SUBJECTS. EVOLVE THE CONCEPT TO A NEW LEVEL OR ENTIRELY DIFFERENT SUB-TOPIC.`;
+    const pastTopics = memory.map(m => m.topic).join(" | ");
+    return `CRITICAL MEMORY KNOWLEDGE (PAST GENERATIONS):\n[\n${pastTopics}\n]\n\nDO NOT repeat the exact subjects, specific compositions, or unique visual features listed above. Your goal is to EXCLUSIVELY invent NEW visual scenarios, lighting setups, or completely different sub-topics that have NOT been done recently in this category.`;
   } catch (e) {
     return "";
   }

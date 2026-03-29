@@ -1,4 +1,4 @@
-type Engine = "gemini" | "claude" | "local";
+type Engine = "gemini" | "claude" | "openai" | "local";
 type Action = "prompts" | "keywords" | "analysis";
 type Status = "success" | "failure";
 
@@ -30,6 +30,7 @@ function createDayMetrics(day: string): DayMetrics {
     engines: {
       gemini: createCounter(),
       claude: createCounter(),
+      openai: createCounter(),
       local: createCounter(),
     },
     actions: {

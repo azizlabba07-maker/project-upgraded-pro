@@ -2,15 +2,15 @@ import { useEffect, useState } from "react";
 import {
   classifyGeminiError,
   generateAIVideoPrompts,
-  generateGeminiStockPrompts,
   getGeminiErrorUserMessage,
   hasAnyApiKey,
   type VideoPromptResult,
-  type GeminiStockPrompt,
 } from "@/lib/gemini";
-import { generateStockPrompts, hasClaudeKey } from "@/lib/claude";
+import { hasClaudeKey } from "@/lib/claude";
+import { hasOpenAIKey } from "@/lib/openai";
 import { getPromptEvolutionHint } from "@/lib/promptEvolution";
-import { trackAiMetric } from "@/lib/aiMetrics";
+import { getPromptMemory } from "@/lib/promptMemory";
+import { dispatchPromptGeneration, type UnifiedStockPrompt } from "@/lib/aiDispatcher";
 import { toast } from "sonner";
 
 const VIDEO_CATEGORIES = [
@@ -265,7 +265,7 @@ function generateLocalVideoPrompts(category: string, count: number): VideoPrompt
   return results;
 }
 
-type DisplayPrompt = VideoPromptResult & { type?: string; title?: string; keywords?: string[] };
+type DisplayPrompt = VideoPromptResult & { type?: string; title?: string; keywords?: string[]; demand?: string };
 
 export default function PromptGenerator() {
   const [category, setCategory] = useState("Nature");
@@ -277,7 +277,7 @@ export default function PromptGenerator() {
     } catch { return []; }
   });
   const [loading, setLoading] = useState(false);
-  const [useAI, setUseAI] = useState(() => hasAnyApiKey());
+  const [useAI, setUseAI] = useState(() => hasAnyApiKey() || hasClaudeKey() || hasOpenAIKey());
   const [advancedMode, setAdvancedMode] = useState(true);
   const [outputType, setOutputType] = useState<"image" | "video" | "both">("video");
   const [competition, setCompetition] = useState("medium");
@@ -325,122 +325,84 @@ export default function PromptGenerator() {
     localStorage.removeItem("gemini_saved_prompts");
 
     try {
-      if (useAI && hasAnyApiKey()) {
-        const evolutionHint = getPromptEvolutionHint(category);
-        if (advancedMode && batchTitles.length > 0) {
-          const allResults: DisplayPrompt[] = [];
-          for (const title of batchTitles) {
-            const baseHint = `${title}. ${evolutionHint}`.trim();
-            let result = await generateGeminiStockPrompts(
-              category,
-              promptCount,
-              outputType,
-              selectedTrends,
-              competition,
-              baseHint
-            );
-            const firstValid = (result as DisplayPrompt[]).filter((item) => isPromptCategoryValid(item.prompt, category));
-            if (firstValid.length === 0) {
-              result = await generateGeminiStockPrompts(
-                category,
-                promptCount,
-                outputType,
-                selectedTrends,
-                competition,
-                `${baseHint}. CRITICAL: return ONLY ${category} content`
-              );
-            }
-            allResults.push(
-              ...(result as DisplayPrompt[]).map((item) => ({
-                ...item,
-                title: item.title ? `${item.title} | Seed: ${title}` : `Seed: ${title}`,
-              }))
-            );
-          }
-          const validated = allResults.filter((item) => isPromptCategoryValid(item.prompt, category));
-          const finalList = (validated.length > 0 ? validated : allResults).map((item, idx) => ({ ...item, number: idx + 1 }));
-          setPrompts(finalList);
-          try { localStorage.setItem("gemini_saved_prompts", JSON.stringify(finalList)); } catch {}
-          trackAiMetric("gemini", "prompts", "success");
-          if (validated.length !== allResults.length) {
-            toast.warning(`تمت فلترة ${allResults.length - validated.length} برومبت خارج الفئة المختارة.`);
-          }
-          toast.success(`✅ تم توليد ${finalList.length} برومبت لـ ${batchTitles.length} عنوان`);
-        } else if (advancedMode) {
-          let result = await generateGeminiStockPrompts(
-            category,
-            promptCount,
-            outputType,
-            selectedTrends,
-            competition,
-            evolutionHint || undefined
+      const hasAnyKey = hasAnyApiKey() || hasClaudeKey() || hasOpenAIKey();
+      const evolutionHint = getPromptEvolutionHint(category);
+      const historyContext = getPromptMemory(category);
+
+      if (useAI && hasAnyKey && advancedMode && batchTitles.length > 0) {
+        // ── BATCH MODE: multiple titles ──
+        const allResults: DisplayPrompt[] = [];
+        for (const title of batchTitles) {
+          const baseHint = `${title}. ${evolutionHint}`.trim();
+          const { prompts: result, engineUsed } = await dispatchPromptGeneration(
+            category, promptCount, outputType, selectedTrends, competition,
+            baseHint, historyContext
           );
-          let validated = (result as DisplayPrompt[]).filter((item) => isPromptCategoryValid(item.prompt, category));
-          if (validated.length === 0) {
-            result = await generateGeminiStockPrompts(
-              category,
-              promptCount,
-              outputType,
-              selectedTrends,
-              competition,
-              `${evolutionHint || ""}. CRITICAL: return ONLY ${category} content`
-            );
-            validated = (result as DisplayPrompt[]).filter((item) => isPromptCategoryValid(item.prompt, category));
-          }
-          const finalList = validated.length > 0 ? validated : (result as DisplayPrompt[]);
-          setPrompts(finalList);
-          try { localStorage.setItem("gemini_saved_prompts", JSON.stringify(finalList)); } catch {}
-          trackAiMetric("gemini", "prompts", "success");
-          if (validated.length !== (result as DisplayPrompt[]).length) {
-            toast.warning("تمت فلترة بعض البرومبتات غير المطابقة للفئة.");
-          }
-          toast.success(`✅ تم توليد ${finalList.length} برومبت بالذكاء الاصطناعي!`);
-        } else {
+          allResults.push(
+            ...(result as DisplayPrompt[]).map((item) => ({
+              ...item,
+              title: item.title ? `${item.title} | Seed: ${title}` : `Seed: ${title}`,
+            }))
+          );
+        }
+        const validated = allResults.filter((item) => isPromptCategoryValid(item.prompt, category));
+        const finalList = (validated.length > 0 ? validated : allResults).map((item, idx) => ({ ...item, number: idx + 1 }));
+        setPrompts(finalList);
+        try { localStorage.setItem("gemini_saved_prompts", JSON.stringify(finalList)); } catch {}
+        if (validated.length !== allResults.length) {
+          toast.warning(`تمت فلترة ${allResults.length - validated.length} برومبت خارج الفئة المختارة.`);
+        }
+        toast.success(`✅ تم توليد ${finalList.length} برومبت لـ ${batchTitles.length} عنوان`);
+      } else if (useAI && hasAnyKey && advancedMode) {
+        // ── ADVANCED MODE: single generation ──
+        const topicHint = evolutionHint || undefined;
+        const { prompts: result, engineUsed, message } = await dispatchPromptGeneration(
+          category, promptCount, outputType, selectedTrends, competition,
+          topicHint, historyContext
+        );
+        let validated = (result as DisplayPrompt[]).filter((item) => isPromptCategoryValid(item.prompt, category));
+        const finalList = validated.length > 0 ? validated : (result as DisplayPrompt[]);
+        setPrompts(finalList);
+        try { localStorage.setItem("gemini_saved_prompts", JSON.stringify(finalList)); } catch {}
+        if (validated.length !== (result as DisplayPrompt[]).length && validated.length > 0) {
+          toast.warning("تمت فلترة بعض البرومبتات غير المطابقة للفئة.");
+        }
+        const engineLabel = engineUsed === "local" ? "محلياً" : engineUsed.toUpperCase();
+        toast.success(`✅ تم توليد ${finalList.length} برومبت (${engineLabel})`);
+        if (message) toast.info(message, { duration: 5000 });
+      } else if (useAI && hasAnyKey && !advancedMode) {
+        // ── SIMPLE MODE: video-only ──
+        try {
           const result = await generateAIVideoPrompts(category, promptCount);
           setPrompts(result as DisplayPrompt[]);
           try { localStorage.setItem("gemini_saved_prompts", JSON.stringify(result)); } catch {}
-          trackAiMetric("gemini", "prompts", "success");
-          toast.success(`✅ تم توليد ${promptCount} برومبت بالذكاء الاصطناعي!`);
+          toast.success(`✅ تم توليد ${promptCount} برومبت فيديو`);
+        } catch {
+          // Fallback to dispatch
+          const { prompts: fallback, engineUsed } = await dispatchPromptGeneration(
+            category, promptCount, "video", selectedTrends, competition
+          );
+          setPrompts(fallback as DisplayPrompt[]);
+          toast.success(`✅ تم التوليد عبر ${engineUsed.toUpperCase()}`);
         }
       } else {
-        setPrompts(generateLocalVideoPrompts(category, promptCount) as DisplayPrompt[]);
-        try { localStorage.setItem("gemini_saved_prompts", JSON.stringify(generateLocalVideoPrompts(category, promptCount))); } catch {}
-        trackAiMetric("local", "prompts", "success");
+        // ── NO API OR AI DISABLED: local only ──
+        const { prompts: localResult, message } = await dispatchPromptGeneration(
+          category, promptCount, outputType, selectedTrends, competition
+        );
+        setPrompts(localResult as DisplayPrompt[]);
+        try { localStorage.setItem("gemini_saved_prompts", JSON.stringify(localResult)); } catch {}
         toast.success(`تم توليد ${promptCount} برومبت محلياً`);
-        if (useAI && !hasAnyApiKey()) {
+        if (useAI && !hasAnyKey) {
           toast.error("أضف مفتاح API من الإعدادات ⚙️ لاستخدام AI");
           setUseAI(false);
         }
       }
     } catch (error) {
-      trackAiMetric("gemini", "prompts", "failure");
-      const errorType = classifyGeminiError(error);
+      console.error("Generation failed:", error);
       toast.error(getGeminiErrorUserMessage(error));
-      if (advancedMode && hasClaudeKey()) {
-        try {
-          const claudeOutputType = outputType === "both" ? "both" : outputType === "video" ? "video" : "image";
-          const claudeResult = await generateStockPrompts(
-            category,
-            promptCount,
-            claudeOutputType,
-            selectedTrends,
-            competition
-          );
-          setPrompts(claudeResult.map((p, i) => ({ ...p, number: i + 1, category: p.category || category })));
-          trackAiMetric("claude", "prompts", "success");
-          toast.success("✅ تم التحويل تلقائيًا إلى Claude");
-          return;
-        } catch {
-          trackAiMetric("claude", "prompts", "failure");
-          // Continue to local fallback.
-        }
-      }
-      if (errorType === "quota" || errorType === "rate_limit") {
-        setUseAI(false);
-      }
+      // Ultimate fallback
       setPrompts(generateLocalVideoPrompts(category, promptCount) as DisplayPrompt[]);
-      try { localStorage.setItem("gemini_saved_prompts", JSON.stringify(generateLocalVideoPrompts(category, promptCount))); } catch {}
-      trackAiMetric("local", "prompts", "success");
     } finally {
       setLoading(false);
     }
