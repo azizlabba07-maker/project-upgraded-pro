@@ -763,23 +763,31 @@ export async function analyzeImageForStock(
   file: File,
   base64Data: string
 ): Promise<ImageAnalysisResult> {
+  const isVideo = file.type.startsWith("video/");
+  const mediaType = isVideo ? "VIDEO FRAME" : "IMAGE";
+  const extraRules = isVideo 
+    ? "This is a VIDEO FRAME. Include video-specific keywords (footage, motion, video, clip, animation). AVOID words like vector, illustration, painting."
+    : "This is a STILL IMAGE.";
+
   const prompt = `You are an elite Adobe Stock Vision Analyst and Prompt Engineer.
-Analyze the provided image completely.
-Note: The user might upload a SINGLE image, OR a SCREENSHOT containing MULTIPLE images (a grid from Adobe Stock).
+Analyze the provided ${mediaType} completely.
+Note: The user might upload a SINGLE ${mediaType.toLowerCase()}, OR a SCREENSHOT containing MULTIPLE items.
 If it is a grid, extract the DOMINANT, MOST PROFITABLE pattern/theme connecting them.
+
+${extraRules}
 
 YOUR TASK:
 Generate a complete, ready-to-sell metadata and generation package.
-1. Return EXACTLY 50 highly relevant, comma-separated keywords representing the image(s). Ensure NO trademarks or real people names.
+1. Return EXACTLY 50 highly relevant, comma-separated keywords. The most important and descriptive 10 keywords MUST be at the very beginning of the list to comply with Adobe Stock's algorithm. Ensure NO trademarks, NO real people names, NO copyrighted works.
 2. Return a short SEO optimized Title (max 70 characters).
 3. Return a highly detailed Text-to-Image PROMPT (Midjourney/Firefly style) to recreate or enhance this concept.
-4. Return a "colorPalette" suggesting trending colors to be used (e.g. "Neon Cyberpunk", "Muted Pastels", "Earthy Boho"). These colors MUST be seamlessly integrated into the generated PROMPT as well.
+4. Return a "colorPalette" suggesting trending colors to be used. These colors MUST be seamlessly integrated into the generated PROMPT.
 
 MUST return a raw JSON object EXACTLY like this (NO Markdown, NO backticks):
 {
   "title": "SEO Optimized Product Title",
   "keywords": ["kw1", "kw2", "kw3"],
-  "prompt": "Here goes the highly detailed, professional prompt infused with the suggested trending colors. No humans or real brands.",
+  "prompt": "Highly detailed, professional prompt. No humans or real brands.",
   "colorPalette": "Trending Color Theme Name"
 }`;
 

@@ -3,6 +3,43 @@ import { analyzeImageForStock, hasAnyApiKey, type ImageAnalysisResult } from "@/
 import { toast } from "sonner";
 import { exportCsvFile, copyTextSafely } from "@/lib/shared";
 
+const extractFrameFromVideo = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    const url = URL.createObjectURL(file);
+    video.src = url;
+    video.crossOrigin = "anonymous";
+    video.muted = true;
+    video.playsInline = true;
+    
+    video.onloadeddata = () => {
+      // Seek to 1 second, or middle if it's very short
+      video.currentTime = Math.min(1.5, video.duration / 2);
+    };
+    
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 360;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUri = canvas.toDataURL("image/jpeg", 0.8);
+        URL.revokeObjectURL(url);
+        resolve(dataUri);
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        reject(new Error("فشل استخراج إطار من الفيديو"));
+      }
+    };
+    
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("فشل تحميل الفيديو"));
+    };
+  });
+};
+
 export default function BatchProcessor() {
   const [files, setFiles] = useState<File[]>([]);
   const [results, setResults] = useState<ImageAnalysisResult[]>(() => {
@@ -17,13 +54,13 @@ export default function BatchProcessor() {
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    const droppedFiles = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
+    const droppedFiles = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
     setFiles((prev) => [...prev, ...droppedFiles]);
-    toast.success(`تم إضافة ${droppedFiles.length} صورة`);
+    toast.success(`تم إضافة ${droppedFiles.length} ملف`);
   }, []);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = Array.from(e.target.files || []).filter((f) => f.type.startsWith("image/"));
+    const selected = Array.from(e.target.files || []).filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
     setFiles((prev) => [...prev, ...selected]);
     if (e.target) e.target.value = "";
   };
@@ -53,12 +90,26 @@ export default function BatchProcessor() {
       setProgress(Math.round(((i) / files.length) * 100));
 
       try {
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
+        let base64 = "";
+        
+        if (file.type.startsWith("video/")) {
+          // Extract a frame from the video locally on the client browser
+          base64 = await extractFrameFromVideo(file);
+        } else {
+          // Read image as base64
+          base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        }
+
+        // Artificial delay (3 seconds) to prevent API rate limit (except for the first file)
+        if (i > 0) {
+          await new Promise((r) => setTimeout(r, 3500));
+        }
+
         const result = await analyzeImageForStock(file, base64);
         newResults.push(result);
       } catch (err: any) {
@@ -122,21 +173,21 @@ export default function BatchProcessor() {
         <input
           type="file"
           multiple
-          accept="image/*"
+          accept="image/*,video/*"
           onChange={handleFileInput}
           className="absolute inset-0 opacity-0 cursor-pointer"
         />
         <div className="text-4xl mb-3">📦</div>
         <h2 className="text-lg font-bold text-white mb-2">معالج الدفعات</h2>
-        <p className="text-sm text-slate-500 mb-1">اسحب وأفلت الصور هنا أو اضغط لاختيارها</p>
-        <p className="text-[10px] text-slate-600">يدعم PNG, JPG, WebP • حد 4MB لكل صورة</p>
+        <p className="text-sm text-slate-500 mb-1">اسحب وأفلت الصور والفيديوهات هنا أو اضغط لاختيارها</p>
+        <p className="text-[10px] text-slate-600">يدعم PNG, JPG, MP4, MOV</p>
       </div>
 
       {/* File List */}
       {files.length > 0 && (
         <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-white">📁 {files.length} صورة جاهزة</h3>
+            <h3 className="text-sm font-semibold text-white">📁 {files.length} ملف جاهز</h3>
             <div className="flex gap-2">
               <button onClick={() => setFiles([])} className="text-[10px] text-red-400 hover:text-red-300 transition-colors">مسح الكل</button>
             </div>
