@@ -793,7 +793,7 @@ MUST return a raw JSON object EXACTLY like this (NO Markdown, NO backticks):
 
   const result = await generateWithGemini(prompt, 0.4, {
     base64: base64Data,
-    mimeType: file.type
+    mimeType: isVideo ? "image/jpeg" : file.type
   });
   
   const parsed = extractAndParseJSON<{ title: string; keywords: string[], prompt: string, colorPalette: string }>(result, { 
