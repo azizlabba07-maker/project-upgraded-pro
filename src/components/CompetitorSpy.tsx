@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { analyzeCompetitorSpyImage, hasAnyApiKey, classifyGeminiError, getGeminiErrorUserMessage, type TopSellerAnalysis } from "@/lib/gemini";
 import { toast } from "sonner";
 
@@ -25,19 +25,29 @@ export default function CompetitorSpy() {
     if (file) processFile(file);
   };
 
-  const handlePaste = (event: React.ClipboardEvent) => {
-    const items = event.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf("image") === 0) {
-        const file = items[i].getAsFile();
-        if (file) {
-          processFile(file);
-          event.preventDefault();
-          break;
+  useEffect(() => {
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      // Ignore text input fields
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+      
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith("image/")) {
+          const file = items[i].getAsFile();
+          if (file) {
+            processFile(file);
+            e.preventDefault();
+            break;
+          }
         }
       }
-    }
-  };
+    };
+    
+    window.addEventListener("paste", handleGlobalPaste);
+    return () => window.removeEventListener("paste", handleGlobalPaste);
+  }, []);
 
   const clearImage = () => {
     setSelectedFile(null);
@@ -79,7 +89,7 @@ export default function CompetitorSpy() {
 
   return (
     <div className="animate-fade-in space-y-5">
-      <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow relative overflow-hidden" onPaste={handlePaste}>
+      <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow relative overflow-hidden">
         <div className="absolute inset-0 bg-primary/5 scanline-animation pointer-events-none" />
         <h3 className="text-base font-semibold text-primary text-glow mb-2 font-mono relative z-10">
           🕵️ جاسوس كبار البائعين البصري

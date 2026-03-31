@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { analyzeStoreScreenshot, hasAnyApiKey, classifyGeminiError, getGeminiErrorUserMessage } from "@/lib/gemini";
 import { toast } from "sonner";
 import CompetitorSpy from "@/components/CompetitorSpy";
@@ -26,19 +26,29 @@ export default function StoreAnalyzer() {
     if (file) processFile(file);
   };
 
-  const handlePaste = (event: React.ClipboardEvent) => {
-    const items = event.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf("image") === 0) {
-        const file = items[i].getAsFile();
-        if (file) {
-          processFile(file);
-          event.preventDefault();
-          break;
+  useEffect(() => {
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      // Ignore text input fields
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+      
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith("image/")) {
+          const file = items[i].getAsFile();
+          if (file) {
+            processFile(file);
+            e.preventDefault();
+            break;
+          }
         }
       }
-    }
-  };
+    };
+    
+    window.addEventListener("paste", handleGlobalPaste);
+    return () => window.removeEventListener("paste", handleGlobalPaste);
+  }, []);
 
   const clearImage = () => {
     setSelectedFile(null);
@@ -76,7 +86,7 @@ export default function StoreAnalyzer() {
 
   return (
     <div className="animate-fade-in space-y-5">
-      <div className="bg-card border-2 border-accent rounded-lg p-5 box-glow-gold" onPaste={handlePaste}>
+      <div className="bg-card border-2 border-accent rounded-lg p-5 box-glow-gold">
         <h3 className="text-base font-semibold text-accent text-glow-gold mb-2 font-mono">
           👁️ محلل المتجر والمبيعات (Vision AI)
         </h3>
