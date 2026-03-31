@@ -29,9 +29,7 @@ export default function ToolsSection() {
   const [quickNote, setQuickNote] = useState("");
   const [savedNotes, setSavedNotes] = useState<{ id: string, text: string }[]>([]);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const processFiles = async (files: FileList | File[]) => {
     if (!hasAnyApiKey()) {
       toast.error("أضف مفتاح Gemini API من الإعدادات ⚙️");
       return;
@@ -59,8 +57,41 @@ export default function ToolsSection() {
     
     setImageResults(prev => [...prev, ...newResults]);
     setAnalyzingImages(false);
-    if (e.target) e.target.value = ''; // reset
   };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      processFiles(files);
+      e.target.value = ''; // reset
+    }
+  };
+
+  useEffect(() => {
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      // Ignore if user is typing in a text field
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+      
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      
+      const files: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith("image/")) {
+          const file = items[i].getAsFile();
+          if (file) files.push(file);
+        }
+      }
+      
+      if (files.length > 0) {
+        processFiles(files);
+        e.preventDefault();
+      }
+    };
+    
+    window.addEventListener("paste", handleGlobalPaste);
+    return () => window.removeEventListener("paste", handleGlobalPaste);
+  }, []);
 
   const exportToCSV = () => {
     if (imageResults.length === 0) {
@@ -234,8 +265,8 @@ export default function ToolsSection() {
 
           <label className="border-2 border-dashed border-primary/50 hover:border-primary bg-primary/5 flex flex-col items-center justify-center p-6 rounded-lg cursor-pointer transition-all group mb-4">
             <span className="text-primary text-2xl mb-2 group-hover:scale-110 transition-transform">📸</span>
-            <span className="text-primary font-mono text-xs font-semibold">اضغط لاختيار الصور</span>
-            <span className="text-secondary font-mono text-[10px] mt-1">(يمكنك اختيار عدة صور معاً)</span>
+            <span className="text-primary font-mono text-xs font-semibold">اضغط لاختيار الصور أو الصق هنا (Ctrl+V)</span>
+            <span className="text-secondary font-mono text-[10px] mt-1">(يمكنك اختيار عدة صور أو لصق سكرين شوت)</span>
             <input 
               type="file" 
               multiple 
