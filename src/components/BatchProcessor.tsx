@@ -542,6 +542,38 @@ export default function BatchProcessor() {
                   {res.colorPalette && (
                     <p className="text-[10px] text-blue-400 mb-1">🎨 {res.colorPalette}</p>
                   )}
+                  
+                  {/* Quality Shield & Compliance Check */}
+                  {res.compliance && (
+                    <div className={`mb-2 flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-bold w-fit ${
+                      res.compliance.status === 'safe' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                      res.compliance.status === 'warning' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
+                      'bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                    }`}>
+                      <span className="text-xs">
+                        {res.compliance.status === 'safe' ? '🛡️' : res.compliance.status === 'warning' ? '⚠️' : '🚫'}
+                      </span>
+                      <span>
+                        {res.compliance.status === 'safe' ? 'آمن للرفع' : res.compliance.status === 'warning' ? 'تنبيه جودة' : 'خطر رفض مرتفع'}
+                      </span>
+                      <span className="opacity-40">|</span>
+                      <span>{res.compliance.score}%</span>
+                    </div>
+                  )}
+
+                  {res.compliance?.issues && res.compliance.issues.length > 0 && (
+                    <div className="mb-2 p-2 rounded-lg bg-red-500/5 border border-red-500/10">
+                      <p className="text-[8px] uppercase font-bold text-red-400/60 mb-1 tracking-wider">مشاكل تم رصدها:</p>
+                      <ul className="space-y-0.5">
+                        {res.compliance.issues.map((issue, idx) => (
+                          <li key={idx} className="text-[9px] text-red-400/90 flex items-start gap-1 leading-tight">
+                            <span className="shrink-0">•</span> {issue}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   {res.prompt && (
                     <p className="text-[10px] text-slate-500 italic mb-2 line-clamp-2">{res.prompt}</p>
                   )}

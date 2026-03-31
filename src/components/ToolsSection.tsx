@@ -297,6 +297,34 @@ export default function ToolsSection() {
                   <p className="text-primary font-mono text-[10px] font-bold mb-1 break-all pr-6">{res.filename}</p>
                   <p className="text-secondary font-mono text-[11px] mb-3 leading-relaxed">{res.title}</p>
                   
+                  {/* Quality Shield */}
+                  {res.compliance && (
+                    <div className={`mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded border font-mono text-[10px] font-bold w-fit ${
+                      res.compliance.status === 'safe' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                      res.compliance.status === 'warning' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
+                      'bg-red-500/10 text-red-500 border-red-500/20 shadow-glow-red'
+                    }`}>
+                      <span>
+                        {res.compliance.status === 'safe' ? '🛡️ آمن للرفع' : res.compliance.status === 'warning' ? '⚠️ تنبيه جودة' : '🚫 خطر رفض'}
+                      </span>
+                      <span className="opacity-30">|</span>
+                      <span>امتثال: {res.compliance.score}%</span>
+                    </div>
+                  )}
+
+                  {res.compliance?.issues && res.compliance.issues.length > 0 && (
+                    <div className="mb-3 p-2.5 rounded bg-red-500/5 border border-red-500/10 font-mono">
+                      <p className="text-[9px] text-red-500/60 font-bold uppercase mb-1">الملاحظات:</p>
+                      <ul className="space-y-1">
+                        {res.compliance.issues.map((issue, idx) => (
+                          <li key={idx} className="text-[10px] text-red-500/90 flex items-start gap-1.5">
+                            <span className="mt-1 w-1 h-1 rounded-full bg-red-500 shrink-0" /> {issue}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   {/* NEW PROMPT FIELD */}
                   <div className="bg-accent/5 border left border-accent/20 p-2.5 rounded mb-3 flex flex-col gap-1.5 shadow-sm">
                      <span className="text-accent font-mono text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">

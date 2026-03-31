@@ -639,10 +639,95 @@ ${notePrompt}
 
 اكتب بشكل واضح، احترافي ومنظم.`;
 
-  return generateWithGemini(prompt, 0.75, {
+  return generateWithGemini(prompt, 0.4, {
     base64: base64Data,
     mimeType: file.type
   });
+}
+
+export interface ComplianceResult {
+  score: number; // 0 to 100
+  status: "safe" | "warning" | "danger";
+  issues: string[];
+}
+
+/**
+ * فحص امتثال العناوين والكلمات المفتاحية لمعايير Adobe Stock
+ */
+export function checkAdobeCompliance(title: string, keywords: string[]): ComplianceResult {
+  const issues: string[] = [];
+  let score = 100;
+
+  // قائمة العلامات التجارية المشهورة التي تسبب الرفض المباشر
+  const bannedTrademarks = [
+    "apple", "iphone", "ipad", "macbook", "nike", "adidas", "coca-cola", "pepsi", 
+    "google", "facebook", "instagram", "meta", "whatsapp", "twitter", "microsoft", 
+    "windows", "android", "samsung", "sony", "playstation", "xbox", "nintendo", 
+    "disney", "marvel", "star wars", "lego", "tesla", "spacex", "amazon", "netflix", 
+    "youtube", "photoshop", "illustrator", "firefly", "midjourney"
+  ];
+
+  // كلمات غير مرغوبة أو تمنع القبول
+  const genericBanned = [
+    "high resolution", "exclusive", "masterpiece", "best quality", "4k", "8k", "uhd",
+    "stunning", "amazing", "beautiful", "must see", "best", "top", "trending"
+  ];
+
+  const lowerTitle = title.toLowerCase();
+  const lowerKeywords = keywords.map(k => k.toLowerCase());
+  const combined = (lowerTitle + " " + lowerKeywords.join(" "));
+
+  // 1. فحص العلامات التجارية (Danger)
+  for (const tm of bannedTrademarks) {
+    const regex = new RegExp(`\\b${tm}\\b`, "i");
+    if (regex.test(combined)) {
+      issues.push(`علامة تجارية محظورة: ${tm}`);
+      score -= 40;
+    }
+  }
+
+  // 2. فحص الكلمات "المزعجة" (Warning)
+  for (const word of genericBanned) {
+    if (combined.includes(word)) {
+      issues.push(`كلمة وصفيّة غير مقبولة: ${word}`);
+      score -= 15;
+    }
+  }
+
+  // 3. فحص طول العنوان
+  if (title.trim().length < 10) {
+    issues.push("العنوان قصير جداً (يفضل أكثر من 10 حروف)");
+    score -= 15;
+  } else if (title.trim().length > 150) {
+    issues.push("العنوان طويل جداً (Adobe يفضل أقل من 70-100 حرف للترتيب)");
+    score -= 10;
+  }
+
+  // 4. فحص عدد الكلمات المفتاحية
+  if (keywords.length < 5) {
+    issues.push("عدد الكلمات قليل جداً (أقل من 5)");
+    score -= 20;
+  } else if (keywords.length > 50) {
+    issues.push("تجاوزت الحد الأقصى (50 كلمة)");
+    score -= 50;
+  }
+
+  // 5. فحص وجود "AI" في الحالات غير المطلوبة
+  if (combined.includes("generative ai") && !combined.includes("ai-generated")) {
+    // Adobe يفضل صيغة معينة للأعمال المولدة
+  }
+
+  // النتيجة النهائية
+  score = Math.max(0, score);
+  let status: "safe" | "warning" | "danger" = "safe";
+  
+  if (score < 60 || issues.some(i => i.includes("علامة تجارية"))) {
+    status = "danger";
+  } else if (score < 90 || issues.length > 0) {
+    status = "warning";
+  }
+
+  return { score, status, issues };
 }
 
 export async function getAIMarketAnalysis(topic: string): Promise<string> {
@@ -757,6 +842,7 @@ export interface ImageAnalysisResult {
   keywords: string[];
   prompt: string;        // The new AI generated text-to-image prompt
   colorPalette: string;  // The suggested trending colors
+  compliance?: ComplianceResult; // النتيجة الخاصة بفحص الجودة والامتثال
 }
 
 export async function analyzeImageForStock(
