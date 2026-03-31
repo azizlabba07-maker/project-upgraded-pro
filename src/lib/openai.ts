@@ -176,7 +176,7 @@ TECHNICAL SPECS:
 - sRGB, minimum 4MP
 - Ultra realistic, sharp focus, clean composition
 - Professional lighting (specify exact type)
-- Smooth camera motion for video; duration 10–30s
+- Smooth and slow camera motion for video ONLY (e.g., slow smooth pan, static tripod, slow tracking); duration 10–30s. No jitter or shake.
 - Specify copy space location
 - Every prompt MUST end with: no humans, no faces, no hands, no fingers, no text, no logos, no watermarks, no trademarks, fictional AI-generated content only, commercial royalty-free stock
 

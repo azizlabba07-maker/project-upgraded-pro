@@ -199,7 +199,7 @@ TECHNICAL SPECS:
 - sRGB, minimum 4MP (e.g. 4000×4000 or 3840×2160 for 4K)
 - Ultra realistic, 4K or 8K quality, sharp focus, clean composition
 - Professional lighting (specify exact type)
-- Smooth camera motion for video; duration 10–30s with specific movement
+- Smooth and slow camera motion for video ONLY (e.g., slow smooth pan, static tripod, slow tracking); duration 10–30s with specific movement. No jitter or shake.
 - Specify copy space location (top-left, right side, bottom, etc.)
 - Every prompt MUST end with: no humans, no faces, no hands, no fingers, no text, no logos, no watermarks, no trademarks, fictional AI-generated content only, commercial royalty-free stock
 

@@ -440,7 +440,7 @@ FORMULA: [Subject - MUST be from ${category}] + [Environment] + [Lighting] + [Ca
 
 TECHNICAL:
 - 4K (3840x2160), 15-30 seconds, 24-30fps, sRGB
-- Camera: slow pan, dolly zoom, static, aerial drone, timelapse, tracking, crane, orbit, steadicam
+- Camera: slow smooth pan, static tripod, slow tracking, subtle slow dolly, slow aerial drift. NO chaotic motion.
 - Each prompt MUST end with: ${ADOBE_VIDEO_NEGATIVE_SUFFIX}
 - NO artist names, real people, fictional characters, copyrighted works, brands
 - Each prompt: UNIQUE subject and environment within "${category}"
