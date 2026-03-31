@@ -9,19 +9,34 @@ export default function CompetitorSpy() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const processFile = (file: File) => {
     if (file.size > 4 * 1024 * 1024) {
       toast.error("عذراً، حجم الصورة يجب أن لا يتجاوز 4 ميجابايت");
       return;
     }
-
     setSelectedFile(file);
     const reader = new FileReader();
     reader.onload = (e) => setImagePreview(e.target?.result as string);
     reader.readAsDataURL(file);
+  };
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) processFile(file);
+  };
+
+  const handlePaste = (event: React.ClipboardEvent) => {
+    const items = event.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf("image") === 0) {
+        const file = items[i].getAsFile();
+        if (file) {
+          processFile(file);
+          event.preventDefault();
+          break;
+        }
+      }
+    }
   };
 
   const clearImage = () => {
@@ -64,7 +79,7 @@ export default function CompetitorSpy() {
 
   return (
     <div className="animate-fade-in space-y-5">
-      <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow relative overflow-hidden">
+      <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow relative overflow-hidden" onPaste={handlePaste}>
         <div className="absolute inset-0 bg-primary/5 scanline-animation pointer-events-none" />
         <h3 className="text-base font-semibold text-primary text-glow mb-2 font-mono relative z-10">
           🕵️ جاسوس كبار البائعين البصري
@@ -75,9 +90,13 @@ export default function CompetitorSpy() {
 
         <div className="space-y-4 relative z-10">
           {!imagePreview ? (
-            <label className="border-2 border-dashed border-primary/50 hover:border-primary bg-primary/5 flex flex-col items-center justify-center p-8 rounded-lg cursor-pointer transition-all group">
+            <label 
+              className="border-2 border-dashed border-primary/50 hover:border-primary bg-primary/5 flex flex-col items-center justify-center p-8 rounded-lg cursor-pointer transition-all group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
+              tabIndex={0}
+              onKeyDown={(e) => { if(e.key === "Enter" || e.key === " ") e.currentTarget.click(); }}
+            >
               <span className="text-primary text-3xl mb-3 group-hover:scale-110 transition-transform">🎯📸</span>
-              <span className="text-primary font-mono text-xs font-semibold">ارفع صورة المنافس</span>
+              <span className="text-primary font-mono text-xs font-semibold">ارفع صورة المنافس أو الصقها هنا (Ctrl+V)</span>
               <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
             </label>
           ) : (

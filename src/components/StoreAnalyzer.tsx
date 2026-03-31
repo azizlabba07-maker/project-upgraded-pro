@@ -10,19 +10,34 @@ export default function StoreAnalyzer() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const processFile = (file: File) => {
     if (file.size > 4 * 1024 * 1024) {
       toast.error("عذراً، حجم الصورة يجب أن لا يتجاوز 4 ميجابايت");
       return;
     }
-
     setSelectedFile(file);
     const reader = new FileReader();
     reader.onload = (e) => setImagePreview(e.target?.result as string);
     reader.readAsDataURL(file);
+  };
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) processFile(file);
+  };
+
+  const handlePaste = (event: React.ClipboardEvent) => {
+    const items = event.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf("image") === 0) {
+        const file = items[i].getAsFile();
+        if (file) {
+          processFile(file);
+          event.preventDefault();
+          break;
+        }
+      }
+    }
   };
 
   const clearImage = () => {
@@ -61,7 +76,7 @@ export default function StoreAnalyzer() {
 
   return (
     <div className="animate-fade-in space-y-5">
-      <div className="bg-card border-2 border-accent rounded-lg p-5 box-glow-gold">
+      <div className="bg-card border-2 border-accent rounded-lg p-5 box-glow-gold" onPaste={handlePaste}>
         <h3 className="text-base font-semibold text-accent text-glow-gold mb-2 font-mono">
           👁️ محلل المتجر والمبيعات (Vision AI)
         </h3>
@@ -71,10 +86,14 @@ export default function StoreAnalyzer() {
 
         <div className="space-y-4">
           {!imagePreview ? (
-            <label className="border-2 border-dashed border-accent/50 hover:border-accent bg-accent/5 flex flex-col items-center justify-center p-8 rounded-lg cursor-pointer transition-all group">
+            <label 
+              className="border-2 border-dashed border-accent/50 hover:border-accent bg-accent/5 flex flex-col items-center justify-center p-8 rounded-lg cursor-pointer transition-all group focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-background"
+              tabIndex={0}
+              onKeyDown={(e) => { if(e.key === "Enter" || e.key === " ") e.currentTarget.click(); }}
+            >
               <span className="text-accent text-3xl mb-3 group-hover:scale-110 transition-transform">📸📸</span>
-              <span className="text-accent font-mono text-xs font-semibold">اضغط لرفع لقطة الشاشة</span>
-              <span className="text-secondary font-mono text-[10px] mt-1">(صورة لعمل أو عدة أعمال، أو إحصائيات)</span>
+              <span className="text-accent font-mono text-xs font-semibold">اضغط لرفع لقطة الشاشة أو الصق هنا (Ctrl+V)</span>
+              <span className="text-secondary font-mono text-[10px] mt-1">(تصميم، إحصائيات، أعمال مرفوضة)</span>
               <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
             </label>
           ) : (
