@@ -1,16 +1,41 @@
 import { useState, useEffect } from "react";
 import { runOpportunityPipeline, type OpportunityEngineResult } from "@/lib/opportunityEngine";
-import { hasAnyApiKey, getGeminiErrorUserMessage } from "@/lib/gemini";
+import { hasAnyApiKey, getGeminiErrorUserMessage, suggestStockTitle } from "@/lib/gemini";
+import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { categories } from "@/data/marketData";
 import MarketSniper from "@/components/MarketSniper";
 
 export default function OpportunityEngine() {
+  const { pendingSearch, setPendingSearch } = useApp();
   const [topic, setTopic] = useState("");
   const [category, setCategory] = useState("Technology");
   const [loading, setLoading] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
   const [result, setResult] = useState<OpportunityEngineResult | null>(null);
   const [step, setStep] = useState(0); // 0: Idle, 1: Intent, 2: Score, 3: Mutating, 4: Done
+
+  const getNewSuggestion = async (nicheName: string) => {
+    if (!hasAnyApiKey()) return;
+    setSuggesting(true);
+    try {
+      const suggestion = await suggestStockTitle(nicheName);
+      setTopic(suggestion);
+    } catch (err) {
+      toast.error("فشل في توليد اقتراح ذكي");
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (pendingSearch) {
+      // Mapping categories if needed (simple match for now)
+      setCategory(pendingSearch.category);
+      getNewSuggestion(pendingSearch.topic);
+      setPendingSearch(null); // Clear after use
+    }
+  }, [pendingSearch]);
 
   const runEngine = async () => {
     if (!topic.trim()) {
@@ -81,10 +106,19 @@ export default function OpportunityEngine() {
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && runEngine()}
-              placeholder="اكتب فكرة عامة لتبدأ..."
+              placeholder="اكتب فكرة عامة أو اختر نيش لتبدأ..."
               className={inputClass}
               disabled={loading}
             />
+            {topic && (
+              <button
+                onClick={() => getNewSuggestion(topic)}
+                disabled={suggesting || loading}
+                className="mt-2 text-[10px] text-accent font-mono flex items-center gap-1.5 hover:text-accent/80 transition-colors"
+              >
+                {suggesting ? "⚙️ جاري التوليد..." : "🔄 اقتراح عنوان مغاير لهذا النيش"}
+              </button>
+            )}
           </div>
           <div className="w-full md:w-1/3">
             <label className="text-primary text-xs font-semibold font-mono block mb-2">الفئة (Category)</label>

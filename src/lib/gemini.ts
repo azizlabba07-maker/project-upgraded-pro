@@ -144,6 +144,19 @@ export async function validateAllGeminiApiKeys(): Promise<Array<{ key: string; s
   return results;
 }
 
+/**
+ * توليد عنوان مقترح احترافي لنيش معيّن لغرض البدء في محرك الفرص
+ */
+export async function suggestStockTitle(niche: string): Promise<string> {
+  const prompt = `You are a high-conversion Adobe Stock title specialist. 
+  Someone is starting a niche search for: "${niche}".
+  Suggest ONE extremely clickable, professional, and SEO-optimized English title (max 70 characters) that covers this niche but adds a "buyer-intent" angle.
+  Example if niche is "Ramadan": "Ramadan Kareem Background with Golden Islamic Patterns"
+  Return ONLY the title string, no quotes.`;
+  
+  return generateWithGemini(prompt, 0.7);
+}
+
 export function hasAnyApiKey(): boolean {
   return readStoredGeminiApiKeys().length > 0 || Boolean((import.meta.env.VITE_GEMINI_API_KEY || "").trim());
 }

@@ -51,6 +51,8 @@ interface AppState {
   unreadAlertCount: number;
   goldOpportunityCount: number;
   setGoldOpportunityCount: (count: number) => void;
+  pendingSearch: { topic: string; category: string } | null;
+  setPendingSearch: (search: { topic: string; category: string } | null) => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -71,6 +73,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     getStorageJSON<Alert[]>("app_alerts", [])
   );
   const [goldOpportunityCount, setGoldOpportunityCount] = useState(0);
+  const [pendingSearch, setPendingSearch] = useState<{ topic: string; category: string } | null>(null);
 
   useEffect(() => {
     setStorageJSON("app_active_page", activePage);
@@ -132,6 +135,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         unreadAlertCount,
         goldOpportunityCount,
         setGoldOpportunityCount,
+        pendingSearch,
+        setPendingSearch,
       }}
     >
       {children}

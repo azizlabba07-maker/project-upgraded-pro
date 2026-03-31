@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { marketData as staticData, type MarketTrend } from "@/data/marketData";
+import { generateAITrends, hasAnyApiKey } from "@/lib/gemini";
+import { toast } from "sonner";
 import { EMERGING_TRENDS_2026 } from "@/data/trends2026";
 import { useApp } from "@/contexts/AppContext";
 import AnimatedCounter from "@/components/ui/AnimatedCounter";
@@ -35,12 +37,31 @@ function computeNiches(data: MarketTrend[]): NicheInfo[] {
 }
 
 export default function NicheExplorer() {
-  const { setActivePage } = useApp();
+  const { setActivePage, setPendingSearch } = useApp();
   const [sortBy, setSortBy] = useState<"opportunity" | "growth" | "marketSize">("opportunity");
   const [compFilter, setCompFilter] = useState("");
   const [catFilter, setCatFilter] = useState("");
   const [search, setSearch] = useState("");
   const [baseData, setBaseData] = useState<MarketTrend[]>(staticData);
+  const [loading, setLoading] = useState(false);
+
+  const refreshLiveTrends = async () => {
+    if (!hasAnyApiKey()) {
+      toast.error("أضف مفتاح Gemini API أولاً ⚙️");
+      return;
+    }
+    setLoading(true);
+    try {
+      const trends = await generateAITrends();
+      setBaseData(trends);
+      localStorage.setItem("gemini_live_trends", JSON.stringify(trends));
+      toast.success("تم صيد أحدث النيشات من السوق العالمي! 🔥");
+    } catch (err) {
+      toast.error("فشل الاتصال بمحرك البحث العالمي");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -103,9 +124,23 @@ export default function NicheExplorer() {
       {/* Header */}
       <div className="rounded-2xl bg-gradient-to-br from-indigo-600/10 to-purple-600/10 border border-white/[0.08] p-6 relative overflow-hidden">
         <div className="absolute -top-20 -right-20 w-60 h-60 bg-purple-500/5 rounded-full blur-3xl" />
-        <div className="relative z-10">
-          <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">🗺️ مستكشف النيتشات</h2>
-          <p className="text-[11px] text-slate-500">خريطة تفاعلية لكل نيتش — حجم السوق، المنافسة، معدل النمو، وفرصة الدخول</p>
+        <div className="relative z-10 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">🗺️ مستكشف النيتشات (AI Live)</h2>
+            <p className="text-[11px] text-slate-500">خريطة تفاعلية للفرص — حجم السوق، المنافسة، والنمو</p>
+          </div>
+          <button
+            onClick={refreshLiveTrends}
+            disabled={loading}
+            className={`px-4 py-2 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-2 ${
+              loading 
+                ? "bg-blue-500/10 border-blue-500/20 text-blue-400 cursor-not-allowed" 
+                : "bg-white/[0.04] border-white/[0.1] text-white hover:bg-white/[0.08]"
+            }`}
+          >
+            {loading ? <span className="animate-spin text-sm">⚙️</span> : "🔄"}
+            {loading ? "جاري الاستكشاف..." : "تحديث حي (AI)"}
+          </button>
         </div>
       </div>
 
@@ -155,7 +190,10 @@ export default function NicheExplorer() {
           <div
             key={i}
             className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-4 hover:bg-white/[0.04] hover:border-white/[0.12] transition-all group cursor-pointer"
-            onClick={() => setActivePage("opportunity")}
+            onClick={() => {
+              setPendingSearch({ topic: niche.name, category: niche.category });
+              setActivePage("opportunity");
+            }}
           >
             <div className="flex items-start justify-between mb-3">
               <div>
