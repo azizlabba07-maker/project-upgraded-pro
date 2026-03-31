@@ -761,12 +761,17 @@ export interface ImageAnalysisResult {
 
 export async function analyzeImageForStock(
   file: File,
-  base64Data: string
+  base64Data: string,
+  isPanoramaCollage: boolean = false
 ): Promise<ImageAnalysisResult> {
-  const isVideo = file.type.startsWith("video/");
-  const mediaType = isVideo ? "VIDEO FRAME" : "IMAGE";
+  const isVideo = file.type.startsWith("video/") || isPanoramaCollage;
+  const mediaType = isVideo 
+    ? (isPanoramaCollage ? "VIDEO TIMELINE (3 FRAMES COLLAGE)" : "VIDEO FRAME") 
+    : "IMAGE";
+    
   const extraRules = isVideo 
-    ? "This is a VIDEO FRAME. Include video-specific keywords (footage, motion, video, clip, animation). AVOID words like vector, illustration, painting."
+    ? `This is a ${mediaType}. ${isPanoramaCollage ? "You are looking at 3 sequenced frames (Start, Middle, End) merged together. Analyze the MOTION, the progression of the scene, and how the subject behaves." : ""} 
+    Include high-converting video-specific keywords (e.g., footage, motion, video, clip, animation, cinematography). AVOID static words like vector, illustration, painting.`
     : "This is a STILL IMAGE.";
 
   const prompt = `You are an elite Adobe Stock Vision Analyst and Prompt Engineer.

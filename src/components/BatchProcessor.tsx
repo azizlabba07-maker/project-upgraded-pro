@@ -1,9 +1,42 @@
-import { useState, useCallback } from "react";
-import { analyzeImageForStock, hasAnyApiKey, type ImageAnalysisResult } from "@/lib/gemini";
+import { useState, useCallback, useRef } from "react";
+import { analyzeImageForStock, hasAnyApiKey, getUserGeminiApiKeys, type ImageAnalysisResult } from "@/lib/gemini";
 import { toast } from "sonner";
 import { exportCsvFile, copyTextSafely } from "@/lib/shared";
 
-const extractFrameFromVideo = (file: File): Promise<string> => {
+// ─────────────────────────────────────────────
+// 🎬  3-Frame Panorama Extraction (الاستخراج الذكي)
+// ─────────────────────────────────────────────
+
+/** Seek to a specific time and draw the frame onto a canvas context */
+function seekAndDraw(
+  video: HTMLVideoElement,
+  time: number,
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  frameW: number,
+  frameH: number
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onSeeked = () => {
+      video.removeEventListener("seeked", onSeeked);
+      try {
+        ctx.drawImage(video, x, 0, frameW, frameH);
+        resolve();
+      } catch {
+        reject(new Error("Failed to draw frame"));
+      }
+    };
+    video.addEventListener("seeked", onSeeked);
+    video.currentTime = time;
+  });
+}
+
+/**
+ * Extracts 3 frames from a video (at 20%, 50%, 80% of duration)
+ * and stitches them side-by-side into a single panorama JPEG.
+ * This gives the AI a full "motion timeline" of the video.
+ */
+const extractPanoramaFromVideo = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
     const url = URL.createObjectURL(file);
@@ -11,34 +44,115 @@ const extractFrameFromVideo = (file: File): Promise<string> => {
     video.crossOrigin = "anonymous";
     video.muted = true;
     video.playsInline = true;
-    
-    video.onloadeddata = () => {
-      // Seek to 1 second, or middle if it's very short
-      video.currentTime = Math.min(1.5, video.duration / 2);
-    };
-    
-    video.onseeked = () => {
+    video.preload = "auto";
+
+    video.onloadedmetadata = async () => {
       try {
+        const duration = video.duration;
+        if (!duration || !isFinite(duration) || duration < 0.5) {
+          // Fallback: too short, just grab one frame
+          video.currentTime = 0.1;
+          const waitSeeked = () =>
+            new Promise<void>((res) => {
+              video.addEventListener("seeked", () => res(), { once: true });
+            });
+          await waitSeeked();
+          const c = document.createElement("canvas");
+          c.width = video.videoWidth || 640;
+          c.height = video.videoHeight || 360;
+          c.getContext("2d")?.drawImage(video, 0, 0, c.width, c.height);
+          URL.revokeObjectURL(url);
+          resolve(c.toDataURL("image/jpeg", 0.82));
+          return;
+        }
+
+        // Calculate the 3 timestamps
+        const times = [duration * 0.2, duration * 0.5, duration * 0.8];
+
+        // Frame dimensions – cap width to prevent oversized canvas
+        const maxFrameW = Math.min(video.videoWidth || 640, 640);
+        const scale = maxFrameW / (video.videoWidth || 640);
+        const frameW = maxFrameW;
+        const frameH = Math.round((video.videoHeight || 360) * scale);
+
+        // Create the panorama canvas (3 frames side-by-side with labels)
+        const labelH = 28; // height for the label bar
         const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth || 640;
-        canvas.height = video.videoHeight || 360;
-        const ctx = canvas.getContext("2d");
-        ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUri = canvas.toDataURL("image/jpeg", 0.8);
+        canvas.width = frameW * 3;
+        canvas.height = frameH + labelH;
+        const ctx = canvas.getContext("2d")!;
+
+        // Black background
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw each frame
+        for (let i = 0; i < 3; i++) {
+          await seekAndDraw(video, times[i], ctx, i * frameW, frameW, frameH);
+        }
+
+        // Draw labels at top
+        ctx.font = "bold 16px Arial, sans-serif";
+        ctx.textAlign = "center";
+        const labels = ["▶ START (20%)", "■ MIDDLE (50%)", "◼ END (80%)"];
+        const colors = ["#4ade80", "#60a5fa", "#f472b6"];
+        for (let i = 0; i < 3; i++) {
+          // Semi-transparent label background
+          ctx.fillStyle = "rgba(0,0,0,0.7)";
+          ctx.fillRect(i * frameW, frameH, frameW, labelH);
+          // Label text
+          ctx.fillStyle = colors[i];
+          ctx.fillText(labels[i], i * frameW + frameW / 2, frameH + 20);
+        }
+
         URL.revokeObjectURL(url);
-        resolve(dataUri);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
       } catch (err) {
         URL.revokeObjectURL(url);
-        reject(new Error("فشل استخراج إطار من الفيديو"));
+        reject(err);
       }
     };
-    
+
     video.onerror = () => {
       URL.revokeObjectURL(url);
       reject(new Error("فشل تحميل الفيديو"));
     };
   });
 };
+
+/** Read an image file as base64 data URI */
+const readImageBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+// ─────────────────────────────────────────────
+// 🔧  Utility
+// ─────────────────────────────────────────────
+
+function formatEta(seconds: number): string {
+  if (!isFinite(seconds) || seconds <= 0) return "—";
+  const m = Math.floor(seconds / 60);
+  const s = Math.ceil(seconds % 60);
+  return m > 0 ? `${m}د ${s}ث` : `${s}ث`;
+}
+
+// ─────────────────────────────────────────────
+// 🧩  Component
+// ─────────────────────────────────────────────
+
+interface BatchStats {
+  completed: number;
+  total: number;
+  errors: number;
+  activeLanes: number;
+  maxLanes: number;
+  eta: string;
+  startTime: number;
+}
 
 export default function BatchProcessor() {
   const [files, setFiles] = useState<File[]>([]);
@@ -49,18 +163,28 @@ export default function BatchProcessor() {
     } catch { return []; }
   });
   const [processing, setProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentFile, setCurrentFile] = useState("");
+  const [stats, setStats] = useState<BatchStats>({
+    completed: 0, total: 0, errors: 0,
+    activeLanes: 0, maxLanes: 1, eta: "—", startTime: 0,
+  });
+  const [currentFiles, setCurrentFiles] = useState<string[]>([]);
+  const cancelRef = useRef(false);
+
+  const progress = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    const droppedFiles = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
+    const droppedFiles = Array.from(e.dataTransfer.files).filter(
+      (f) => f.type.startsWith("image/") || f.type.startsWith("video/")
+    );
     setFiles((prev) => [...prev, ...droppedFiles]);
     toast.success(`تم إضافة ${droppedFiles.length} ملف`);
   }, []);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = Array.from(e.target.files || []).filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
+    const selected = Array.from(e.target.files || []).filter(
+      (f) => f.type.startsWith("image/") || f.type.startsWith("video/")
+    );
     setFiles((prev) => [...prev, ...selected]);
     if (e.target) e.target.value = "";
   };
@@ -68,6 +192,10 @@ export default function BatchProcessor() {
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
+
+  // ─────────────────────────────────────────
+  //  🚀  Core Concurrent Processing Engine
+  // ─────────────────────────────────────────
 
   const handleProcess = async () => {
     if (!hasAnyApiKey()) {
@@ -79,59 +207,146 @@ export default function BatchProcessor() {
       return;
     }
 
+    cancelRef.current = false;
     setProcessing(true);
-    setProgress(0);
     setResults([]);
 
-    const newResults: ImageAnalysisResult[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      setCurrentFile(file.name);
-      setProgress(Math.round(((i) / files.length) * 100));
+    // Determine concurrency from number of API keys
+    const apiKeys = getUserGeminiApiKeys();
+    const concurrency = Math.max(1, Math.min(apiKeys.length, 5)); // Cap at 5 lanes
+    const delayPerKey = 4000; // 4s between requests per key (safe for free tier)
+
+    const total = files.length;
+    const startTime = Date.now();
+    let completed = 0;
+    let errors = 0;
+
+    setStats({
+      completed: 0, total, errors: 0,
+      activeLanes: 0, maxLanes: concurrency,
+      eta: "جاري الحساب...", startTime,
+    });
+
+    const newResults: ImageAnalysisResult[] = new Array(total).fill(null);
+
+    // Process a single file
+    const processFile = async (index: number) => {
+      if (cancelRef.current) return;
+
+      const file = files[index];
+      setCurrentFiles((prev) => [...prev, file.name]);
 
       try {
-        let base64 = "";
-        
+        let base64: string;
+        let isPanorama = false;
+
         if (file.type.startsWith("video/")) {
-          // Extract a frame from the video locally on the client browser
-          base64 = await extractFrameFromVideo(file);
+          // 🎬 Extract 3-frame panorama collage
+          base64 = await extractPanoramaFromVideo(file);
+          isPanorama = true;
         } else {
-          // Read image as base64
-          base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
+          base64 = await readImageBase64(file);
         }
 
-        // Artificial delay (3 seconds) to prevent API rate limit (except for the first file)
-        if (i > 0) {
-          await new Promise((r) => setTimeout(r, 3500));
-        }
-
-        const result = await analyzeImageForStock(file, base64);
-        newResults.push(result);
+        const result = await analyzeImageForStock(file, base64, isPanorama);
+        newResults[index] = result;
       } catch (err: any) {
-        toast.error(`❌ خطأ في ${file.name}: ${err.message}`);
-        // Add a placeholder result
-        newResults.push({
+        errors++;
+        newResults[index] = {
           filename: file.name,
           title: `[Error] ${err.message}`,
           keywords: [],
           prompt: "",
           colorPalette: "",
+        };
+      } finally {
+        completed++;
+        setCurrentFiles((prev) => prev.filter((n) => n !== file.name));
+
+        // Calculate ETA
+        const elapsed = (Date.now() - startTime) / 1000;
+        const rate = completed / elapsed;
+        const remaining = total - completed;
+        const etaSeconds = rate > 0 ? remaining / rate : 0;
+
+        setStats({
+          completed, total, errors,
+          activeLanes: Math.min(concurrency, total - completed),
+          maxLanes: concurrency,
+          eta: formatEta(etaSeconds),
+          startTime,
         });
+
+        // Update results progressively
+        setResults([...newResults.filter(Boolean)]);
       }
+    };
+
+    // Chunk files into batches based on concurrency
+    // Each lane processes files sequentially with a delay between them
+    if (concurrency <= 1) {
+      // Sequential mode (single key)
+      for (let i = 0; i < total; i++) {
+        if (cancelRef.current) break;
+        setStats((prev) => ({ ...prev, activeLanes: 1 }));
+        await processFile(i);
+        // Rate limit delay (skip for last file)
+        if (i < total - 1 && !cancelRef.current) {
+          await new Promise((r) => setTimeout(r, delayPerKey));
+        }
+      }
+    } else {
+      // 🚀 Concurrent mode (multiple keys)
+      // Create lanes - each lane processes its share of files sequentially
+      const lanes: number[][] = Array.from({ length: concurrency }, () => []);
+      for (let i = 0; i < total; i++) {
+        lanes[i % concurrency].push(i);
+      }
+
+      const lanePromises = lanes.map(async (fileIndices, laneIndex) => {
+        for (let j = 0; j < fileIndices.length; j++) {
+          if (cancelRef.current) break;
+
+          // Stagger lane starts to avoid burst
+          if (j === 0 && laneIndex > 0) {
+            await new Promise((r) => setTimeout(r, laneIndex * 800));
+          }
+
+          await processFile(fileIndices[j]);
+
+          // Rate limit delay per lane
+          if (j < fileIndices.length - 1 && !cancelRef.current) {
+            await new Promise((r) => setTimeout(r, delayPerKey));
+          }
+        }
+      });
+
+      await Promise.all(lanePromises);
     }
 
-    setResults(newResults);
-    setProgress(100);
-    setCurrentFile("");
+    // Final state
+    const finalResults = newResults.filter(Boolean);
+    setResults(finalResults);
+    setStats((prev) => ({ ...prev, activeLanes: 0, eta: "—" }));
     setProcessing(false);
+    setCurrentFiles([]);
+
     // Persist results
-    try { localStorage.setItem("batch_processor_results", JSON.stringify(newResults)); } catch {}
-    toast.success(`✅ تم تحليل ${newResults.filter(r => !r.title.startsWith("[Error]")).length}/${files.length} صورة`);
+    try {
+      localStorage.setItem("batch_processor_results", JSON.stringify(finalResults));
+    } catch {}
+
+    const successCount = finalResults.filter((r) => !r.title.startsWith("[Error]")).length;
+    if (cancelRef.current) {
+      toast.info(`⏹️ تم الإيقاف — ${successCount} ناجحة من ${completed} معالَجة`);
+    } else {
+      toast.success(`✅ تم تحليل ${successCount}/${total} ملف بنجاح!`);
+    }
+  };
+
+  const handleCancel = () => {
+    cancelRef.current = true;
+    toast.info("⏹️ جاري الإيقاف...");
   };
 
   const handleExport = () => {
@@ -178,9 +393,9 @@ export default function BatchProcessor() {
           className="absolute inset-0 opacity-0 cursor-pointer"
         />
         <div className="text-4xl mb-3">📦</div>
-        <h2 className="text-lg font-bold text-white mb-2">معالج الدفعات</h2>
+        <h2 className="text-lg font-bold text-white mb-2">معالج الدفعات المتقدم</h2>
         <p className="text-sm text-slate-500 mb-1">اسحب وأفلت الصور والفيديوهات هنا أو اضغط لاختيارها</p>
-        <p className="text-[10px] text-slate-600">يدعم PNG, JPG, MP4, MOV</p>
+        <p className="text-[10px] text-slate-600">يدعم PNG, JPG, MP4, MOV — الفيديوهات تستخرج منها 3 لقطات ذكية تلقائياً 🎬</p>
       </div>
 
       {/* File List */}
@@ -188,7 +403,13 @@ export default function BatchProcessor() {
         <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-white">📁 {files.length} ملف جاهز</h3>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              {/* Show concurrency info */}
+              {!processing && (
+                <span className="text-[10px] text-slate-600">
+                  ⚡ {Math.max(1, Math.min(getUserGeminiApiKeys().length, 5))} مسارات متزامنة
+                </span>
+              )}
               <button onClick={() => setFiles([])} className="text-[10px] text-red-400 hover:text-red-300 transition-colors">مسح الكل</button>
             </div>
           </div>
@@ -201,7 +422,7 @@ export default function BatchProcessor() {
                 >
                   ✕
                 </button>
-                <div className="text-lg mb-1">🖼️</div>
+                <div className="text-lg mb-1">{file.type.startsWith("video/") ? "🎬" : "🖼️"}</div>
                 <p className="text-[9px] text-slate-500 truncate">{file.name}</p>
               </div>
             ))}
@@ -215,7 +436,7 @@ export default function BatchProcessor() {
           onClick={handleProcess}
           className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold hover:scale-[1.01] active:scale-[0.99] transition-all shadow-xl shadow-blue-500/20"
         >
-          🚀 ابدأ التحليل الجماعي ({files.length} صورة)
+          🚀 ابدأ التحليل الجماعي ({files.length} ملف) — {Math.max(1, Math.min(getUserGeminiApiKeys().length, 5))} مسارات
         </button>
       )}
 
@@ -242,20 +463,50 @@ export default function BatchProcessor() {
         </div>
       )}
 
-      {/* Progress */}
+      {/* Progress — Enhanced with concurrency stats */}
       {processing && (
-        <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-5">
-          <div className="flex items-center justify-between mb-3">
+        <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-5 space-y-3">
+          <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-white">⏳ جاري التحليل...</span>
-            <span className="text-xs text-blue-400 font-bold">{progress}%</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-blue-400 font-bold">{progress}%</span>
+              <button
+                onClick={handleCancel}
+                className="text-[10px] px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all"
+              >
+                ⏹️ إيقاف
+              </button>
+            </div>
           </div>
-          <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden mb-2">
+
+          {/* Progress bar */}
+          <div className="w-full h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500"
+              className="h-full rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-500"
               style={{ width: `${progress}%` }}
             />
           </div>
-          <p className="text-[10px] text-slate-500">📸 {currentFile}</p>
+
+          {/* Stats row */}
+          <div className="flex items-center justify-between text-[10px] text-slate-500">
+            <div className="flex gap-4">
+              <span>✅ {stats.completed}/{stats.total}</span>
+              {stats.errors > 0 && <span className="text-red-400">❌ {stats.errors} أخطاء</span>}
+              <span>⚡ {stats.activeLanes}/{stats.maxLanes} مسارات نشطة</span>
+            </div>
+            <span>⏱️ ETA: {stats.eta}</span>
+          </div>
+
+          {/* Currently processing files */}
+          {currentFiles.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {currentFiles.map((name, i) => (
+                <span key={i} className="text-[9px] bg-blue-500/10 border border-blue-500/20 text-blue-400 px-2 py-0.5 rounded-lg animate-pulse">
+                  📸 {name}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -39,27 +39,68 @@ export default function ApiKeySettings() {
   const handleAddGeminiKey = async () => {
     const trimmed = geminiKey.trim();
     if (!trimmed) return;
+    
+    // Split by commas or newlines and remove duplicates/empty
+    const keysToProcess = Array.from(new Set(trimmed.split(/[\n,]+/).map(k => k.trim()).filter(Boolean)));
+    if (keysToProcess.length === 0) return;
+
     setSavingGemini(true);
+    let addedCount = 0;
+
     try {
-      const v = await validateGeminiApiKey(trimmed);
-      setGeminiResult(v);
-      if (!v.ok && !v.message.includes("صالح")) { toast.error(v.message); return; }
-      const added = addUserGeminiApiKey(trimmed);
-      if (!added.added) {
-        if (added.reason === "exists") {
-          toast.error("هذا المفتاح مضاف بالفعل.");
-        } else if (added.reason === "limit") {
-          toast.error("الحد الأقصى 10 مفاتيح Gemini.");
-        } else {
-          toast.error("تعذر إضافة المفتاح.");
+      if (keysToProcess.length === 1) {
+        // Single key behavior
+        const v = await validateGeminiApiKey(keysToProcess[0]);
+        setGeminiResult(v);
+        if (!v.ok && !v.message.includes("صالح")) { toast.error(v.message); return; }
+        
+        const added = addUserGeminiApiKey(keysToProcess[0]);
+        if (!added.added) {
+          if (added.reason === "exists") toast.error("هذا المفتاح مضاف بالفعل.");
+          else if (added.reason === "limit") toast.error("الحد الأقصى 10 مفاتيح Gemini.");
+          else toast.error("تعذر إضافة المفتاح.");
+          return;
         }
-        return;
+        addedCount = 1;
+        toast.success("✅ تم إضافة API جديد لـ Gemini!");
+      } else {
+        // Multiple keys behavior
+        setGeminiResult(null);
+        let limitReached = false;
+        toast.info(`⏳ جاري فحص ${keysToProcess.length} مفاتيح...`);
+        
+        const results = await Promise.all(keysToProcess.map(k => validateGeminiApiKey(k)));
+        
+        for (let i = 0; i < keysToProcess.length; i++) {
+          // If valid (or quota exceeded but valid auth) add it
+          if (results[i].ok || results[i].message.includes("صالح") || results[i].message.includes("مستنفدة")) {
+            const added = addUserGeminiApiKey(keysToProcess[i]);
+            if (added.added) {
+              addedCount++;
+            } else if (added.reason === "limit") {
+              limitReached = true;
+              break;
+            }
+          }
+        }
+        
+        if (addedCount > 0) {
+          toast.success(`✅ تم إضافة ${addedCount} مفاتيح صالحة بنجاح!`);
+          if (limitReached) toast.warning("⚠️ تم الوصول للحد الأقصى (10 مفاتيح).");
+          if (addedCount < keysToProcess.length) toast.error(`❌ تم تجاهل ${keysToProcess.length - addedCount} مفاتيح غير صالحة.`);
+        } else {
+          toast.error("❌ لم يتم إضافة أي مفتاح. جميع المفاتيح غير صالحة أو مضافة مسبقاً.");
+        }
       }
-      setGeminiKeys(getUserGeminiApiKeys());
-      setGeminiKeyState("");
-      notifyKeyUpdated(true);
-      toast.success("✅ تم إضافة API جديد لـ Gemini!");
-    } finally { setSavingGemini(false); }
+
+      if (addedCount > 0) {
+        setGeminiKeys(getUserGeminiApiKeys());
+        setGeminiKeyState("");
+        notifyKeyUpdated(true);
+      }
+    } finally { 
+      setSavingGemini(false); 
+    }
   };
 
   const handleSaveClaude = async () => {
@@ -128,8 +169,15 @@ export default function ApiKeySettings() {
             <p className="text-destructive font-mono text-[10px]">⚡ إذا ظهر خطأ 403، أزل قيود HTTP referrer من Google Cloud Console</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <input type={showGemini ? "text" : "password"} value={geminiKey} onChange={(e) => setGeminiKeyState(e.target.value)} placeholder="AIzaSy..." className={inputClass} dir="ltr" />
+        <div className="flex gap-2 items-start">
+          <textarea 
+            value={showGemini ? geminiKey : geminiKey.replace(/./g, '•')} 
+            onChange={(e) => setGeminiKeyState(e.target.value)} 
+            placeholder="لصق مفتاح واحد، أو عدة مفاتيح (لكل سطر مفتاح)..." 
+            className={`${inputClass} resize-y min-h-[42px] max-h-32 py-3`} 
+            dir="ltr" 
+            rows={geminiKey.includes('\n') ? 3 : 1}
+          />
           <button
             onClick={handleAddGeminiKey}
             disabled={savingGemini || !geminiKey.trim()}
