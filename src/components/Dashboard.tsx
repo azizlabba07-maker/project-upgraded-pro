@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { marketData as initialMarketData, dailyTips, seasonalEvents, type MarketTrend } from "@/data/marketData";
 import { EMERGING_TRENDS_2026 } from "@/data/trends2026";
 import { createSourcePulse, pulseLocalTrends } from "@/lib/livePulse";
-import { generateAITrends, hasAnyApiKey } from "@/lib/gemini";
+import { generateAITrends, hasAnyApiKey, getUnifiedMarketOracle, type MarketOracleItem } from "@/lib/gemini";
 import { clearAllCache } from "@/lib/sanitizer";
 import { toast } from "sonner";
 import { calcSuccessRate, getTodayAiMetrics } from "@/lib/aiMetrics";
@@ -43,6 +43,8 @@ export default function Dashboard() {
   const [aiMetrics, setAiMetrics] = useState(getTodayAiMetrics());
   const [selectedTrendForGeneration, setSelectedTrendForGeneration] = useState<MarketTrend | null>(null);
   const [trendRadar, setTrendRadar] = useState<Array<{topic: string; time: string; prob: string}>>([]);
+  const [oracleData, setOracleData] = useState<MarketOracleItem[]>([]);
+  const [oracleLoading, setOracleLoading] = useState(false);
 
   const goldOpportunities = useMemo(() => marketData.filter((i) => i.demand === "high" && i.competition === "low").length, [marketData]);
   const avgProfit = useMemo(() => Math.round(marketData.reduce((s, i) => s + i.profitability, 0) / (marketData.length || 1)), [marketData]);
@@ -102,7 +104,22 @@ export default function Dashboard() {
       })));
     };
 
+    const loadOracle = async () => {
+      if (hasAnyApiKey()) {
+        setOracleLoading(true);
+        try {
+          const data = await getUnifiedMarketOracle();
+          setOracleData(data);
+        } catch (e) {
+          console.warn("Oracle failed to load", e);
+        } finally {
+          setOracleLoading(false);
+        }
+      }
+    };
+
     loadRealData();
+    loadOracle();
   }, []);
 
   useEffect(() => {
@@ -141,10 +158,17 @@ export default function Dashboard() {
       })));
 
       toast.success("🔄 تم تحديث التراندات بنجاح من بيانات حية!");
+      
+      // Update Oracle too
+      setOracleLoading(true);
+      const oracle = await getUnifiedMarketOracle();
+      setOracleData(oracle);
+      setOracleLoading(false);
     } catch (err: any) {
       toast.error(err.message ? `خطأ: ${err.message}` : "تعذر التحديث بالذكاء الاصطناعي.");
     } finally {
       setRefreshing(false);
+      setOracleLoading(false);
     }
   };
   const newTip = () => setTip(dailyTips[Math.floor(Math.random() * dailyTips.length)]);
@@ -393,52 +417,101 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Market Oracle - Unified Predictive System */}
+        <div className="lg:col-span-2 bg-card border-2 border-primary rounded-lg p-5 box-glow relative overflow-hidden">
+          <div className="absolute inset-0 bg-primary/5 scanline-animation pointer-events-none" />
+          <div className="flex items-center justify-between mb-4 relative z-10">
+            <h3 className="text-base font-bold text-primary font-mono flex items-center gap-2">
+              <span>🔮</span> أوراكل السوق الموحد (Market Oracle)
+            </h3>
+            {oracleLoading && <span className="animate-spin text-primary text-xs">⚙️</span>}
+          </div>
+          
+          <div className="space-y-3 relative z-10">
+            {oracleData.length > 0 ? (
+              oracleData.map((item, i) => (
+                <div 
+                  key={i} 
+                  className={`border-r-[4px] p-3 rounded-md bg-background/40 hover:bg-primary/10 transition-all group flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                    item.timeframe === "now" ? "border-primary" : item.timeframe === "soon" ? "border-accent" : "border-indigo-400"
+                  }`}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-bold text-primary uppercase font-mono">{item.topic}</span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                        item.timeframe === "now" ? "bg-primary/20 text-primary" : item.timeframe === "soon" ? "bg-accent/20 text-accent" : "bg-indigo-400/20 text-indigo-300"
+                      }`}>
+                        {item.timeframe === "now" ? "الآن 🔥" : item.timeframe === "soon" ? "قريباً ⏳" : "موسمي 📅"}
+                      </span>
+                      <span className="text-secondary text-[10px] font-mono opacity-60">Peak in {item.daysToPeak}d</span>
+                    </div>
+                    <div className="text-secondary text-[10px] leading-relaxed font-mono flex items-center gap-1.5 line-clamp-1">
+                      <span className="text-accent underline decoration-accent/30 decoration-dashed underline-offset-2">إشارة:</span> 
+                      {item.strategy}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-4 shrink-0">
+                    <div className="text-center">
+                      <div className="text-[9px] text-secondary font-mono mb-0.5 uppercase">Prob.</div>
+                      <div className="text-sm font-bold text-primary font-mono">{item.probability}%</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[9px] text-secondary font-mono mb-0.5 uppercase">Diff.</div>
+                      <div className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border ${
+                        item.difficulty === "easy" ? "text-primary border-primary/30" : item.difficulty === "medium" ? "text-accent border-accent/30" : "text-destructive border-destructive/30"
+                      }`}>
+                        {item.difficulty.toUpperCase()}
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setSelectedTrendForGeneration({ topic: item.topic, category: item.category, demand: item.demand, competition: item.competition, profitability: item.probability, searches: 0 })}
+                      className="bg-primary/10 border border-primary/40 text-primary px-3 py-1.5 rounded text-[10px] font-bold hover:bg-primary/20 transition-all box-glow font-mono uppercase"
+                    >
+                      الاقتناص
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="py-10 text-center text-secondary font-mono text-xs italic">
+                {oracleLoading ? "جاري استشارة الأوراكل..." : "أضف مفتاح API لتفعيل الرؤية التنبؤية ⚙️"}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Top 10 list */}
         <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
           <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono">🔥 أكثر 10 مواضيع بحثاً</h3>
-          {top10.map((item, i) => {
-            const isGold = item.demand === "high" && item.competition === "low";
-            const barW = Math.round((item.searches / top10[0].searches) * 100);
-            return (
-              <div key={i} className="py-2 border-b border-primary/20">
-                <div className="flex items-center justify-between text-secondary font-mono text-xs mb-1">
-                  <span className="flex-1 truncate mr-2">
-                    <span className="text-primary font-bold">{i + 1}.</span>{" "}
-                    {item.topic}
-                    {isGold ? (
-                      <button onClick={() => setSelectedTrendForGeneration(item)} className="ml-2 text-accent text-[10px] bg-accent/20 px-2 py-0.5 rounded border border-accent/30 tracking-wide font-extrabold shadow-[0_0_8px_rgba(255,215,0,0.4)] inline-block hover:scale-[1.05] hover:bg-accent/40 transition-all">🔥 أنشئ 15 صورة</button>
-                    ) : item.profitability > 80 ? (
-                      <span className="ml-2 text-primary text-[9px] bg-primary/20 px-1.5 py-0.5 rounded border border-primary/30 tracking-wide inline-block">⭐ ممتازة</span>
-                    ) : null}
-                  </span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-accent font-semibold bg-accent/10 px-1.5 py-0.5 rounded border border-accent/20 text-[10px]">Score: {item.profitability}</span>
-                    <span className="text-primary font-semibold">{item.searches.toLocaleString()}</span>
+          <div className="space-y-1.5">
+            {top10.map((item, i) => {
+              const isGold = item.demand === "high" && item.competition === "low";
+              const barW = Math.round((item.searches / (top10[0]?.searches || 1)) * 100);
+              return (
+                <div key={i} className="py-1.5 border-b border-primary/10">
+                  <div className="flex items-center justify-between text-secondary font-mono text-[11px] mb-1">
+                    <span className="flex-1 truncate mr-2">
+                      <span className="text-primary font-bold">{i + 1}.</span>{" "}
+                      {item.topic}
+                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {isGold && <span className="text-[9px] bg-accent/20 text-accent px-1 rounded font-bold">GOLD</span>}
+                      <span className="text-primary font-bold">{item.searches.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <div className="h-0.5 bg-primary/5 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary/40 rounded-full transition-all"
+                      style={{ width: `${barW}%` }}
+                    />
                   </div>
                 </div>
-                <div className="h-1 bg-primary/10 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary/60 rounded-full transition-all"
-                    style={{ width: `${barW}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Seasonal */}
-        <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow">
-          <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono">📅 مؤشر الموسم</h3>
-          {seasonalEvents.map((ev, i) => (
-            <div key={i} className="p-3 mb-3 bg-primary/5 rounded-md border-r-[3px] border-primary hover:bg-primary/10 transition-all">
-              <div className="text-primary font-semibold font-mono text-sm">{ev.event}
-                <span className="text-secondary text-[10px] font-normal mr-2">({ev.month})</span>
-              </div>
-              <div className="text-secondary text-xs mt-1 font-mono">{ev.images}</div>
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -565,26 +638,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Crystal Ball Radar */}
-        <div className="bg-card border-2 border-primary rounded-lg p-5 box-glow relative overflow-hidden">
-          <div className="absolute inset-0 bg-primary/5 scanline-animation pointer-events-none" />
-          <h3 className="text-base font-semibold text-primary text-glow mb-4 font-mono relative z-10">🔮 رادار التراندات القادمة (Trend Radar)</h3>
-          <div className="space-y-3 relative z-10">
-            {(trendRadar.length > 0 ? trendRadar : [
-              { topic: "جاري تحميل التراندات...", time: "--", prob: "--" },
-            ]).map((t, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-background/50 border border-primary/20 rounded-md hover:bg-primary/10 transition-colors">
-                <div>
-                  <div className="text-primary text-xs font-mono font-bold animate-pulse-slow">{t.topic}</div>
-                  <div className="text-secondary text-[10px] font-mono mt-1">{t.time}</div>
-                </div>
-                <div className="text-accent text-xs font-mono font-bold bg-accent/20 px-2 py-1 rounded border border-accent/30 tracking-wider shadow-[0_0_10px_rgba(255,215,0,0.3)]">
-                  {t.prob}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* AI performance pulse and Quick Links section remains the same or refined */}
       </div>
     </div>
   );

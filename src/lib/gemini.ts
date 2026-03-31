@@ -796,6 +796,57 @@ Return ONLY a JSON array, no markdown.`;
   });
 }
 
+export interface MarketOracleItem {
+  topic: string;
+  category: string;
+  timeframe: "now" | "soon" | "seasonal";
+  daysToPeak: number;
+  probability: number;
+  difficulty: "easy" | "medium" | "hard";
+  strategy: string;
+  demand: "high" | "medium" | "low";
+  competition: "high" | "medium" | "low";
+}
+
+/**
+ * أوراكل السوق الموحد - يجمع بين التراندات الحالية والتوقعات المستقبلية والموسمية
+ */
+export async function getUnifiedMarketOracle(): Promise<MarketOracleItem[]> {
+  const seed = `ORACLE-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const date = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+
+  const prompt = `You are the ultimate Adobe Stock Predictive Oracle. 
+  Today's Date: ${date}
+  Seed for variety: ${seed}
+  
+  CRITICAL: SEARCH THE WEB using Google Search to identify:
+  1. NOW (0-15 days): Viral visual trends happening TODAY (news, pop culture, sudden search spikes).
+  2. SOON (15-60 days): Emerging topics that are gaining traction for next month.
+  3. SEASONAL (60-120 days): Major global events, holidays, or business cycles that buyers will prepare for soon.
+  
+  Generate a unified list of 10-12 HIGH-VALUE opportunities for an Adobe Stock contributor.
+  
+  For each item:
+  - topic: 2-4 word English name.
+  - category: one of "AI", "Sustainability", "Work", "Wellness", "Diversity", "Design", "Nature", "Food", "Business", "Technology", "Science".
+  - timeframe: "now", "soon", or "seasonal".
+  - daysToPeak: estimated days until this reaches maximum demand on Adobe Stock.
+  - probability: 0-100 (how likely this will sell).
+  - difficulty: "easy" (simple photos/icons), "medium" (complex composites/standard video), "hard" (high-end 3D/CGI/complex cinematic video).
+  - strategy: A short Arabic sentence advising the contributor on WHICH visual style to use (e.g. "استخدم نمط الـ Minimalist 3D لخلفيات تقنية").
+  - demand: "high", "medium", or "low".
+  - competition: "high", "medium", or "low".
+  
+  Return ONLY a JSON array of objects. No markdown.`;
+
+  return withCache("gemini_unified_oracle", 12 * 60 * 60 * 1000, async () => {
+    const result = await generateWithGemini(prompt, 0.7, undefined, true);
+    const parsed = extractAndParseJSON<MarketOracleItem[]>(result, []);
+    if (!parsed || parsed.length === 0) throw new Error("Failed to parse Oracle data");
+    return parsed;
+  });
+}
+
 export interface TopSellerAnalysis {
   secretSauce: string;
   hiddenKeywords: string[];
