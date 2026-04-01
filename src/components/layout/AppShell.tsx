@@ -1,5 +1,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { useApp } from "@/contexts/AppContext";
+import { useAuth } from "@/contexts/AuthContext";
+import AuthModal from "@/components/AuthModal";
 import Sidebar from "./Sidebar";
 import SmartCommand from "@/components/SmartCommand";
 import SmartAlerts from "@/components/SmartAlerts";
@@ -25,7 +27,9 @@ const pageTitles: Record<string, string> = {
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const { activePage, sidebarOpen, commandPaletteOpen, setCommandPaletteOpen, unreadAlertCount } = useApp();
+  const { user, loading, signOut } = useAuth();
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -91,7 +95,35 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <h1 className="text-sm font-semibold text-white">
             {pageTitles[activePage] || "Stock AI PRO"}
           </h1>
-          <span className="text-xs text-slate-600 font-mono hidden sm:inline">v3.0</span>
+          <span className="text-xs text-slate-600 font-mono hidden sm:inline">v3.1</span>
+
+          <div className="h-4 w-[1px] bg-white/10 mx-1 hidden sm:block" />
+
+          {loading ? (
+            <div className="w-8 h-8 rounded-full bg-white/5 animate-pulse" />
+          ) : user ? (
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:block text-right">
+                <p className="text-[10px] text-white font-medium truncate max-w-[100px]">{user.email}</p>
+                <button 
+                  onClick={() => signOut()}
+                  className="text-[9px] text-slate-500 hover:text-red-400 block ml-auto"
+                >
+                  تسجيل الخروج
+                </button>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-[10px] font-bold border border-white/20">
+                {user.email?.charAt(0).toUpperCase()}
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAuthModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-bold hover:bg-blue-500/20 transition-all"
+            >
+              تسجيل الدخول
+            </button>
+          )}
         </div>
       </header>
 
@@ -105,6 +137,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </ErrorBoundary>
         </div>
       </main>
+
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={authModalOpen} 
+        onClose={() => setAuthModalOpen(false)} 
+        onSuccess={() => setAuthModalOpen(false)} 
+      />
 
       {/* Command Palette */}
       {commandPaletteOpen && (

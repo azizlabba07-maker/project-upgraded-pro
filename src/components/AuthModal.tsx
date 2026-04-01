@@ -44,75 +44,95 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
   };
 
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-      <div className="bg-card border-2 border-primary rounded-xl w-full max-w-md p-6 box-glow-strong relative overflow-hidden">
-        {/* Background scanline */}
-        <div className="absolute inset-0 bg-primary/5 scanline-animation pointer-events-none" />
+    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+      <div className="bg-slate-900/90 border border-white/10 rounded-2xl w-full max-w-md p-8 shadow-2xl relative overflow-hidden group">
+        {/* Animated background accent */}
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all duration-700" />
+        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl group-hover:bg-purple-500/20 transition-all duration-700" />
         
         <button
           onClick={onClose}
-          className="absolute top-4 left-4 text-secondary hover:text-primary transition-colors text-xl font-bold font-mono z-10"
+          className="absolute top-5 right-5 text-slate-500 hover:text-white transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/5 z-10"
         >
-          ×
+          ✕
         </button>
-
+ 
         <div className="relative z-10">
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-primary font-mono mb-2 text-glow">
-              {isLogin ? "تسجيل الدخول السحابي" : "حساب سحابي جديد"}
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
+              💎
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              {isLogin ? "تسجيل الدخول" : "إنشاء حساب جديد"}
             </h2>
-            <p className="text-sm text-secondary font-mono">
-              فعّل الحفظ السحابي الآمن لبياناتك للحفاظ عليها ومزامنتها.
+            <p className="text-xs text-slate-400 leading-relaxed max-w-[280px] mx-auto">
+              {isLogin 
+                ? "مرحباً بك مجدداً! ادخل لمزامنة بياناتك والحصول على تنبيهات الفرص الحية." 
+                : "انضم إلى مجتمع المحترفين وابدأ في تتبع محفظتك وحفظ برومبتاتك في السحابة."}
             </p>
           </div>
-
+ 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-primary text-xs font-semibold font-mono mb-1">البريد الإلكتروني</label>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">البريد الإلكتروني</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-background border border-primary/50 text-foreground p-3 rounded font-mono text-sm focus:outline-none focus:border-primary focus:box-glow transition-all"
-                placeholder="developer@example.com"
+                className="w-full bg-white/5 border border-white/10 text-white p-3.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-slate-600"
+                placeholder="name@company.com"
                 dir="ltr"
               />
             </div>
-            <div>
-              <label className="block text-primary text-xs font-semibold font-mono mb-1">كلمة المرور</label>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">كلمة المرور</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-background border border-primary/50 text-foreground p-3 rounded font-mono text-sm focus:outline-none focus:border-primary focus:box-glow transition-all"
-                placeholder="********"
+                className="w-full bg-white/5 border border-white/10 text-white p-3.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-slate-600"
+                placeholder="••••••••"
                 dir="ltr"
               />
             </div>
-
+ 
             <button
               type="submit"
               disabled={loading}
-              className="w-full gradient-primary text-primary-foreground py-3 rounded-md font-mono text-sm font-bold box-glow-strong hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 mt-4"
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-sm shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 mt-6 overflow-hidden relative"
             >
-              {loading ? "⏳ جاري الاتصال بالخادم..." : isLogin ? "🚀 تسجيل الدخول" : "✨ إنشاء حساب"}
+              {loading ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  جاري المعالجة...
+                </>
+              ) : (
+                isLogin ? "🚀 دخول النظام" : "✨ إنشاء الحساب"
+              )}
             </button>
           </form>
-
-          <div className="mt-6 text-center">
+ 
+          <div className="mt-8 text-center pt-6 border-t border-white/5">
             <button
               type="button"
               onClick={() => setIsLogin(!isLogin)}
-              className="text-xs text-secondary hover:text-primary font-mono transition-colors border-b border-transparent hover:border-primary pb-0.5"
+              className="text-xs text-slate-400 hover:text-blue-400 transition-colors flex items-center justify-center gap-2 mx-auto group"
             >
-              {isLogin ? "لا تملك حساباً؟ أنشئ حساباً جديداً" : "لديك حساب بالفعل؟ سجل دخولك"}
+              {isLogin ? (
+                <>ليس لديك حساب؟ <span className="text-blue-400 font-bold group-hover:underline">سجل الآن</span></>
+              ) : (
+                <>لديك حساب بالفعل؟ <span className="text-blue-400 font-bold group-hover:underline">سجل دخولك</span></>
+              )}
             </button>
           </div>
           
-          <div className="mt-4 pt-4 border-t border-primary/20 text-center">
-            <p className="text-[10px] text-secondary/70 font-mono">
-              يمكنك المتابعة بـ <span className="text-primary font-bold">وضع الزائر</span> في أي وقت عن طريق إغلاق هذه النافذة.
-            </p>
+          <div className="mt-4 text-center">
+            <button
+              onClick={onClose}
+              className="text-[10px] text-slate-600 hover:text-slate-400 transition-all"
+            >
+              المتابعة كزائر (بدء تجربة محدودة)
+            </button>
           </div>
         </div>
       </div>

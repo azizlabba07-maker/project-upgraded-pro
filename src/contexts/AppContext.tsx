@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { getStorageJSON, setStorageJSON } from "@/lib/shared";
+import { createSmartAlertEngine } from "@/lib/smartAlertEngine";
 
 // ── Types ──
 export type ActivePage =
@@ -16,7 +17,8 @@ export type ActivePage =
   | "battle"
   | "batch"
   | "niche"
-  | "settings";
+  | "settings"
+  | "autopilot";
 
 export interface ApiKeyState {
   gemini: string;
@@ -98,14 +100,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const hasAnyKey = useCallback(() => Object.values(apiKeys).some(Boolean), [apiKeys]);
 
   const addAlert = useCallback((alert: Omit<Alert, "id" | "timestamp" | "read">) => {
-    const newAlert: Alert = {
-      ...alert,
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      timestamp: Date.now(),
-      read: false,
-    };
-    setAlerts((prev) => [newAlert, ...prev].slice(0, 50));
+    setAlerts((prev) => {
+      // Prevent duplicate active (unread) alerts with same title
+      const isDuplicate = prev.some(a => a.title === alert.title && !a.read);
+      if (isDuplicate) return prev;
+
+      const newAlert: Alert = {
+        ...alert,
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: Date.now(),
+        read: false,
+      };
+      return [newAlert, ...prev].slice(0, 50);
+    });
   }, []);
+
+  useEffect(() => {
+    const engine = createSmartAlertEngine(addAlert);
+    // Start after a small delay to not block initial load
+    const timer = setTimeout(() => {
+      engine.start();
+    }, 5000);
+
+    return () => {
+      clearTimeout(timer);
+      engine.stop();
+    };
+  }, [addAlert]);
 
   const markAlertRead = useCallback((id: string) => {
     setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, read: true } : a)));

@@ -20,6 +20,7 @@ const navItems: NavItem[] = [
   { id: "battle",      label: "مقارنة المحركات", icon: "⚔️", section: "ai" },
   { id: "history",     label: "سجل البرومبتات",  icon: "📜", section: "ai" },
   { id: "batch",       label: "معالج الدفعات",   icon: "📦", section: "ai" },
+  { id: "autopilot",   label: "الطيار الآلي",    icon: "🚀", section: "ai" },
 
   { id: "tools",       label: "أدوات",           icon: "🛠️", section: "tools" },
   { id: "store",       label: "محلل المتجر",     icon: "🔍", section: "tools" },
