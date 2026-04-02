@@ -1,8 +1,10 @@
 import { useState } from "react";
 import PromptGenerator from "@/components/PromptGenerator";
 import ImagePromptGenerator from "@/components/ImagePromptGenerator";
-import { hasOpenAIKey } from "@/lib/openai";
+import { hasOpenAIKey, generateOpenAIStockPrompts, type OpenAIStockPrompt } from "@/lib/openai";
 import { useApp } from "@/contexts/AppContext";
+import { toast } from "sonner";
+import { copyTextSafely, exportCsvFile } from "@/lib/shared";
 
 type Engine = "gemini" | "claude" | "openai";
 
@@ -108,9 +110,6 @@ export default function UnifiedPromptHub() {
 }
 
 // ── OpenAI Prompt Generator View ──
-import { generateOpenAIStockPrompts, type OpenAIStockPrompt } from "@/lib/openai";
-import { toast } from "sonner";
-import { copyTextSafely, exportCsvFile } from "@/lib/shared";
 
 const CATEGORIES = [
   "Nature", "Technology", "Food", "Business", "Science",

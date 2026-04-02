@@ -81,3 +81,13 @@ export function pulseLocalTrends(trends: MarketTrend[]): MarketTrend[] {
   }));
 }
 
+/**
+ * Mock function for future real-time backend pulse.
+ * Currently returns null to fallback to local pulse logic.
+ */
+export async function fetchMarketPulseFromBackend(): Promise<MarketTrend[] | null> {
+  // Placeholder for real API call
+  // return fetch("/api/market-pulse").then(r => r.json());
+  return null;
+}
+

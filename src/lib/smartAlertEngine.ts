@@ -25,16 +25,16 @@ class SmartAlertEngine {
     this.checkOpportunities();
 
     // Set up periodic check
-    this.intervalId = window.setInterval(() => {
+    this.intervalId = setInterval(() => {
       this.checkOpportunities();
-    }, intervalMs);
+    }, intervalMs) as any;
     
     console.log("🚀 Smart Alert Engine started.");
   }
 
   stop() {
     if (this.intervalId) {
-      window.clearInterval(this.intervalId);
+      clearInterval(this.intervalId);
       this.intervalId = null;
       console.log("🛑 Smart Alert Engine stopped.");
     }

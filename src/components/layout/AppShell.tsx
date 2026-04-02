@@ -22,6 +22,7 @@ const pageTitles: Record<string, string> = {
   battle: "مقارنة المحركات",
   batch: "معالج الدفعات",
   niche: "مستكشف النيتش",
+  autopilot: "الطيار الآلي",
   settings: "الإعدادات",
 };
 
