@@ -213,7 +213,9 @@ export default function BatchProcessor() {
 
     // Determine concurrency from number of API keys
     const apiKeys = getUserGeminiApiKeys();
-    const concurrency = Math.max(1, Math.min(apiKeys.length, 5)); // Cap at 5 lanes
+    // Use ALL available keys simultaneously (no upper limit of 5)
+    // The user has multiple keys and wants them all active at once
+    const concurrency = Math.max(1, apiKeys.length);
     const delayPerKey = 4000; // 4s between requests per key (safe for free tier)
 
     const total = files.length;
@@ -347,6 +349,26 @@ export default function BatchProcessor() {
   const handleCancel = () => {
     cancelRef.current = true;
     toast.info("⏹️ جاري الإيقاف...");
+  };
+
+  const handleAutoFilter = () => {
+    const originalCount = results.length;
+    const filtered = results.filter(r => 
+      !r.title.startsWith("[Error]") && 
+      (r.estimatedAcceptance !== undefined ? r.estimatedAcceptance >= 80 : true) && 
+      (r.deformationScore !== undefined ? r.deformationScore <= 30 : true)
+    );
+    setResults(filtered);
+    try {
+      localStorage.setItem("batch_processor_results", JSON.stringify(filtered));
+    } catch {}
+    
+    const removedCount = originalCount - filtered.length;
+    if (removedCount > 0) {
+      toast.success(`تم التصفية 🧹! تم استبعاد ${removedCount} ملف ذي جودة منخفضة.`);
+    } else {
+      toast.info("كل الملفات اجتازت الفلتر المشدد! ✨");
+    }
   };
 
   const handleExport = () => {
@@ -516,6 +538,9 @@ export default function BatchProcessor() {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white">✅ النتائج ({results.filter(r => !r.title.startsWith("[Error]")).length} ناجحة)</h3>
             <div className="flex gap-2">
+              <button onClick={handleAutoFilter} className="px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-xs font-bold text-orange-400 hover:bg-orange-500/20 hover:scale-105 transition-all shadow-lg shadow-orange-500/10">
+                🧹 تصفية تلقائية
+              </button>
               <button onClick={handleCopyAll} className="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-xs text-slate-400 hover:text-white transition-all">
                 📋 نسخ الكل
               </button>
@@ -543,22 +568,57 @@ export default function BatchProcessor() {
                     <p className="text-[10px] text-blue-400 mb-1">🎨 {res.colorPalette}</p>
                   )}
                   
-                  {/* Quality Shield & Compliance Check */}
-                  {res.compliance && (
-                    <div className={`mb-2 flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-bold w-fit ${
-                      res.compliance.status === 'safe' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-                      res.compliance.status === 'warning' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
-                      'bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
-                    }`}>
-                      <span className="text-xs">
-                        {res.compliance.status === 'safe' ? '🛡️' : res.compliance.status === 'warning' ? '⚠️' : '🚫'}
-                      </span>
-                      <span>
-                        {res.compliance.status === 'safe' ? 'آمن للرفع' : res.compliance.status === 'warning' ? 'تنبيه جودة' : 'خطر رفض مرتفع'}
-                      </span>
-                      <span className="opacity-40">|</span>
-                      <span>{res.compliance.score}%</span>
-                    </div>
+                  {/* Quality & Compliance Intelligence */}
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    {/* Deformation Score */}
+                    {res.deformationScore !== undefined && (
+                      <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-bold ${
+                        res.deformationScore <= 10 ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                        res.deformationScore <= 30 ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
+                        'bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_8px_rgba(239,68,68,0.2)]'
+                      }`}>
+                        <span>{res.deformationScore <= 10 ? '✨' : res.deformationScore <= 30 ? '👀' : '👾'}</span>
+                        <span>شذوذ AI: {res.deformationScore}%</span>
+                      </div>
+                    )}
+
+                    {/* Estimated Acceptance */}
+                    {res.estimatedAcceptance !== undefined && (
+                      <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-bold ${
+                        res.estimatedAcceptance >= 90 ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-[0_0_8px_rgba(59,130,246,0.2)]' :
+                        res.estimatedAcceptance >= 70 ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
+                        'bg-orange-500/10 text-orange-400 border border-orange-500/20'
+                      }`}>
+                        <span>{res.estimatedAcceptance >= 90 ? '📈' : res.estimatedAcceptance >= 70 ? '📊' : '📉'}</span>
+                        <span>فرصة القبول: {res.estimatedAcceptance}%</span>
+                      </div>
+                    )}
+                    
+                    {/* Legacy Compliance shield if no estimatedAcceptance */}
+                    {!res.estimatedAcceptance && res.compliance && (
+                      <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-bold w-fit ${
+                        res.compliance.status === 'safe' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                        res.compliance.status === 'warning' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
+                        'bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                      }`}>
+                        <span className="text-xs">
+                          {res.compliance.status === 'safe' ? '🛡️' : res.compliance.status === 'warning' ? '⚠️' : '🚫'}
+                        </span>
+                        <span>
+                          {res.compliance.status === 'safe' ? 'آمن للرفع' : res.compliance.status === 'warning' ? 'تنبيه جودة' : 'خطر رفض مرتفع'}
+                        </span>
+                        <span className="opacity-40">|</span>
+                        <span>{res.compliance.score}%</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Uniqueness Review */}
+                  {res.uniquenessReview && (
+                    <p className="text-[10px] text-accent mb-2 font-mono flex items-start gap-1">
+                      <span className="shrink-0 text-amber-400">💡 الجودة التسويقية:</span> 
+                      {res.uniquenessReview}
+                    </p>
                   )}
 
                   {res.compliance?.issues && res.compliance.issues.length > 0 && (

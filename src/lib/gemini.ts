@@ -907,6 +907,9 @@ export interface ImageAnalysisResult {
   prompt: string;        // The new AI generated text-to-image prompt
   colorPalette: string;  // The suggested trending colors
   compliance?: ComplianceResult; // النتيجة الخاصة بفحص الجودة والامتثال
+  deformationScore?: number; // 0 (flawless) to 100 (highly deformed)
+  estimatedAcceptance?: number; // 0 to 100% acceptance probability
+  uniquenessReview?: string; // Assessment of similarity to existing Adobe Stock items
 }
 
 export async function analyzeImageForStock(
@@ -932,18 +935,24 @@ If it is a grid, extract the DOMINANT, MOST PROFITABLE pattern/theme connecting 
 ${extraRules}
 
 YOUR TASK:
-Generate a complete, ready-to-sell metadata and generation package.
-1. Return EXACTLY 50 highly relevant, comma-separated keywords. The most important and descriptive 10 keywords MUST be at the very beginning of the list to comply with Adobe Stock's algorithm. Ensure NO trademarks, NO real people names, NO copyrighted works.
-2. Return a short SEO optimized Title (max 70 characters).
-3. Return a highly detailed Text-to-Image PROMPT (Midjourney/Firefly style) to recreate or enhance this concept.
-4. Return a "colorPalette" suggesting trending colors to be used. These colors MUST be seamlessly integrated into the generated PROMPT.
+Generate a complete Adobe Stock evaluation and metadata package.
+1. "keywords": EXACTLY 50 highly relevant, comma-separated keywords. Ensure NO trademarks, NO real people names, NO copyrighted works.
+2. "title": Short SEO optimized Title (max 70 characters).
+3. "prompt": A highly detailed Text-to-Image PROMPT (Midjourney/Firefly style) based on this concept.
+4. "colorPalette": Trending colors used.
+5. "deformationScore": (0-100 Number) Analyze visually for AI artifacts, anatomical errors, weird hands, blurred text, or bad lighting. 0 = flawless, 100 = severely deformed.
+6. "estimatedAcceptance": (0-100 Number) Probability of acceptance on Adobe Stock based on technical quality, commercial appeal, and lack of IP/trademarks.
+7. "uniquenessReview": A short Arabic sentence evaluating if this concept is over-saturated (e.g. generic sunset) or a Blue Ocean opportunity.
 
 MUST return a raw JSON object EXACTLY like this (NO Markdown, NO backticks):
 {
-  "title": "SEO Optimized Product Title",
-  "keywords": ["kw1", "kw2", "kw3"],
-  "prompt": "Highly detailed, professional prompt. No humans or real brands.",
-  "colorPalette": "Trending Color Theme Name"
+  "title": "Title",
+  "keywords": ["kw1", "kw2"],
+  "prompt": "Prompt...",
+  "colorPalette": "Colors",
+  "deformationScore": 15,
+  "estimatedAcceptance": 95,
+  "uniquenessReview": "فكرة ممتازة ومطلوبة بقوة..."
 }`;
 
   const result = await generateWithGemini(prompt, 0.4, {
@@ -951,11 +960,14 @@ MUST return a raw JSON object EXACTLY like this (NO Markdown, NO backticks):
     mimeType: isVideo ? "image/jpeg" : file.type
   });
   
-  const parsed = extractAndParseJSON<{ title: string; keywords: string[], prompt: string, colorPalette: string }>(result, { 
+  const parsed = extractAndParseJSON<{ title: string; keywords: string[], prompt: string, colorPalette: string, deformationScore: number, estimatedAcceptance: number, uniquenessReview: string }>(result, { 
     title: "Untitled Stock Element", 
     keywords: ["stock", "illustration", "vector"],
     prompt: "A beautiful stock illustration concept, bright colors",
-    colorPalette: "Vibrant"
+    colorPalette: "Vibrant",
+    deformationScore: 0,
+    estimatedAcceptance: 80,
+    uniquenessReview: "جاري الفحص..."
   });
 
   if (!parsed.title && !parsed.keywords.length) throw new Error("Failed to parse Image Analysis AI response");
@@ -971,5 +983,8 @@ MUST return a raw JSON object EXACTLY like this (NO Markdown, NO backticks):
     keywords: cleanKeywords,
     prompt: sanitizePromptOrKeywords(parsed.prompt),
     colorPalette: parsed.colorPalette,
+    deformationScore: parsed.deformationScore,
+    estimatedAcceptance: parsed.estimatedAcceptance,
+    uniquenessReview: parsed.uniquenessReview
   };
 }
