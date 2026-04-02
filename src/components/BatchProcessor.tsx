@@ -2,6 +2,8 @@ import { useState, useCallback, useRef } from "react";
 import { analyzeImageForStock, hasAnyApiKey, getUserGeminiApiKeys, type ImageAnalysisResult } from "@/lib/gemini";
 import { toast } from "sonner";
 import { exportCsvFile, copyTextSafely } from "@/lib/shared";
+import ShinyText from "./animations/ShinyText";
+import DecryptedText from "./animations/DecryptedText";
 
 // ─────────────────────────────────────────────
 // 🎬  3-Frame Panorama Extraction (الاستخراج الذكي)
@@ -548,8 +550,8 @@ export default function BatchProcessor() {
             return (
               <div className="rounded-3xl bg-slate-900/60 border border-white/10 p-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl opacity-50" />
-                <h3 className="text-lg font-bold text-white mb-5 flex items-center gap-2 relative z-10">
-                  <span>📊</span> تقرير فحص الجودة الشامل
+                <h3 className="text-lg font-bold mb-5 flex items-center gap-2 relative z-10">
+                  <span>📊</span> <ShinyText text="تقرير فحص الجودة الشامل" speed={4} className="text-white" />
                 </h3>
                 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5 relative z-10">
@@ -624,8 +626,12 @@ export default function BatchProcessor() {
               <div className="flex items-start gap-3">
                 <span className="text-lg shrink-0">{res.title.startsWith("[Error]") ? "❌" : "✅"}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] text-slate-600 mb-1">{res.filename}</p>
-                  <p className="text-xs text-white font-semibold mb-1.5">{res.title}</p>
+                  <p className="text-[10px] text-slate-600 mb-1">
+                    <DecryptedText text={res.filename} speed={40} maxIterations={8} animateOn="hover" />
+                  </p>
+                  <p className="text-xs text-white font-semibold mb-1.5">
+                    <DecryptedText text={res.title} speed={25} maxIterations={10} animateOn="view" />
+                  </p>
                   {res.colorPalette && (
                     <p className="text-[10px] text-blue-400 mb-1">🎨 {res.colorPalette}</p>
                   )}
