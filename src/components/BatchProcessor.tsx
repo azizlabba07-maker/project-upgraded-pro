@@ -168,6 +168,8 @@ export default function BatchProcessor() {
     activeLanes: 0, maxLanes: 1, eta: "—", startTime: 0,
   });
   const [currentFiles, setCurrentFiles] = useState<string[]>([]);
+  const [riskFilter, setRiskFilter] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const cancelRef = useRef(false);
 
   const progress = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
@@ -563,10 +565,16 @@ export default function BatchProcessor() {
                     <div className="text-2xl font-bold text-blue-400 mb-1">{perfectQualityCount}</div>
                     <div className="text-[10px] text-blue-500/70">تصنيف امتياز (+95%)</div>
                   </div>
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-center">
+                  <button 
+                    onClick={() => {
+                      setRiskFilter(prev => !prev);
+                      if (!riskFilter) setDetailsOpen(true);
+                    }}
+                    className={`bg-red-500/10 border ${riskFilter ? 'border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)] scale-105' : 'border-red-500/20'} rounded-2xl p-4 text-center cursor-pointer hover:bg-red-500/20 transition-all`}
+                  >
                     <div className="text-2xl font-bold text-red-400 mb-1">{highRiskCount}</div>
-                    <div className="text-[10px] text-red-500/70">مرفوض وخطر</div>
-                  </div>
+                    <div className="text-[10px] text-red-500/70">{riskFilter ? "إلغاء فلتر الخطر ✖" : "اضغط لعرض الخطرة فقط"}</div>
+                  </button>
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between mt-2 pt-4 border-t border-white/10 relative z-10 gap-3">
@@ -586,11 +594,11 @@ export default function BatchProcessor() {
             );
           })()}
 
-          <details className="group">
+          <details className="group" open={detailsOpen} onToggle={(e) => setDetailsOpen(e.currentTarget.open)}>
             <summary className="flex items-center justify-between cursor-pointer p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] transition-all list-none">
               <span className="text-sm font-bold text-white flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs group-open:rotate-90 transition-transform text-slate-400 shadow-inner">▶</span>
-                📋 استعراض كافة تفاصيل الملفات المحللة
+                <span className={`w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs transition-transform text-slate-400 shadow-inner ${detailsOpen ? 'rotate-90' : ''}`}>▶</span>
+                📋 {riskFilter ? "مراجعة الملفات الخطرة فقط" : "استعراض كافة تفاصيل الملفات المحللة"}
               </span>
               <button 
                 onClick={(e) => { e.preventDefault(); handleCopyAll(); }} 
@@ -601,7 +609,10 @@ export default function BatchProcessor() {
             </summary>
             
             <div className="pt-4 space-y-3">
-              {results.map((res, i) => (
+              {results.filter(res => {
+                if (!riskFilter) return true;
+                return (!res.title.startsWith("[Error]") && ((res.estimatedAcceptance !== undefined ? res.estimatedAcceptance < 60 : false) || (res.deformationScore !== undefined ? res.deformationScore > 50 : false)));
+              }).map((res, i) => (
             <div
               key={i}
               className={`rounded-2xl border p-4 ${
