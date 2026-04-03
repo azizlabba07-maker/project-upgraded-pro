@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useApp } from "@/contexts/AppContext";
 import { getUnifiedMarketOracle, MarketOracleItem } from "@/lib/gemini";
 import { dispatchPromptGeneration } from "@/lib/aiDispatcher";
-import { exportCsvFile } from "@/lib/shared";
+import { exportCsvFile, copyTextSafely } from "@/lib/shared";
 import { toast } from "sonner";
 
 interface AutoPilotStep {
@@ -16,6 +16,7 @@ export default function AutoPilot() {
   const { hasAnyKey } = useApp();
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [results, setResults] = useState<any[]>([]);
   const [steps, setSteps] = useState<AutoPilotStep[]>([
     { id: "oracle", label: "تحليل السوق عبر الأوراكل", status: "pending" },
     { id: "selection", label: "اختيار الفرص الذهبية", status: "pending" },
@@ -35,6 +36,7 @@ export default function AutoPilot() {
 
     setIsRunning(true);
     setProgress(0);
+    setResults([]);
     setSteps(prev => prev.map(s => ({ ...s, status: "pending", message: "" })));
 
     try {
@@ -78,6 +80,7 @@ export default function AutoPilot() {
         allGeneratedPrompts.push(...result.prompts);
         setProgress(50 + ((i + 1) / goldItems.length) * 40);
       }
+      setResults(allGeneratedPrompts);
       updateStep("generation", { status: "completed", message: `تم توليد ${allGeneratedPrompts.length} برومبت بنجاح.` });
 
       // Step 4: Export
@@ -222,6 +225,88 @@ export default function AutoPilot() {
           </p>
         </div>
       </div>
+
+      {/* Results Display */}
+      {results.length > 0 && (
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-3xl p-6 mt-6 animate-fade-in shadow-xl">
+          <div className="flex items-center justify-between mb-4 mt-2">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-xl">🎯</span>
+              نتائج الطيار الآلي ({results.length} فرصة)
+            </h3>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  const filename = `autopilot-stock-export-${new Date().toISOString().split('T')[0]}.csv`;
+                  exportCsvFile(
+                    filename,
+                    ["Title", "Keywords", "Prompt", "Category", "Type"],
+                    results.map(p => [
+                      p.title || "",
+                      (p.keywords || []).join(", "),
+                      p.prompt,
+                      p.category,
+                      p.type
+                    ])
+                  );
+                }}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:scale-[1.03] text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2"
+              >
+                <span>📥</span> تحميل CSV
+              </button>
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto rounded-2xl border border-white/[0.07] bg-black/20">
+             <table className="w-full text-right text-sm">
+                <thead>
+                  <tr className="border-b border-white/10 text-slate-400 bg-white/[0.03]">
+                    <th className="p-4 font-semibold text-xs whitespace-nowrap">الفئة</th>
+                    <th className="p-4 font-semibold text-xs w-1/2">البرومبت والتفاصيل</th>
+                    <th className="p-4 font-semibold text-xs">الكلمات المفتاحية الخبيئة</th>
+                    <th className="p-4 w-16"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((p, index) => (
+                    <tr key={index} className="border-b border-white/5 hover:bg-white/[0.04] transition-colors group">
+                      <td className="p-4 align-top">
+                        <span className="bg-blue-500/10 text-blue-400 px-3 py-1.5 rounded-lg text-[10px] font-bold tracking-wider uppercase border border-blue-500/20 shadow-inner">
+                          {p.category}
+                        </span>
+                      </td>
+                      <td className="p-4 align-top max-w-sm">
+                        <p className="text-slate-200 text-xs leading-relaxed mb-3 break-words font-medium">{p.prompt}</p>
+                        {p.title && <p className="text-blue-300 text-[11px] font-semibold border-r-2 border-blue-500/40 pr-3 opacity-90">📌 {p.title}</p>}
+                      </td>
+                      <td className="p-4 align-top max-w-xs">
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {(p.keywords || []).slice(0, 8).map((kw: string, i: number) => (
+                            <span key={i} className="text-[10px] font-medium text-slate-300 bg-white/[0.06] px-2 py-1 rounded-md border border-white/[0.12] hover:bg-white/[0.1] hover:text-white transition-colors cursor-default">
+                              {kw}
+                            </span>
+                          ))}
+                          {(p.keywords || []).length > 8 && (
+                            <span className="text-[10px] text-slate-500 px-1 py-1 font-semibold">+{p.keywords.length - 8} كلمات أخرى</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 align-middle text-center">
+                         <button
+                           onClick={() => copyTextSafely(p.prompt).then(ok => ok && toast.success("تم النسخ بنجاح!"))}
+                           className="text-slate-400 hover:text-white hover:bg-blue-500/20 hover:border-blue-500/40 border border-transparent p-2.5 rounded-xl transition-all shadow-sm group-hover:scale-105 active:scale-95"
+                           title="نسخ البرومبت"
+                         >
+                           📋
+                         </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+             </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
