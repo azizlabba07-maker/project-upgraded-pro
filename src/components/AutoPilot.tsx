@@ -12,11 +12,24 @@ interface AutoPilotStep {
   message?: string;
 }
 
+interface AutoPilotHistoryEntry {
+  id: string;
+  timestamp: string;
+  count: number;
+  results: any[];
+}
+
 export default function AutoPilot() {
   const { hasAnyKey } = useApp();
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<any[]>([]);
+  const [history, setHistory] = useState<AutoPilotHistoryEntry[]>(() => {
+    try {
+      const saved = localStorage.getItem("autopilot_history");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [steps, setSteps] = useState<AutoPilotStep[]>([
     { id: "oracle", label: "تحليل السوق عبر الأوراكل", status: "pending" },
     { id: "selection", label: "اختيار الفرص الذهبية", status: "pending" },
@@ -81,6 +94,20 @@ export default function AutoPilot() {
         setProgress(50 + ((i + 1) / goldItems.length) * 40);
       }
       setResults(allGeneratedPrompts);
+      
+      const newHistoryEntry: AutoPilotHistoryEntry = {
+        id: Date.now().toString(),
+        timestamp: new Date().toLocaleString("ar-EG", { dateStyle: "short", timeStyle: "short" }),
+        count: allGeneratedPrompts.length,
+        results: allGeneratedPrompts
+      };
+      
+      setHistory(prev => {
+        const updated = [newHistoryEntry, ...prev].slice(0, 5); // Keep only top 5
+        try { localStorage.setItem("autopilot_history", JSON.stringify(updated)); } catch {}
+        return updated;
+      });
+
       updateStep("generation", { status: "completed", message: `تم توليد ${allGeneratedPrompts.length} برومبت بنجاح.` });
 
       // Step 4: Export
@@ -225,6 +252,42 @@ export default function AutoPilot() {
           </p>
         </div>
       </div>
+
+      {/* History Memos */}
+      {history.length > 0 && (
+        <div className="mt-8 animate-fade-in border-t border-white/[0.05] pt-8">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-sm font-bold text-slate-300 flex items-center gap-2">
+              <span>🕰️</span> مذكرات الطيار الآلي (آخر {history.length} عمليات)
+            </h3>
+            <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-md font-semibold tracking-wide">
+              للحفاظ على نقاط الـ API
+            </span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+             {history.map((entry, idx) => (
+                <div 
+                  key={entry.id} 
+                  onClick={() => {
+                    setResults(entry.results);
+                    toast.success("تم استرجاع السجل بنجاح!");
+                  }}
+                  className="bg-white/[0.02] border border-white/[0.06] hover:border-blue-500/40 hover:bg-blue-500/10 hover:shadow-lg hover:shadow-blue-500/10 cursor-pointer rounded-2xl p-4 transition-all duration-300 group relative overflow-hidden"
+                >
+                  <div className="absolute -right-4 -top-4 w-16 h-16 bg-blue-500/10 rounded-full blur-xl group-hover:bg-blue-500/20 transition-all opacity-0 group-hover:opacity-100"></div>
+                  <div className="flex justify-between items-start mb-3 relative z-10">
+                    <span className="text-2xl group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-300 drop-shadow-md">📂</span>
+                    <span className="text-[9px] text-slate-400 font-mono bg-black/40 border border-white/[0.05] px-2 py-1 rounded-md shadow-inner">{entry.timestamp}</span>
+                  </div>
+                  <div className="relative z-10">
+                    <p className="text-[13px] text-white font-bold mb-1 group-hover:text-blue-300 transition-colors">مذكرة السجل</p>
+                    <p className="text-[10px] text-blue-400 font-semibold">{entry.count} فرصة جاهزة</p>
+                  </div>
+                </div>
+             ))}
+          </div>
+        </div>
+      )}
 
       {/* Results Display */}
       {results.length > 0 && (
