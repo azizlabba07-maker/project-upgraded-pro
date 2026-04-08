@@ -1,47 +1,69 @@
-// Local-first memory system to allow the prompt generator to evolve concepts daily
+// src/lib/promptMemory.ts
+import Cache from "./Cache";
 
-const MEMORY_KEY_PREFIX = "stock_prompt_memory_";
-const MAX_MEMORY_LIMIT = 50; // Increased limit for better long-term uniqueness
+const MEMORY_KEY_PREFIX = "prompt_memory_";
+const MEMORY_TTL = 72 * 60 * 60 * 1000; // 3 days
+const MAX_PER_CATEGORY = 30;
 
 export interface PromptMemoryEntry {
   category: string;
-  topic: string; // The specific subject or prompt snapshot
+  topic: string; 
   date: number;
 }
 
+/**
+ * Saves subjects to a category-specific memory pool in Cache.
+ */
 export function saveToPromptMemory(category: string, topics: string[]): void {
   try {
-    const key = `${MEMORY_KEY_PREFIX}${category}`;
-    const existingRaw = localStorage.getItem(key);
-    let memory: PromptMemoryEntry[] = existingRaw ? JSON.parse(existingRaw) : [];
-
+    const key = MEMORY_KEY_PREFIX + category;
+    const existing = Cache.get<PromptMemoryEntry[]>(key) || [];
     const now = Date.now();
-    topics.forEach((t) => {
-      // Don't save duplicates
-      if (!memory.find(m => m.topic === t)) {
-        memory.push({ category, topic: t, date: now });
-      }
-    });
 
-    memory = memory.sort((a, b) => b.date - a.date).slice(0, MAX_MEMORY_LIMIT);
-    localStorage.setItem(key, JSON.stringify(memory));
+    const newEntries: PromptMemoryEntry[] = topics.map(t => ({
+      category,
+      topic: t,
+      date: now
+    }));
+
+    // Combine, unique by topic, limit, and sort
+    const combined = [...newEntries, ...existing];
+    const unique = combined.filter((v, i, a) => a.findIndex(t => t.topic === v.topic) === i);
+    const result = unique.sort((a, b) => b.date - a.date).slice(0, MAX_PER_CATEGORY);
+
+    Cache.set(key, result, MEMORY_TTL);
   } catch (e) {
-    console.warn("Could not save to prompt memory", e);
+    console.warn("Could not save prompt memory:", e);
   }
 }
 
+/**
+ * Retrieves the memory pool for a specific category as a formatted string for AI.
+ */
 export function getPromptMemory(category: string): string {
   try {
-    const key = `${MEMORY_KEY_PREFIX}${category}`;
-    const existingRaw = localStorage.getItem(key);
-    if (!existingRaw) return "";
+    const key = MEMORY_KEY_PREFIX + category;
+    const memory = Cache.get<PromptMemoryEntry[]>(key) || [];
     
-    const memory: PromptMemoryEntry[] = JSON.parse(existingRaw);
     if (memory.length === 0) return "";
 
     const pastTopics = memory.map(m => m.topic).join(" | ");
-    return `CRITICAL MEMORY KNOWLEDGE (PAST GENERATIONS):\n[\n${pastTopics}\n]\n\nDO NOT repeat the exact subjects, specific compositions, or unique visual features listed above. Your goal is to EXCLUSIVELY invent NEW visual scenarios, lighting setups, or completely different sub-topics that have NOT been done recently in this category.`;
+    
+    return `
+RECOGNIZED PORTFOLIO MEMORY:
+The system has recently generated the following topics/compositions in the "${category}" category:
+[ ${pastTopics} ]
+
+INSTRUCTION: Ensure your new generations provide FRESH visual diversity. Iterate into unexplored niches or unique lighting/compositional styles not mentioned above.
+`;
   } catch (e) {
     return "";
   }
+}
+
+/**
+ * Total cleanup of memory for a category.
+ */
+export function clearPromptMemory(category: string): void {
+  Cache.set(MEMORY_KEY_PREFIX + category, [], 0);
 }

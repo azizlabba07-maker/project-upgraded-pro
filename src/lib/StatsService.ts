@@ -51,7 +51,18 @@ export function getTrendScore(item: MarketTrend): number {
 }
 
 /**
+ * Filter and return high-value market trends (Golden Opportunities).
+ * Trends are considered "Golden" if they have high demand and low competition.
+ */
+export function getGoldenTargets(trends: MarketTrend[]): MarketTrend[] {
+  return trends
+    .filter((t) => t.demand === "high" && t.competition === "low")
+    .sort((a, b) => getTrendScore(b) - getTrendScore(a));
+}
+
+/**
  * Produce a confidence interval for a given market item.
+
  * The interval is a simple +/- 5 % of the trend score, clamped to 0‑100.
  */
 export function getConfidenceInterval(item: MarketTrend): { low: number; high: number } {
@@ -136,6 +147,7 @@ export async function fetchMarketData(): Promise<MarketTrend[]> {
 export const StatsService = {
   fetchMarketData,
   getTrendScore,
+  getGoldenTargets,
   getConfidenceInterval,
   formatNumber,
 };
