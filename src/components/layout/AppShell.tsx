@@ -58,7 +58,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <header
         className={`fixed top-0 left-0 z-30 h-[56px] flex items-center justify-between px-5 bg-slate-950/80 backdrop-blur-xl border-b border-white/[0.06] transition-all duration-300 ${isMobile ? "right-0" : sidebarOpen ? "right-60" : "right-[68px]"}`}
       >
-      >
         <div className="flex items-center gap-3">
           {/* Search / Command Palette trigger */}
           <button
