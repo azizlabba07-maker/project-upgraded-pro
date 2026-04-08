@@ -1,4 +1,4 @@
-import { getUnifiedMarketOracle, MarketOracleItem } from "./gemini";
+import { StatsService } from "./StatsService";
 
 export interface SmartAlert {
   id: string;
@@ -42,30 +42,33 @@ class SmartAlertEngine {
 
   private async checkOpportunities() {
     try {
-      console.log("🔍 Smart Alert Engine checking for opportunities...");
-      const opportunities = await getUnifiedMarketOracle();
-      
-      // Filter for "Gold" opportunities (high probability, high demand, low competition)
-      const goldItems = opportunities.filter(
-        item => item.probability >= 85 && item.demand === "high" && item.competition === "low"
+      console.log("🔍 Smart Alert Engine checking for opportunities using StatsService...");
+      const data = await StatsService.fetchMarketData();
+
+      const goldItems = data.filter(item =>
+        item.demand === "high" &&
+        item.competition === "low" &&
+        StatsService.getTrendScore(item) >= 85
       );
 
       goldItems.forEach(item => {
+        const score = StatsService.getTrendScore(item);
         this.onAlertAdded({
           type: "gold",
           title: `فرصة ذهبية: ${item.topic}`,
-          message: `تم اكتشاف نيش عالي الربحية! ${item.strategy}. نسبة النجاح المتوقعة: ${item.probability}%`,
+          message: `تم اكتشاف نيش عالي الربحية! درجة الاتجاه: ${score}%`,
         });
       });
 
-      // Check for trending "Now" items
-      const nowItems = opportunities.filter(item => item.timeframe === "now" && item.probability >= 70);
+      // Trending items: any with trend score >=70
+      const nowItems = data.filter(item => StatsService.getTrendScore(item) >= 70);
       if (nowItems.length > 0) {
         const topNow = nowItems[0];
+        const score = StatsService.getTrendScore(topNow);
         this.onAlertAdded({
           type: "trend",
           title: `تريند عاجل: ${topNow.topic}`,
-          message: `هذا النيش يتصدر البحث الآن. ابدأ بالرفع فوراً لضمان أفضل ترتيب.`,
+          message: `هذا النيش يتصدر البحث الآن. درجة الاتجاه: ${score}%`,
         });
       }
 

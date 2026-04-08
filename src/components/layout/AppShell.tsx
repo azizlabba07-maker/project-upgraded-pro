@@ -51,12 +51,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const sidebarWidth = isMobile ? "" : sidebarOpen ? "pr-60" : "pr-[68px]";
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="min-h-screen bg-background text-foreground">
       <Sidebar />
 
       {/* Header */}
       <header
         className={`fixed top-0 left-0 z-30 h-[56px] flex items-center justify-between px-5 bg-slate-950/80 backdrop-blur-xl border-b border-white/[0.06] transition-all duration-300 ${isMobile ? "right-0" : sidebarOpen ? "right-60" : "right-[68px]"}`}
+      >
       >
         <div className="flex items-center gap-3">
           {/* Search / Command Palette trigger */}

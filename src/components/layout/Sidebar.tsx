@@ -1,5 +1,6 @@
 import { useApp, type ActivePage } from "@/contexts/AppContext";
 import { useEffect, useState } from "react";
+import { useTheme } from "@/lib/ThemeContext";
 
 interface NavItem {
   id: ActivePage;
@@ -40,6 +41,7 @@ const sections = [
 export default function Sidebar() {
   const { activePage, setActivePage, sidebarOpen, setSidebarOpen, goldOpportunityCount, unreadAlertCount } = useApp();
   const [isMobile, setIsMobile] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -159,7 +161,7 @@ export default function Sidebar() {
         </nav>
 
         {/* Bottom status */}
-        <div className="px-3 py-3 border-t border-white/[0.06] shrink-0">
+        <div className="px-3 py-3 border-t border-white/[0.06] shrink-0 flex items-center justify-between">
           {sidebarOpen ? (
             <div className="flex items-center gap-2 text-[10px] text-slate-500">
               <div className="flex gap-1.5">
@@ -175,6 +177,10 @@ export default function Sidebar() {
               <span className={`w-2 h-2 rounded-full ${localStorage.getItem("gemini_api_key") ? "bg-emerald-500" : "bg-slate-700"}`} />
             </div>
           )}
+          {/* Theme toggle button */}
+          <button onClick={toggleTheme} className="flex items-center gap-1 text-sm text-slate-400 hover:text-white">
+            {theme === 'dark' ? '🌙' : '☀️'}
+          </button>
         </div>
       </aside>
     </>
