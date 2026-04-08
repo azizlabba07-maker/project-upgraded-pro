@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import OneClickOpportunity from "@/components/OneClickOpportunity";
 import { createSourcePulse, pulseLocalTrends, fetchMarketPulseFromBackend } from "@/lib/livePulse";
 import { StatsService } from "@/lib/StatsService";
+import { formatNumber } from "@/lib/shared";
 
 function DemandBadge({ demand }: { demand: string }) {
   const config = {
@@ -264,7 +265,7 @@ export default function MarketAnalysis() {
                       }`} title={`Demand: ${item.demand} | Competition: ${item.competition} | Profitability: ${item.profitability}% | Searches: ${item.searches}`}>
                         {score}/100 {scoreLabel(score)}
                       </span>
-                      <span className="text-[9px] text-secondary font-mono">طلب: {item.demand} • منافسة: {item.competition} • بحث: {item.searches.toLocaleString()}</span>
+                      <span className="text-[9px] text-secondary font-mono">طلب: {item.demand} • منافسة: {item.competition} • بحث: {formatNumber(item.searches)}</span>
                     </div>
                   </td>
                   <td className="p-2.5">

@@ -111,10 +111,11 @@ export function setStorageJSON(key: string, value: any): void {
 }
 
 // ── Number formatting ──
-export function formatNumber(n: number): string {
+export function formatNumber(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "0";
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
   if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return n.toLocaleString();
+  return n.toLocaleString("ar-EG");
 }
 
 // ── Season helper ──

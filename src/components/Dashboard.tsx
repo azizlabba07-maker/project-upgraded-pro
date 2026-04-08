@@ -6,6 +6,7 @@ import { generateAITrends, hasAnyApiKey, getUnifiedMarketOracle, type MarketOrac
 import { clearAllCache } from "@/lib/sanitizer";
 import { toast } from "sonner";
 import { calcSuccessRate, getTodayAiMetrics } from "@/lib/aiMetrics";
+import { formatNumber } from "@/lib/shared";
 import DailyFeed from "@/components/DailyFeed";
 import OneClickOpportunity from "@/components/OneClickOpportunity";
 import {
@@ -467,7 +468,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <button 
-                      onClick={() => setSelectedTrendForGeneration({ topic: item.topic, category: item.category, demand: item.demand, competition: item.competition, profitability: item.probability, searches: 0 })}
+                      onClick={() => setSelectedTrendForGeneration({ topic: item.topic, category: item.category, demand: item.demand as any, competition: item.competition as any, profitability: item.probability, searches: 0 })}
                       className="bg-primary/10 border border-primary/40 text-primary px-3 py-1.5 rounded text-[10px] font-bold hover:bg-primary/20 transition-all box-glow font-mono uppercase"
                     >
                       الاقتناص
@@ -499,7 +500,7 @@ export default function Dashboard() {
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {isGold && <span className="text-[9px] bg-accent/20 text-accent px-1 rounded font-bold">GOLD</span>}
-                      <span className="text-primary font-bold">{item.searches.toLocaleString()}</span>
+                      <span className="text-primary font-bold">{formatNumber(item.searches)}</span>
                     </div>
                   </div>
                   <div className="h-0.5 bg-primary/5 rounded-full overflow-hidden">
@@ -637,8 +638,6 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
-
-      {/* AI performance pulse and Quick Links section remains the same or refined */}
       </div>
     </div>
   );
