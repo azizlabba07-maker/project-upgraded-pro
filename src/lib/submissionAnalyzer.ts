@@ -100,8 +100,19 @@ export async function analyzeBeforeSubmission(
     const trend = trendScore * 0.15;
     const metadata = metadataScore * 0.1;
 
-    const overallAcceptanceProbability = Math.round(
-      similarities + ipSafety + quality + trend + metadata
+    // 6. Title & Keyword Strength (New factors for better variation)
+    const titleStrength = analyzeTitleStrength(data.title);
+    const keywordDiversity = (new Set(data.keywords)).size / Math.max(data.keywords.length, 1) * 10;
+    
+    const baseProbability = 
+      similarities + ipSafety + quality + trend + metadata + titleStrength + (keywordDiversity * 0.5);
+
+    // 7. Deterministic Jitter (ensure unique titles get slightly unique scores even with same metrics)
+    const jitter = calculateJitter(data.title + (data.concept || ""));
+    
+    const overallAcceptanceProbability = Math.min(
+      99, 
+      Math.max(1, Math.round(baseProbability + jitter))
     );
 
     // Determine risk level
@@ -435,6 +446,41 @@ function estimateApprovalTime(probability: number): string {
   if (probability > 40) return "5-10 أيام";
   if (probability > 20) return "10-30 يوم";
   return "قد يكون الرفض محتملاً";
+}
+
+/**
+ * موازنة نهائية لضمان عدم تطابق الأرقام عشوائياً
+ */
+function calculateJitter(seed: string): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  // Return a stable float between -1.5 and 1.5
+  return (Math.abs(hash % 30) - 15) / 10;
+}
+
+/**
+ * تحليل قوة العنوان تسويقياً وتقنياً
+ */
+function analyzeTitleStrength(title: string): number {
+  if (!title) return 0;
+  const words = title.trim().split(/\s+/).length;
+  const chars = title.length;
+  
+  let score = 0;
+  if (words >= 3 && words <= 12) score += 5;
+  if (chars >= 20 && chars <= 70) score += 3;
+  
+  // Bonus for descriptive words
+  const descriptiveWords = ["cinematic", "aerial", "macro", "ultra", "professional", "stunning", "detailed"];
+  descriptiveWords.forEach(w => {
+    if (title.toLowerCase().includes(w)) score += 1;
+  });
+
+  return Math.min(score, 10);
 }
 
 function getDefaultAnalysis(): SubmissionAnalysis {

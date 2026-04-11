@@ -302,10 +302,31 @@ function calculateTrendRisk(keywords: string[], concept: string): number {
 }
 
 function stringSimilarity(str1: string, str2: string): number {
-  const s1 = str1.split(" ");
-  const s2 = str2.split(" ");
-  const matches = s1.filter((word) => s2.some((w) => w === word)).length;
-  return matches / Math.max(s1.length, s2.length);
+  if (!str1 || !str2) return 0;
+  const s1 = str1.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  const s2 = str2.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  
+  if (s1.length === 0 || s2.length === 0) return 0;
+
+  // 1. Intersection over Union (Jaccard)
+  const set1 = new Set(s1);
+  const set2 = new Set(s2);
+  const intersection = new Set([...set1].filter(x => set2.has(x)));
+  const union = new Set([...set1, ...set2]);
+  const jaccard = intersection.size / union.size;
+
+  // 2. Continuous Word Match (Word Order)
+  let continuousMatches = 0;
+  for (let i = 0; i < s1.length - 1; i++) {
+    const bigram = s1[i] + " " + s1[i+1];
+    if (str2.toLowerCase().includes(bigram)) {
+      continuousMatches += 1;
+    }
+  }
+  const orderFactor = continuousMatches / Math.max(s1.length - 1, 1);
+
+  // Combine factors
+  return (jaccard * 0.7) + (orderFactor * 0.3);
 }
 
 async function generateUniqueRecommendations(
