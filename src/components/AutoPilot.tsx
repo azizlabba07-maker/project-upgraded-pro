@@ -4,6 +4,7 @@ import { getUnifiedMarketOracle, MarketOracleItem } from "@/lib/gemini";
 import { dispatchPromptGeneration } from "@/lib/aiDispatcher";
 import { exportCsvFile, copyTextSafely } from "@/lib/shared";
 import { toast } from "sonner";
+import { detectBatchSimilarity, SimilarityWarning } from "@/lib/sanitizer";
 
 interface AutoPilotStep {
   id: string;
@@ -24,6 +25,7 @@ export default function AutoPilot() {
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<any[]>([]);
+  const [similarityWarnings, setSimilarityWarnings] = useState<SimilarityWarning[]>([]);
   const [history, setHistory] = useState<AutoPilotHistoryEntry[]>(() => {
     try {
       const saved = localStorage.getItem("autopilot_history");
@@ -93,6 +95,22 @@ export default function AutoPilot() {
         allGeneratedPrompts.push(...result.prompts);
         setProgress(50 + ((i + 1) / goldItems.length) * 40);
       }
+
+      // Step 3.5: Similarity Check
+      const warnings = detectBatchSimilarity(
+        allGeneratedPrompts.map((p, i) => ({
+           filename: `Asset-${i+1}`,
+           title: p.title || "",
+           keywords: p.keywords || []
+        })),
+        45 // Lower threshold for "Auto-Pilot" to be extra safe
+      );
+      setSimilarityWarnings(warnings);
+      
+      if (warnings.length > 0) {
+        toast.warning(`تم اكتشاف تشابه في ${warnings.length} أزواج من النتائج. يرجى المراجعة.`);
+      }
+
       setResults(allGeneratedPrompts);
       
       const newHistoryEntry: AutoPilotHistoryEntry = {
@@ -368,6 +386,41 @@ export default function AutoPilot() {
                 </tbody>
              </table>
           </div>
+        </div>
+      )}
+
+      {/* Similarity Warnings Display */}
+      {similarityWarnings.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-6 mt-6 animate-fade-in shadow-xl">
+          <h3 className="text-amber-400 font-bold mb-4 flex items-center gap-2">
+            ⚠️ تحذير: تم اكتشاف محتوى متشابه جداً ({similarityWarnings.length} تنبيهات)
+          </h3>
+          <p className="text-xs text-amber-300/70 mb-4">
+            Adobe Stock قد يرفض هذه المجموعة إذا تم رفعها معاً بسبب "التشابه الكبير". ننصح بتعديل العناوين أو الكلمات المفتاحية للعناصر التالية:
+          </p>
+          <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+            {similarityWarnings.map((w, idx) => (
+              <div key={idx} className="bg-black/20 p-3 rounded-xl border border-amber-500/10 text-[11px] flex justify-between items-center">
+                <span className="text-slate-300">
+                  <span className="text-white font-bold">{results[w.indexA]?.title || `عنصر ${w.indexA+1}`}</span>
+                  {" ↔️ "}
+                  <span className="text-white font-bold">{results[w.indexB]?.title || `عنصر ${w.indexB+1}`}</span>
+                </span>
+                <span className="text-amber-500 font-mono bg-amber-500/5 px-2 py-0.5 rounded border border-amber-500/20">
+                  نسبة التشابه: {w.similarity}%
+                </span>
+              </div>
+            ))}
+          </div>
+          <button 
+            onClick={() => {
+               setSimilarityWarnings([]);
+               toast.info("تم تجاهل التحذير. يمكنك التحميل الآن.");
+            }}
+            className="mt-4 text-[10px] text-amber-400/50 hover:text-amber-400 transition-colors"
+          >
+            تجاهل التحذير (غير مستحسن)
+          </button>
         </div>
       )}
     </div>

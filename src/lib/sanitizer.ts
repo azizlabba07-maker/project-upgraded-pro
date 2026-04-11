@@ -1,52 +1,316 @@
-// src/lib/sanitizer.ts
+import { GLOBAL_IP_BLACKLIST } from "./adobeStockCompliance";
 
 /**
- * 1. ADOBE STOCK COMPLIANCE SANITIZER
- * This prevents the user's account from being banned due to AI hallucinations
- * that include copyrighted material, artist names, or forbidden platform words.
+ * Smart Swap Map: Maps high-risk brand names to safe generic synonyms.
  */
+const SMART_SWAP_MAP: Record<string, string> = {
+  "apple": "generic tech",
+  "iphone": "premium smartphone",
+  "ipad": "tablet",
+  "macbook": "laptop",
+  "imac": "desktop computer",
+  "airpods": "wireless earbuds",
+  "samsung": "electronics brand",
+  "galaxy": "mobile device",
+  "microsoft": "software company",
+  "windows": "operating system",
+  "xbox": "gaming console",
+  "google": "search engine company",
+  "pixel": "android phone",
+  "tesla": "electric vehicle",
+  "bmw": "luxury sedan",
+  "mercedes": "premium car",
+  "audi": "modern vehicle",
+  "ferrari": "sports car",
+  "lamborghini": "supercar",
+  "nike": "athletic footwear",
+  "adidas": "sportswear",
+  "gucci": "luxury fashion",
+  "louis vuitton": "designer bag",
+  "rolex": "high-end watch",
+  "coca-cola": "cola beverage",
+  "pepsi": "soda drink",
+  "mcdonalds": "fast food chain",
+  "starbucks": "coffeehouse",
+  "heinz": "tomato ketchup",
+  "tabasco": "pepper sauce",
+  "maggi": "instant seasoning",
+  "knorr": "bouillon",
+  "kfc": "fried chicken",
+  "subway": "sandwich shop",
+  "lego": "building blocks",
+  "barbie": "fashion doll",
+  "moka pot": "stovetop espresso maker",
+  "kleenex": "facial tissue",
+  "velcro": "hook and loop fastener",
+  "ziploc": "plastic storage bag",
+  "tupperware": "food container"
+};
+
+
+/**
+ * 1. ADOBE STOCK COMPLIANCE SANITIZER — HARDENED v2
+ * =================================================
+ * Prevents account ban due to AI hallucinations that include:
+ *  - Copyrighted material & trademarks (IP Refusal)
+ *  - Artist names, fictional characters
+ *  - AI platform names
+ *  - Food brands & product packaging references (NEW — primary rejection cause)
+ *  - Promotional/spam keywords Adobe blacklists
+ */
+
 const ADOBE_STOCK_BLACKLIST = [
-  // Brands and Companies
-  "nike", "adidas", "apple", "microsoft", "google", "disney", "marvel", "dc comics", "star wars",
-  "coca-cola", "pepsi", "mcdonalds", "burger king", "starbucks", "tesla", "ferrari", "porsche",
-  "bmw", "mercedes", "audi", "lamborghini", "rolex", "gucci", "louis vuitton", "prada", "chanel",
-  "amazon", "facebook", "instagram", "twitter", "tiktok", "netflix", "youtube", "sony", "nintendo",
-  "playstation", "xbox", "ikea", "lego", "mattel", "barbie", "hasbro", "hot wheels", "nerf",
-  
-  // Specific restricted IPs
-  "mickey mouse", "donald duck", "batman", "superman", "spiderman", "iron man", "avengers",
-  "darth vader", "yoda", "harry potter", "hogwarts", "pokemon", "pikachu", "minions",
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Major Brands & Tech Companies
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  "nike", "adidas", "puma", "reebok", "under armour",
+  "apple", "iphone", "ipad", "macbook", "imac", "airpods",
+  "microsoft", "windows", "xbox", "surface",
+  "google", "android", "pixel", "chromebook",
+  "samsung", "galaxy",
+  "disney", "marvel", "dc comics", "star wars", "pixar",
+  "coca-cola", "pepsi", "mcdonalds", "burger king", "starbucks",
+  "tesla", "spacex", "ferrari", "porsche", "lamborghini",
+  "bmw", "mercedes", "audi", "bentley", "rolls royce", "maserati",
+  "rolex", "omega", "cartier", "gucci", "louis vuitton", "prada", "chanel",
+  "hermes", "versace", "dior", "balenciaga", "yves saint laurent",
+  "amazon", "facebook", "meta", "instagram", "whatsapp", "twitter", "tiktok",
+  "netflix", "youtube", "hulu", "spotify", "twitch",
+  "sony", "playstation", "nintendo", "switch",
+  "ikea", "lego", "mattel", "barbie", "hasbro", "hot wheels", "nerf",
+  "hp", "dell", "lenovo", "asus", "acer",
 
-  // Artists / Styles (To avoid "in the style of [Artist]")
-  "picasso", "van gogh", "da vinci", "monet", "rembrandt", "salvador dali", "andy warhol",
-  "banksy", "greg rutkowski", "artgerm", "alphonse mucha", "stanley artgerm", "james gurney",
-  "thomas kinkade", "bob ross", "wlop", "ilya kuvshinov", "makoto shinkai", "hayao miyazaki",
-  "studio ghibli", "disney style", "pixar style", "marvel style", "comic book style", 
-  "in the style of", "inspired by", "by artist",
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Fictional Characters & IP
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  "mickey mouse", "donald duck", "goofy", "winnie the pooh",
+  "batman", "superman", "spiderman", "spider-man", "iron man", "avengers",
+  "captain america", "thor marvel", "hulk marvel", "black panther",
+  "wonder woman", "aquaman", "flash dc",
+  "darth vader", "yoda", "luke skywalker", "chewbacca", "r2d2",
+  "harry potter", "hogwarts", "dumbledore", "voldemort",
+  "pokemon", "pikachu", "charizard",
+  "mario bros", "sonic hedgehog", "zelda", "link nintendo",
+  "minions", "shrek", "elsa frozen", "buzz lightyear",
+  "transformers", "optimus prime",
+  "spongebob", "patrick star",
+  "hello kitty", "totoro",
 
-  // AI Generators (Adobe forbids tagging images as Midjourney, etc.)
-  "midjourney", "dall-e", "dalle", "stable diffusion", "ai generated", "chatgpt", "openai", "gemini", "claude",
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Artists / Styles (Prevents "in the style of [Artist]")
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  "picasso", "van gogh", "da vinci", "monet", "rembrandt", "salvador dali",
+  "andy warhol", "banksy", "frida kahlo", "kandinsky", "klimt",
+  "greg rutkowski", "artgerm", "alphonse mucha", "stanley artgerm",
+  "james gurney", "thomas kinkade", "bob ross", "wlop",
+  "ilya kuvshinov", "makoto shinkai", "hayao miyazaki",
+  "studio ghibli", "disney style", "pixar style", "marvel style",
+  "dreamworks style", "comic book style",
+  "in the style of", "inspired by", "by artist", "style of",
+  "reminiscent of", "homage to", "tribute to",
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // AI Generators (Adobe forbids tagging as AI platform output)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  "midjourney", "dall-e", "dalle", "dall e",
+  "stable diffusion", "stability ai",
+  "ai generated", "ai-generated", "made with ai", "created by ai",
+  "chatgpt", "openai", "gemini ai", "claude ai",
+  "firefly", "adobe firefly",
+  "leonardo ai", "ideogram", "runway ml",
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Adobe-Banned Promotional Language
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  "best quality", "masterpiece", "award winning", "exclusive",
+  "must see", "top rated", "number one", "world's best",
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Famous Landmarks (IP for recognizable buildings/places)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  "eiffel tower", "statue of liberty", "big ben", "sydney opera house",
+  "taj mahal", "colosseum rome", "christ the redeemer",
+  "burj khalifa", "empire state building", "golden gate bridge",
+  "hollywood sign", "times square",
+
+  // Merge in the GLOBAL_IP_BLACKLIST from compliance module
+  ...GLOBAL_IP_BLACKLIST,
 ];
 
+/**
+ * Sanitize a single text string (prompt, title, or keyword) by removing all blacklisted terms.
+ */
 export function sanitizePromptOrKeywords(text: string): string {
   if (!text) return "";
   let sanitized = text;
   
-  // Replace blacklisted words case-insensitively
+  // Replace blacklisted words case-insensitively with Smart Swap or Generic term
   for (const word of ADOBE_STOCK_BLACKLIST) {
-    const regex = new RegExp(`\\b${word}\\b`, 'gi');
-    sanitized = sanitized.replace(regex, "[Redacted-IP]");
+    const lowerWord = word.toLowerCase();
+    const replacement = SMART_SWAP_MAP[lowerWord] || "generic term";
+    
+    // Escape regex special characters in the word
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`\\b${escaped}\\b`, 'gi');
+    
+    if (regex.test(sanitized)) {
+        sanitized = sanitized.replace(regex, replacement);
+    }
+  }
+
+  // Also strip packaging-related visual cues from prompts
+  const packagingPatterns = [
+    /\b(branded|brand\s*name|product\s*label|logo\s*on)\b/gi,
+    /\b(trademark|registered|©|®|™)\b/gi,
+    /\b(bottle\s*with\s*label|labeled\s*(container|bottle|jar|can))\b/gi,
+  ];
+  for (const pattern of packagingPatterns) {
+    sanitized = sanitized.replace(pattern, "[Redacted-IP]");
   }
 
   return sanitized;
 }
 
+/**
+ * Sanitize an array of strings (keywords), removing any that contain blacklisted content.
+ */
 export function sanitizeStringArray(arr: string[]): string[] {
   if (!Array.isArray(arr)) return [];
   // Also filter out any keywords that BECAME entirely "[Redacted-IP]"
   return arr
     .map(kw => sanitizePromptOrKeywords(kw))
     .filter(kw => kw.trim().length > 0 && !kw.includes("[Redacted-IP]"));
+}
+
+/**
+ * 1.5 BATCH SIMILARITY DETECTOR — NEW
+ * =====================================
+ * Prevents "SIMILAR CONTENT IN OUR COLLECTION" rejection.
+ * Compares titles and keywords across a batch to detect near-duplicates
+ * BEFORE upload, alerting the user to remove highly similar assets.
+ */
+
+export interface SimilarityWarning {
+  indexA: number;
+  indexB: number;
+  filenameA: string;
+  filenameB: string;
+  similarity: number; // 0 to 100
+  reason: string;
+}
+
+/**
+ * Compute Jaccard similarity between two keyword sets (0-100).
+ */
+function keywordSimilarity(kwA: string[], kwB: string[]): number {
+  if (kwA.length === 0 && kwB.length === 0) return 100;
+  if (kwA.length === 0 || kwB.length === 0) return 0;
+  const setA = new Set(kwA.map(k => k.toLowerCase().trim()));
+  const setB = new Set(kwB.map(k => k.toLowerCase().trim()));
+  let intersection = 0;
+  for (const k of setA) {
+    if (setB.has(k)) intersection++;
+  }
+  const union = new Set([...setA, ...setB]).size;
+  return Math.round((intersection / union) * 100);
+}
+
+/**
+ * Simple word-overlap similarity between two titles (0-100).
+ */
+function titleSimilarity(titleA: string, titleB: string): number {
+  const wordsA = new Set(titleA.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+  const wordsB = new Set(titleB.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+  if (wordsA.size === 0 && wordsB.size === 0) return 100;
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+  let intersection = 0;
+  for (const w of wordsA) {
+    if (wordsB.has(w)) intersection++;
+  }
+  const union = new Set([...wordsA, ...wordsB]).size;
+  return Math.round((intersection / union) * 100);
+}
+
+/**
+ * Detect pairs of items in a batch that are too similar.
+ * Returns warnings for any pair with combined similarity > threshold.
+ */
+export function detectBatchSimilarity(
+  items: Array<{ filename: string; title: string; keywords: string[] }>,
+  threshold: number = 60
+): SimilarityWarning[] {
+  const warnings: SimilarityWarning[] = [];
+
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const kwSim = keywordSimilarity(items[i].keywords, items[j].keywords);
+      const ttSim = titleSimilarity(items[i].title, items[j].title);
+      // Weighted average: keywords matter more than title
+      const combined = Math.round(kwSim * 0.7 + ttSim * 0.3);
+
+      if (combined >= threshold) {
+        const reasons: string[] = [];
+        if (kwSim >= 70) reasons.push(`تشابه كلمات مفتاحية: ${kwSim}%`);
+        if (ttSim >= 60) reasons.push(`تشابه عنوان: ${ttSim}%`);
+        if (reasons.length === 0) reasons.push(`تشابه عام: ${combined}%`);
+
+        warnings.push({
+          indexA: i,
+          indexB: j,
+          filenameA: items[i].filename,
+          filenameB: items[j].filename,
+          similarity: combined,
+          reason: reasons.join(" | "),
+        });
+      }
+    }
+  }
+
+  // Sort by highest similarity first
+  warnings.sort((a, b) => b.similarity - a.similarity);
+  return warnings;
+}
+
+/**
+ * IP RISK SCANNER — Checks title and keywords for potential IP violations
+ * Returns a list of flagged terms that could cause INTELLECTUAL PROPERTY REFUSAL
+ */
+export interface IPRiskFlag {
+  term: string;
+  severity: "critical" | "warning";
+  suggestion: string;
+}
+
+export function scanForIPRisks(title: string, keywords: string[]): IPRiskFlag[] {
+  const flags: IPRiskFlag[] = [];
+  const combined = (title + " " + keywords.join(" ")).toLowerCase();
+
+  // Check against all blacklisted terms
+  for (const word of ADOBE_STOCK_BLACKLIST) {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+    if (regex.test(combined)) {
+      flags.push({
+        term: word,
+        severity: "critical",
+        suggestion: `أزل "${word}" — قد يسبب رفض IP فوري`,
+      });
+    }
+  }
+
+  // Check for packaging/label language patterns
+  const packagingPhrases = [
+    { pattern: /\b(dip|dips|sauce|condiment)\s+(brand|variety|type)\b/i, msg: "أوصاف تقترح منتج تجاري بعينه" },
+    { pattern: /\b(labeled|branded|name\s*brand)\b/i, msg: "إشارة لمنتج يحمل علامة تجارية" },
+    { pattern: /\b(recipe|homemade|artisan)\s+(style|version)\s+of\b/i, msg: "قد يشير لمنتج تجاري محدد" },
+  ];
+  for (const { pattern, msg } of packagingPhrases) {
+    if (pattern.test(combined)) {
+      flags.push({ term: pattern.source, severity: "warning", suggestion: msg });
+    }
+  }
+
+  return flags;
 }
 
 

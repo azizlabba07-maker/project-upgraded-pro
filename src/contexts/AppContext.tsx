@@ -17,6 +17,8 @@ export type ActivePage =
   | "battle"
   | "batch"
   | "niche"
+  | "validator"
+  | "validator-batch"
   | "settings"
   | "autopilot";
 

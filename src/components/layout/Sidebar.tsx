@@ -24,6 +24,8 @@ const navItems: NavItem[] = [
   { id: "autopilot",   label: "الطيار الآلي",    icon: "🚀", section: "ai" },
 
   { id: "tools",       label: "أدوات",           icon: "🛠️", section: "tools" },
+  { id: "validator",   label: "محقق المحتوى",   icon: "✅", badge: "alerts", section: "tools" },
+  { id: "validator-batch", label: "معالج الملفات", icon: "📁", section: "tools" },
   { id: "store",       label: "محلل المتجر",     icon: "🔍", section: "tools" },
   { id: "portfolio",   label: "المحفظة",         icon: "💼", section: "tools" },
   { id: "inspiration", label: "إلهام",           icon: "💡", section: "tools" },

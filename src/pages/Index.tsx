@@ -11,6 +11,8 @@ const OpportunityEngine = lazy(() => import("@/components/OpportunityEngine"));
 const UnifiedPromptHub = lazy(() => import("@/components/UnifiedPromptHub"));
 const Dashboard = lazy(() => import("@/components/Dashboard"));
 const ToolsSection = lazy(() => import("@/components/ToolsSection"));
+const ContentValidator = lazy(() => import("@/components/ContentValidator"));
+const ContentValidatorBatch = lazy(() => import("@/components/ContentValidatorBatch"));
 const StoreAnalyzer = lazy(() => import("@/components/StoreAnalyzer"));
 const PortfolioTracker = lazy(() => import("@/components/PortfolioTracker"));
 const InspirationLab = lazy(() => import("@/components/InspirationLab"));
@@ -37,6 +39,8 @@ function PageContent() {
     case "generator":   return <UnifiedPromptHub />;
     case "dashboard":   return <Dashboard />;
     case "tools":       return <ToolsSection />;
+    case "validator":   return <ContentValidator />;
+    case "validator-batch": return <ContentValidatorBatch />;
     case "store":       return <StoreAnalyzer />;
     case "portfolio":   return <PortfolioTracker />;
     case "inspiration": return <InspirationLab />;

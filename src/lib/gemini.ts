@@ -507,9 +507,6 @@ export async function generateGeminiStockPrompts(
     ? `USER TITLE/TOPIC TO FOLLOW STRICTLY: "${topicHint.trim()}". Every prompt must stay aligned with this title and category.`
     : "";
 
-  const randomStyles = ["Cinematic", "Documentary", "Editorial", "Ultra-modern", "Moody/Dramatic", "Bright/Airy", "Cyberpunk/Neon", "Minimalist", "High-contrast", "Vintage/Retro"];
-  const forcedStyle = randomStyles[Math.floor(Math.random() * randomStyles.length)];
-  const forcedCamera = ["Drone/Aerial", "Macro/Close-up", "Wide-angle", "Eye-level tracking", "Low angle dynamic"][Math.floor(Math.random() * 5)];
 
   const prompt = `You are an expert Adobe Stock prompt engineer. Generate exactly ${count} prompts.
 
@@ -517,7 +514,7 @@ ${strictRules}
 
 REQUIRED CATEGORY: "${category}" — EVERY prompt MUST be about this topic ONLY.
 
-UNIQUENESS SEED: ${seed} | MANDATORY STYLE INFLUENCE: "${forcedStyle}" | MANDATORY CAMERA INFLUENCE: "${forcedCamera}"
+UNIQUENESS SEED: ${seed}
 OUTPUT TYPE: ${typeReq}
 COMPETITION: ${compReq}
 ${trendsStr}
@@ -526,18 +523,17 @@ ${generationHistory ? `\nCRITICAL MEMORY KNOWLEDGE:\n${generationHistory}\n` : "
 
 CRITICAL DIVERSITY INSTRUCTION:
 Even though you are strictly following the assigned topic, YOU MUST MAKE EVERY SINGLE PROMPT COMPLETELY UNIQUE.
-Change the lighting totally (e.g., from bright sunlight to dark moody). Change the composition. Change the camera lens (e.g., macro vs wide-angle).
-If you see the CRITICAL MEMORY KNOWLEDGE above, you MUST NOT repeat those scenarios. Invent new ones.
+1. FOR EACH PROMPT in the array, you MUST pick a DIFFERENT visual style (e.g., Cinematic, Documentary, Editorial, Minimalist, Cyberpunk, Moody).
+2. FOR EACH PROMPT, you MUST pick a DIFFERENT camera setup (e.g., Drone Aerial, Macro Close-up, Wide-angle, 50mm Eye-level, Low-angle dynamic).
+3. Change the lighting totally for each (e.g., bright sunlight, golden hour, neon interior, stark studio, misty dawn).
+4. If you see the CRITICAL MEMORY KNOWLEDGE above, you MUST NOT repeat those scenarios. Invent new ones.
 
 ULTRA CRITICAL RULE:
 I asked for EXACTLY ${count} prompts. YOU MUST RETURN A JSON ARRAY OF EXACTLY ${count} OBJECTS.
-PRIORITY RULE: Fulfilling the exact count of ${count} is MORE IMPORTANT than the memory constraints. If you cannot think of ${count} unique ideas without repeating history, YOU MAY REPEAT HISTORY. But NEVER return fewer than ${count} prompts.
-
-1. Change the camera angles (extreme close-up, wide shot, aerial, low angle).
-2. Change the lighting setups (cinematic, warm golden hour, moody neon, stark studio lighting).
-3. Change the specific subject matter and setting details for each of the ${count} prompts.
+Each object in the array MUST be radically different in composition and style from the others.
+DO NOT reuse the same camera angle or style for more than one prompt in this batch.
 NO TWO PROMPTS CAN BE IDENTICAL OR TOO SIMILAR. YOU MUST INVENT DIFFERENT VISUAL STORIES FOR EVERY PROMPT.
-WARNING: YOU MUST RETURN EXACTLY ${count} PROMPTS. DO NOT RETURN 1 PROMPT IF ${count} ARE REQUESTED. I WILL FAIL YOUR TASK IF THE ARRAY LENGTH IS NOT EXACTLY ${count}.
+WARNING: YOU MUST RETURN EXACTLY ${count} PROMPTS. DO NOT RETURN 1 PROMPT IF ${count} ARE REQUESTED.
 
 ${ADOBE_AI_PROMPT_RULES}
 
@@ -658,6 +654,23 @@ ${notePrompt}
   });
 }
 
+import { scanForIPRisks, type IPRiskFlag, extractAndParseJSON, withCache, sanitizePromptOrKeywords, sanitizeStringArray } from "@/lib/sanitizer";
+
+export interface ImageAnalysisResult {
+  filename: string;
+  title: string;
+  keywords: string[];
+  prompt: string;        // The new AI generated text-to-image prompt
+  colorPalette: string;  // The suggested trending colors
+  compliance?: ComplianceResult; // النتيجة الخاصة بفحص الجودة والامتثال
+  deformationScore?: number; // 0 (flawless) to 100 (highly deformed)
+  estimatedAcceptance?: number; // 0 to 100% acceptance probability
+  uniquenessReview?: string; // Assessment of similarity to existing Adobe Stock items
+  ipRisks?: IPRiskFlag[]; // Flagged IP violations
+}
+
+// ... (keep search/other functions)
+
 export interface ComplianceResult {
   score: number; // 0 to 100
   status: "safe" | "warning" | "danger";
@@ -666,40 +679,27 @@ export interface ComplianceResult {
 
 /**
  * فحص امتثال العناوين والكلمات المفتاحية لمعايير Adobe Stock
+ * تم تحديثه ليدمج فحص الملكية الفكرية المتقدم
  */
 export function checkAdobeCompliance(title: string, keywords: string[]): ComplianceResult {
   const issues: string[] = [];
   let score = 100;
 
-  // قائمة العلامات التجارية المشهورة التي تسبب الرفض المباشر
-  const bannedTrademarks = [
-    "apple", "iphone", "ipad", "macbook", "nike", "adidas", "coca-cola", "pepsi", 
-    "google", "facebook", "instagram", "meta", "whatsapp", "twitter", "microsoft", 
-    "windows", "android", "samsung", "sony", "playstation", "xbox", "nintendo", 
-    "disney", "marvel", "star wars", "lego", "tesla", "spacex", "amazon", "netflix", 
-    "youtube", "photoshop", "illustrator", "firefly", "midjourney"
-  ];
-
-  // كلمات غير مرغوبة أو تمنع القبول
-  const genericBanned = [
-    "high resolution", "exclusive", "masterpiece", "best quality", "4k", "8k", "uhd",
-    "stunning", "amazing", "beautiful", "must see", "best", "top", "trending"
-  ];
-
-  const lowerTitle = title.toLowerCase();
-  const lowerKeywords = keywords.map(k => k.toLowerCase());
-  const combined = (lowerTitle + " " + lowerKeywords.join(" "));
-
-  // 1. فحص العلامات التجارية (Danger)
-  for (const tm of bannedTrademarks) {
-    const regex = new RegExp(`\\b${tm}\\b`, "i");
-    if (regex.test(combined)) {
-      issues.push(`علامة تجارية محظورة: ${tm}`);
-      score -= 40;
-    }
+  // 1. فحص الملكية الفكرية المتقدم (Advanced IP Scan)
+  const ipRisks = scanForIPRisks(title, keywords);
+  for (const risk of ipRisks) {
+    issues.push(`خطر ملكية فكرية: ${risk.suggestion}`);
+    score -= risk.severity === "critical" ? 50 : 25;
   }
 
-  // 2. فحص الكلمات "المزعجة" (Warning)
+  // 2. كلمات "وصفية" محظورة (Adobe Banned Promotional Language)
+  const genericBanned = [
+    "high resolution", "exclusive", "masterpiece", "best quality", "4k", "8k", "uhd",
+    "stunning", "amazing", "beautiful", "must see", "best", "top", "trending", 
+    "premium", "sharp focus", "highly detailed"
+  ];
+
+  const combined = (title + " " + keywords.join(" ")).toLowerCase();
   for (const word of genericBanned) {
     if (combined.includes(word)) {
       issues.push(`كلمة وصفيّة غير مقبولة: ${word}`);
@@ -725,16 +725,11 @@ export function checkAdobeCompliance(title: string, keywords: string[]): Complia
     score -= 50;
   }
 
-  // 5. فحص وجود "AI" في الحالات غير المطلوبة
-  if (combined.includes("generative ai") && !combined.includes("ai-generated")) {
-    // Adobe يفضل صيغة معينة للأعمال المولدة
-  }
-
   // النتيجة النهائية
   score = Math.max(0, score);
   let status: "safe" | "warning" | "danger" = "safe";
   
-  if (score < 60 || issues.some(i => i.includes("علامة تجارية"))) {
+  if (score < 60 || ipRisks.some(r => r.severity === "critical")) {
     status = "danger";
   } else if (score < 90 || issues.length > 0) {
     status = "warning";
@@ -742,6 +737,7 @@ export function checkAdobeCompliance(title: string, keywords: string[]): Complia
 
   return { score, status, issues };
 }
+
 
 export async function getAIMarketAnalysis(topic: string): Promise<string> {
   return withCache(`gemini_market_analysis_${topic}`, 12 * 60 * 60 * 1000, () => generateWithGemini(`You are an elite Adobe Stock market analyst. Using Google Search, retrieve the LIVE data and search trends for the topic "${topic}".
