@@ -61,7 +61,20 @@ MANDATORY DIFFERENTIATION per prompt:
   - 25–50 relevant, commercially-focused keywords per asset
   - NO artist names, NO IP references, NO brand names, NO platform names (Midjourney, DALL-E, etc.)
   - DO NOT use promotional language: "stunning," "4K," "amazing," "best," "exclusive," "masterpiece"
+  - NO technical suffixes: Do not end titles with "video clip", "footage", "motion", "4k", or similar terms.
 `.trim();
+
+/**
+ * Technical and promotional terms banned in Titles and Keywords
+ */
+export const ADOBE_BANNED_METADATA_TERMS = [
+  "video", "clip", "footage", "motion", "4k", "8k", "uhd", "high resolution",
+  "stunning", "exclusive", "masterpiece", "best quality", "top quality",
+  "amazing", "beautiful", "must see", "best", "top", "trending", "premium",
+  "sharp focus", "highly detailed", "hyper realistic", "photorealistic",
+  "unreal engine", "octane render", "redshift", "vray", "midjourney", "dall-e",
+  "stable diffusion", "ai generated", "ai-generated", "created by ai"
+];
 
 /** Suffix to append to every image/illustration prompt */
 export const ADOBE_IMAGE_NEGATIVE_SUFFIX =
@@ -115,7 +128,7 @@ export const GLOBAL_IP_BLACKLIST = [
   "franks", "sriracha huy fong", "cholula", "kikkoman", "maille",
   "lea and perrins", "worcestershire sauce", "guldens",
   "hunts", "del monte", "prego", "ragu", "classico", "barilla",
-  "bertolli", "newmans own", "annies",
+  "bertolli", "newmans own", "annies", "charcuterie", "charcuterie board",
   
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // Fast Food & Restaurant
@@ -130,18 +143,20 @@ export const GLOBAL_IP_BLACKLIST = [
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   "lays", "pringles", "doritos", "cheetos", "fritos", "ritz",
   "oreo", "nabisco", "kelloggs", "nestle", "kraft", "philadelphia cream",
-  "velveeta", "campbells", "progresso", "swanson",
+  "velveeta", "campbells", "progresso", "swanson", "nutella", "ferrero",
   
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // Household & Common Names
+  // Household & Common Names (High IP Risk)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   "moka pot", "kleenex", "velcro", "ziploc", "tupperware", "sharpie",
   "post-it", "band-aid", "scotch tape", "frisbee", "chapstick",
+  "thermos", "stanley cup", "yeti", "hydro flask", "le creuset",
   
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // Beverages
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   "coca-cola", "pepsi", "sprite", "fanta", "7up", "red bull", "monster energy",
-  "gatorade", "powerade", "lipton", "arizona tea", "snapple",
+  "gatorade", "powerade", "lipton", "arizona tea", "snapple", "nespresso",
+  "keurig", "volvic", "evian", "perrier", "san pellegrino",
 ];
 

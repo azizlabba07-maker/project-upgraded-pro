@@ -8,6 +8,7 @@ import {
   type SimilarityResult,
 } from "./similarityDetector";
 import { checkIPRights, type IPCheckResult } from "./ipRightsChecker";
+import { ADOBE_BANNED_METADATA_TERMS } from "./adobeStockCompliance";
 import Cache from "./Cache";
 
 export interface SubmissionAnalysis {
@@ -309,20 +310,14 @@ function assessMetadata(
   // Keywords quality
   if (keywords.length >= 5 && keywords.length <= 20) score += 15;
 
-  // No spammy keywords
-  const spammyKeywords = [
-    "free",
-    "download",
-    "best",
-    "top",
-    "awesome",
-    "amazing",
-  ];
-  const hasSpammy = keywords.some((k) =>
-    spammyKeywords.includes(k.toLowerCase())
+  // No spammy keywords (technical/promotional)
+  const lowerKeywords = keywords.map(k => k.toLowerCase());
+  const hasSpammy = lowerKeywords.some((k) =>
+    ADOBE_BANNED_METADATA_TERMS.some(bt => k.includes(bt))
   );
 
   if (!hasSpammy) score += 5;
+  else score -= 15; // Penalty for spam
 
   return Math.min(score, 100);
 }
@@ -467,6 +462,7 @@ function calculateJitter(seed: string): number {
  */
 function analyzeTitleStrength(title: string): number {
   if (!title) return 0;
+  const lowerTitle = title.toLowerCase();
   const words = title.trim().split(/\s+/).length;
   const chars = title.length;
   
@@ -474,13 +470,17 @@ function analyzeTitleStrength(title: string): number {
   if (words >= 3 && words <= 12) score += 5;
   if (chars >= 20 && chars <= 70) score += 3;
   
-  // Bonus for descriptive words
-  const descriptiveWords = ["cinematic", "aerial", "macro", "ultra", "professional", "stunning", "detailed"];
-  descriptiveWords.forEach(w => {
-    if (title.toLowerCase().includes(w)) score += 1;
+  // Bonus for GOOD descriptive words (NOT technical/banned ones)
+  const goodWords = ["aerial", "macro", "artisan", "traditional", "modern", "minimalist", "handcrafted", "concept", "lifestyle"];
+  goodWords.forEach(w => {
+    if (lowerTitle.includes(w)) score += 1;
   });
 
-  return Math.min(score, 10);
+  // PENALTY for banned words
+  const bannedDetected = ADOBE_BANNED_METADATA_TERMS.some(bt => lowerTitle.includes(bt));
+  if (bannedDetected) score -= 20;
+
+  return Math.max(0, Math.min(score, 10));
 }
 
 function getDefaultAnalysis(): SubmissionAnalysis {

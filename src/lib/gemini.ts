@@ -528,24 +528,26 @@ Even though you are strictly following the assigned topic, YOU MUST MAKE EVERY S
 3. Change the lighting totally for each (e.g., bright sunlight, golden hour, neon interior, stark studio, misty dawn).
 4. If you see the CRITICAL MEMORY KNOWLEDGE above, you MUST NOT repeat those scenarios. Invent new ones.
 
-ULTRA CRITICAL RULE:
-I asked for EXACTLY ${count} prompts. YOU MUST RETURN A JSON ARRAY OF EXACTLY ${count} OBJECTS.
-Each object in the array MUST be radically different in composition and style from the others.
-DO NOT reuse the same camera angle or style for more than one prompt in this batch.
-NO TWO PROMPTS CAN BE IDENTICAL OR TOO SIMILAR. YOU MUST INVENT DIFFERENT VISUAL STORIES FOR EVERY PROMPT.
-WARNING: YOU MUST RETURN EXACTLY ${count} PROMPTS. DO NOT RETURN 1 PROMPT IF ${count} ARE REQUESTED.
+ULTRA CRITICAL RULE — NO SPAM:
+- DO NOT INCLUDE technical words like "Video", "Clip", "Footage", "Motion", "4K", "Ultra HD" in the "title" field.
+- The title MUST be a pure description of the SUBJECT only.
+- Example BAD title: "Pizza Dough Stretching Video Clip"
+- Example GOOD title: "Chef Hands Stretching Fresh Pizza Dough on Marble"
+
+- For KEYWORDS: Generate between 35 to 50 HIGH-QUALITY keywords per asset.
+- DO NOT repeat the same keywords across the different prompts in this batch. Diversify!
 
 ${ADOBE_AI_PROMPT_RULES}
 
 FRAMEWORK: [Subject from ${category}] + [Environment] + [Lighting] + [Camera/Composition] + [Motion if video] + [Style] + [Commercial] + [Copy space]
 - sRGB, 4MP min, 4K for video, sharp focus
 - End each: no humans, no faces, no hands, no text, no logos, fictional AI-generated, commercial royalty-free stock
-- PROHIBITED: artist names, real people, brands, IP
+- PROHIBITED: artist names, real people, brands, IP (e.g. No "Charcuterie", use "Meat Platter")
 - EVERY SINGLE PROMPT in the array MUST be entirely different from the others!
 
 Return ONLY a valid JSON array matching this format exactly. 
 CRUCIAL: The array MUST contain EXACTLY ${count} distinct objects. Do not stop at less than ${count}.
-[{"number":1,"category":"${category}","type":"${outputType === 'video' ? 'video' : 'image'}","demand":"low","prompt":"FULL DETAILED PROMPT 60+ words","title":"SEO title max 70 chars","keywords":["kw1","kw2","kw3","kw4","kw5"]}]`;
+[{"number":1,"category":"${category}","type":"${outputType === 'video' ? 'video' : 'image'}","demand":"low","prompt":"FULL DETAILED PROMPT 60+ words","title":"SEO title max 70 chars (NO 'VIDEO'/'CLIP' WORDS)","keywords":["kw1","kw2","kw3", "...total 40 keywords..."]}]`;
 
   const result = await generateWithGemini(prompt, 0.8);
   const parsed = extractAndParseJSON<GeminiStockPrompt[]>(result, []);
@@ -554,7 +556,7 @@ CRUCIAL: The array MUST contain EXACTLY ${count} distinct objects. Do not stop a
     ...p, 
     number: i + 1, 
     category,
-    prompt: sanitizePromptOrKeywords(p.prompt),
+    title: p.title ? sanitizePromptOrKeywords(p.title) : undefined,
     keywords: p.keywords ? sanitizeStringArray(p.keywords) : []
   }));
 }
@@ -566,17 +568,20 @@ function escapeRegex(value: string): string {
 export async function generateAIKeywords(topic: string, count: number): Promise<string[]> {
   const seed = `KW-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const prompt = `You are an Adobe Stock SEO expert. Generate ${count} English keywords for stock content about "${topic}".
+  const prompt = `You are an Adobe Stock SEO expert. Generate exactly ${count} English keywords for stock content about "${topic}".
 
 Seed: ${seed}
 
 Rules:
-- NEVER prepend "${topic}" before any keyword
-- Each keyword stands alone as a search tag
-- Mix single words and 2-3 word phrases
-- Include synonyms, moods, styles, colors, use cases
-- Frequently searched on Adobe Stock
-- NEVER include: artist names, real people, fictional characters, copyrighted works, brands, government names, third-party IP
+- Generate exactly ${count} keywords.
+- NEVER prepend "${topic}" before any keyword.
+- Each keyword stands alone as a search tag.
+- Mix single words and short phrases (2-3 words).
+- Include synonyms, moods, styles, colors, use cases.
+- Frequently searched on Adobe Stock.
+- NEVER include technical words like "4K", "Video", "Clip", "Footage", "Cinematic", "High Quality".
+- NEVER include: artist names, real people, fictional characters, copyrighted works, brands, government names, third-party IP.
+- STICK TO GENERIC TERMS: use "meat platter" instead of "charcuterie", "generic smartphone" instead of "iPhone".
 
 One keyword per line, no numbering.`;
 
@@ -932,8 +937,10 @@ ${extraRules}
 
 YOUR TASK:
 Generate a complete Adobe Stock evaluation and metadata package.
-1. "keywords": EXACTLY 50 highly relevant, comma-separated keywords. Ensure NO trademarks, NO real people names, NO copyrighted works.
-2. "title": Short SEO optimized Title (max 70 characters).
+1. "keywords": EXACTLY 50 highly relevant, comma-separated keywords. Ensure NO trademarks, NO real people names, NO copyrighted works. Use descriptive keywords like "slow motion," "high angle," but NEVER technical meta words like "4K," "Resolution," "Cinematic," "Stunning."
+2. "title": Short SEO optimized Title (max 70 characters). 
+   - ULTRA CRITICAL: The title MUST NOT contain the words "Video", "Clip", "Footage", "Motion", "4K", or any technical specs. 
+   - It must describe ONLY the subject (e.g., "Artisan baker kneading sourdough bread on floured surface").
 3. "prompt": A highly detailed Text-to-Image PROMPT (Midjourney/Firefly style) based on this concept.
 4. "colorPalette": Trending colors used.
 5. "deformationScore": (0-100 Number) Analyze visually for AI artifacts, anatomical errors, weird hands, blurred text, or bad lighting. 0 = flawless, 100 = severely deformed.
@@ -942,7 +949,7 @@ Generate a complete Adobe Stock evaluation and metadata package.
 
 MUST return a raw JSON object EXACTLY like this (NO Markdown, NO backticks):
 {
-  "title": "Title",
+  "title": "Clean descriptive title without video/clip words",
   "keywords": ["kw1", "kw2"],
   "prompt": "Prompt...",
   "colorPalette": "Colors",
@@ -975,7 +982,7 @@ MUST return a raw JSON object EXACTLY like this (NO Markdown, NO backticks):
 
   return {
     filename: file.name,
-    title: parsed.title,
+    title: sanitizePromptOrKeywords(parsed.title),
     keywords: cleanKeywords,
     prompt: sanitizePromptOrKeywords(parsed.prompt),
     colorPalette: parsed.colorPalette,

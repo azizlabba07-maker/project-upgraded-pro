@@ -1,4 +1,4 @@
-import { GLOBAL_IP_BLACKLIST } from "./adobeStockCompliance";
+import { GLOBAL_IP_BLACKLIST, ADOBE_BANNED_METADATA_TERMS } from "./adobeStockCompliance";
 
 /**
  * Smart Swap Map: Maps high-risk brand names to safe generic synonyms.
@@ -44,7 +44,13 @@ const SMART_SWAP_MAP: Record<string, string> = {
   "kleenex": "facial tissue",
   "velcro": "hook and loop fastener",
   "ziploc": "plastic storage bag",
-  "tupperware": "food container"
+  "tupperware": "food container",
+  "charcuterie": "artisan appetizer platter",
+  "charcuterie board": "gourmet meat and cheese platter",
+  "nutella": "hazelnut cocoa spread",
+  "nespresso": "espresso machine",
+  "stanley cup": "insulated tumbler",
+  "thermos": "vacuum flask"
 };
 
 
@@ -143,9 +149,27 @@ const ADOBE_STOCK_BLACKLIST = [
 export function sanitizePromptOrKeywords(text: string): string {
   if (!text) return "";
   let sanitized = text;
+
+  // 1. Technical Suffix Stripping (Adobe Banned Titles/Metadata)
+  // Strips "Video Clip", "Footage", "4K", etc. from the end or middle of strings
+  const technicalSuffixes = [
+    /\s+video\s+clip\b/gi,
+    /\s+footage\b/gi,
+    /\s+motion\s+footage\b/gi,
+    /\s+animation\b/gi,
+    /\s+clip\b/gi,
+    /\b(4k|8k|uhd)\b/gi,
+    /\b(cinematic|stunning|amazing)\b/gi,
+  ];
+  for (const pattern of technicalSuffixes) {
+    sanitized = sanitized.replace(pattern, "");
+  }
   
-  // Replace blacklisted words case-insensitively with Smart Swap or Generic term
-  for (const word of ADOBE_STOCK_BLACKLIST) {
+  // 2. Replace blacklisted words case-insensitively with Smart Swap or Generic term
+  // We combine ADOBE_STOCK_BLACKLIST and ADOBE_BANNED_METADATA_TERMS for thorough cleaning
+  const masterBlacklist = Array.from(new Set([...ADOBE_STOCK_BLACKLIST, ...ADOBE_BANNED_METADATA_TERMS]));
+  
+  for (const word of masterBlacklist) {
     const lowerWord = word.toLowerCase();
     const replacement = SMART_SWAP_MAP[lowerWord] || "generic term";
     
@@ -154,11 +178,16 @@ export function sanitizePromptOrKeywords(text: string): string {
     const regex = new RegExp(`\\b${escaped}\\b`, 'gi');
     
     if (regex.test(sanitized)) {
-        sanitized = sanitized.replace(regex, replacement);
+        // If it's a banned metadata term (e.g. "4k", "video"), just remove it
+        if (ADOBE_BANNED_METADATA_TERMS.includes(lowerWord)) {
+            sanitized = sanitized.replace(regex, "");
+        } else {
+            sanitized = sanitized.replace(regex, replacement);
+        }
     }
   }
 
-  // Also strip packaging-related visual cues from prompts
+  // 3. Strip packaging-related visual cues from prompts
   const packagingPatterns = [
     /\b(branded|brand\s*name|product\s*label|logo\s*on)\b/gi,
     /\b(trademark|registered|©|®|™)\b/gi,
@@ -168,7 +197,8 @@ export function sanitizePromptOrKeywords(text: string): string {
     sanitized = sanitized.replace(pattern, "[Redacted-IP]");
   }
 
-  return sanitized;
+  // Final cleanup of extra spaces
+  return sanitized.replace(/\s+/g, " ").trim();
 }
 
 /**
