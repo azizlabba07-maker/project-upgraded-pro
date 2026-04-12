@@ -171,18 +171,25 @@ export function sanitizePromptOrKeywords(text: string): string {
   
   for (const word of masterBlacklist) {
     const lowerWord = word.toLowerCase();
-    const replacement = SMART_SWAP_MAP[lowerWord] || "generic term";
     
     // Escape regex special characters in the word
     const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const regex = new RegExp(`\\b${escaped}\\b`, 'gi');
     
     if (regex.test(sanitized)) {
-        // If it's a banned metadata term (e.g. "4k", "video"), just remove it
-        if (ADOBE_BANNED_METADATA_TERMS.includes(lowerWord)) {
-            sanitized = sanitized.replace(regex, "");
+        const isBannedMeta = ADOBE_BANNED_METADATA_TERMS.includes(lowerWord);
+        const swap = SMART_SWAP_MAP[lowerWord];
+
+        if (isBannedMeta) {
+          // 1. If it's a banned meta term (e.g. "4k", "stunning"), just delete it.
+          sanitized = sanitized.replace(regex, "");
+        } else if (swap) {
+          // 2. If we have a smart swap (e.g. "iPhone" -> "premium smartphone"), use it.
+          sanitized = sanitized.replace(regex, swap);
         } else {
-            sanitized = sanitized.replace(regex, replacement);
+          // 3. For unknown IP risks, replace with nothing or a very neutral descriptive word
+          // Never use the phrase "generic term" literally.
+          sanitized = sanitized.replace(regex, "");
         }
     }
   }
