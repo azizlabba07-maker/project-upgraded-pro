@@ -936,26 +936,24 @@ If it is a grid, extract the DOMINANT, MOST PROFITABLE pattern/theme connecting 
 ${extraRules}
 
 YOUR TASK:
-Generate a complete Adobe Stock evaluation and metadata package.
-1. "keywords": EXACTLY 50 highly relevant, comma-separated keywords. Ensure NO trademarks, NO real people names, NO copyrighted works. Use descriptive keywords like "slow motion," "high angle," but NEVER technical meta words like "4K," "Resolution," "Cinematic," "Stunning."
-2. "title": Short SEO optimized Title (max 70 characters). 
-   - ULTRA CRITICAL: The title MUST NOT contain the words "Video", "Clip", "Footage", "Motion", "4K", or any technical specs. 
-   - It must describe ONLY the subject (e.g., "Artisan baker kneading sourdough bread on floured surface").
-3. "prompt": A highly detailed Text-to-Image PROMPT (Midjourney/Firefly style) based on this concept.
-4. "colorPalette": Trending colors used.
-5. "deformationScore": (0-100 Number) Analyze visually for AI artifacts, anatomical errors, weird hands, blurred text, or bad lighting. 0 = flawless, 100 = severely deformed.
-6. "estimatedAcceptance": (0-100 Number) Probability of acceptance on Adobe Stock based on technical quality, commercial appeal, and lack of IP/trademarks.
-7. "uniquenessReview": A short Arabic sentence evaluating if this concept is over-saturated (e.g. generic sunset) or a Blue Ocean opportunity.
+Generate Adobe Stock metadata.
+1. "keywords": 50 relevant, comma-separated keywords. NO trademarks, people, or IP. Descriptive only. NO technical meta words (4K, Cinematic, etc.).
+2. "title": descriptive title, max 70 chars. NO "video", "clip", "footage", "4k". Subject-only description.
+3. "prompt": 60+ word Detailed Text-to-Image PROMPT (Midjourney style).
+4. "colorPalette": Colors.
+5. "deformationScore": 0-100 (AI artifacts).
+6. "estimatedAcceptance": 0-100 (probability).
+7. "uniquenessReview": Arabic niche assessment.
 
-MUST return a raw JSON object EXACTLY like this (NO Markdown, NO backticks):
+JSON ONLY:
 {
-  "title": "Clean descriptive title without video/clip words",
+  "title": "Clean descriptive title",
   "keywords": ["kw1", "kw2"],
   "prompt": "Prompt...",
   "colorPalette": "Colors",
   "deformationScore": 15,
   "estimatedAcceptance": 95,
-  "uniquenessReview": "فكرة ممتازة ومطلوبة بقوة..."
+  "uniquenessReview": "فكرة ممتازة..."
 }`;
 
   const result = await generateWithGemini(prompt, 0.4, {

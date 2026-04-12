@@ -217,10 +217,9 @@ export default function BatchProcessor() {
 
     // Determine concurrency from number of API keys
     const apiKeys = getUserGeminiApiKeys();
-    // Use ALL available keys simultaneously (no upper limit of 5)
-    // The user has multiple keys and wants them all active at once
-    const concurrency = Math.max(1, apiKeys.length);
-    const delayPerKey = 4000; // 4s between requests per key (safe for free tier)
+    // Cap concurrency at 8 to prevent browser/OS thermal throttling, even if 10+ keys exist
+    const concurrency = Math.min(8, Math.max(1, apiKeys.length));
+    const delayPerKey = 5000; // Increased to 5s for better stability with 50-keyword loads
 
     const total = files.length;
     const startTime = Date.now();
@@ -230,14 +229,21 @@ export default function BatchProcessor() {
     setStats({
       completed: 0, total, errors: 0,
       activeLanes: 0, maxLanes: concurrency,
-      eta: "جاري الحساب...", startTime,
+      eta: "جاري التحليل...", startTime,
     });
 
-    const newResults: ImageAnalysisResult[] = new Array(total).fill(null);
+    // Use common array for all lanes
+    const newResults: ImageAnalysisResult[] = results.length === total ? [...results] : new Array(total).fill(null);
 
     // Process a single file
     const processFile = async (index: number) => {
       if (cancelRef.current) return;
+      
+      // Skip if already processed successfully
+      if (newResults[index] && !newResults[index].title.startsWith("[Error]")) {
+        completed++;
+        return;
+      }
 
       const file = files[index];
       setCurrentFiles((prev) => [...prev, file.name]);
@@ -247,7 +253,6 @@ export default function BatchProcessor() {
         let isPanorama = false;
 
         if (file.type.startsWith("video/")) {
-          // 🎬 Extract 3-frame panorama collage
           base64 = await extractPanoramaFromVideo(file);
           isPanorama = true;
         } else {
@@ -271,20 +276,25 @@ export default function BatchProcessor() {
 
         // Calculate ETA
         const elapsed = (Date.now() - startTime) / 1000;
-        const rate = completed / elapsed;
+        const rate = (completed || 1) / elapsed;
         const remaining = total - completed;
         const etaSeconds = rate > 0 ? remaining / rate : 0;
 
-        setStats({
-          completed, total, errors,
+        setStats(prev => ({
+          ...prev,
+          completed, errors,
           activeLanes: Math.min(concurrency, total - completed),
-          maxLanes: concurrency,
           eta: formatEta(etaSeconds),
-          startTime,
-        });
+        }));
 
         // Update results progressively
-        setResults([...newResults.filter(Boolean)]);
+        const currentBatch = [...newResults.filter(Boolean)];
+        setResults(currentBatch);
+        
+        // Progressive persistence
+        try {
+          localStorage.setItem("batch_processor_results", JSON.stringify(currentBatch));
+        } catch {}
       }
     };
 
@@ -296,14 +306,11 @@ export default function BatchProcessor() {
         if (cancelRef.current) break;
         setStats((prev) => ({ ...prev, activeLanes: 1 }));
         await processFile(i);
-        // Rate limit delay (skip for last file)
         if (i < total - 1 && !cancelRef.current) {
           await new Promise((r) => setTimeout(r, delayPerKey));
         }
       }
     } else {
-      // 🚀 Concurrent mode (multiple keys)
-      // Create lanes - each lane processes its share of files sequentially
       const lanes: number[][] = Array.from({ length: concurrency }, () => []);
       for (let i = 0; i < total; i++) {
         lanes[i % concurrency].push(i);
@@ -313,14 +320,12 @@ export default function BatchProcessor() {
         for (let j = 0; j < fileIndices.length; j++) {
           if (cancelRef.current) break;
 
-          // Stagger lane starts to avoid burst
           if (j === 0 && laneIndex > 0) {
             await new Promise((r) => setTimeout(r, laneIndex * 800));
           }
 
           await processFile(fileIndices[j]);
 
-          // Rate limit delay per lane
           if (j < fileIndices.length - 1 && !cancelRef.current) {
             await new Promise((r) => setTimeout(r, delayPerKey));
           }
@@ -330,14 +335,12 @@ export default function BatchProcessor() {
       await Promise.all(lanePromises);
     }
 
-    // Final state
     const finalResults = newResults.filter(Boolean);
     setResults(finalResults);
     setStats((prev) => ({ ...prev, activeLanes: 0, eta: "—" }));
     setProcessing(false);
     setCurrentFiles([]);
 
-    // Persist results
     try {
       localStorage.setItem("batch_processor_results", JSON.stringify(finalResults));
     } catch {}
@@ -346,8 +349,22 @@ export default function BatchProcessor() {
     if (cancelRef.current) {
       toast.info(`⏹️ تم الإيقاف — ${successCount} ناجحة من ${completed} معالَجة`);
     } else {
-      toast.success(`✅ تم تحليل ${successCount}/${total} ملف بنجاح!`);
+      if (errors > 0) {
+        toast.warning(`⚠️ اكتمل مع ${errors} أخطاء. استخدم زر "إعادة محاولة الفاشلة".`);
+      } else {
+        toast.success(`✅ تم تحليل ${successCount}/${total} ملف بنجاح!`);
+      }
     }
+  };
+
+  const handleRetryFailed = () => {
+    const failedExist = results.some(r => r.title.startsWith("[Error]"));
+    if (!failedExist) {
+      toast.info("لا توجد ملفات فاشلة ✨");
+      return;
+    }
+    toast.info("🔄 إعادة محاولة الملفات الفاشلة...");
+    handleProcess();
   };
 
   const handleCancel = () => {
@@ -430,7 +447,6 @@ export default function BatchProcessor() {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-white">📁 {files.length} ملف جاهز</h3>
             <div className="flex gap-2 items-center">
-              {/* Show concurrency info */}
               {!processing && (
                 <span className="text-[10px] text-slate-600">
                   ⚡ {Math.max(1, Math.min(getUserGeminiApiKeys().length, 5))} مسارات متزامنة
@@ -457,35 +473,36 @@ export default function BatchProcessor() {
       )}
 
       {/* Start Processing */}
-      {files.length > 0 && !processing && results.length === 0 && (
-        <button
-          onClick={handleProcess}
-          className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold hover:scale-[1.01] active:scale-[0.99] transition-all shadow-xl shadow-blue-500/20"
-        >
-          🚀 ابدأ التحليل الجماعي ({files.length} ملف) — {Math.max(1, Math.min(getUserGeminiApiKeys().length, 5))} مسارات
-        </button>
-      )}
-
-      {/* Reprocess button when results exist */}
-      {results.length > 0 && !processing && (
+      {files.length > 0 && !processing && (
         <div className="flex gap-2">
           <button
             onClick={handleProcess}
-            disabled={files.length === 0}
-            className="flex-1 py-2.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-slate-400 text-xs font-semibold hover:text-white transition-all disabled:opacity-30"
+            className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold hover:scale-[1.01] active:scale-[0.99] transition-all shadow-xl shadow-blue-500/20"
           >
-            🔄 إعادة التحليل ({files.length})
+            🚀 {results.length > 0 ? "إعادة تحليل الدفعة" : "ابدأ التحليل الجماعي"} ({files.length} ملف)
           </button>
-          <button
-            onClick={() => {
-              setResults([]);
-              localStorage.removeItem("batch_processor_results");
-              toast.success("تم مسح النتائج");
-            }}
-            className="px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold hover:bg-red-500/20 transition-all"
-          >
-            🗑️ مسح النتائج
-          </button>
+          
+          {results.some(r => r.title.startsWith("[Error]")) && (
+            <button
+              onClick={handleRetryFailed}
+              className="px-6 py-2.5 rounded-2xl bg-orange-600/20 border border-orange-600/30 text-orange-400 text-xs font-bold hover:bg-orange-600/30 transition-all"
+            >
+              🔄 إعادة محاولة الفاشلة
+            </button>
+          )}
+
+          {results.length > 0 && (
+            <button
+              onClick={() => {
+                setResults([]);
+                localStorage.removeItem("batch_processor_results");
+                toast.success("تم مسح النتائج");
+              }}
+              className="px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold hover:bg-red-500/20 transition-all"
+            >
+              🗑️ مسح
+            </button>
+          )}
         </div>
       )}
 
