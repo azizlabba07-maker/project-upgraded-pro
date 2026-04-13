@@ -343,10 +343,14 @@ export function sanitizeKeywordsForExport(keywords: string[]): string[] {
   const unique = new Set<string>();
   
   keywords.forEach(kw => {
-    const cleaned = sanitizeForExport(kw);
-    if (cleaned && cleaned.length > 1) {
-      unique.add(cleaned.toLowerCase());
-    }
+    // Split by comma in case the model returned a combined string
+    const parts = kw.split(",");
+    parts.forEach(p => {
+      const cleaned = sanitizeForExport(p);
+      if (cleaned && cleaned.length > 1) {
+        unique.add(cleaned.toLowerCase());
+      }
+    });
   });
   
   return Array.from(unique);
