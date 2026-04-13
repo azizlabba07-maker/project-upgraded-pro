@@ -340,9 +340,16 @@ export function sanitizeForExport(text: string): string {
  */
 export function sanitizeKeywordsForExport(keywords: string[]): string[] {
   if (!Array.isArray(keywords)) return [];
-  return keywords
-    .map(kw => sanitizeForExport(kw))
-    .filter(kw => kw.length > 1); // Remove empty/single-char leftovers
+  const unique = new Set<string>();
+  
+  keywords.forEach(kw => {
+    const cleaned = sanitizeForExport(kw);
+    if (cleaned && cleaned.length > 1) {
+      unique.add(cleaned.toLowerCase());
+    }
+  });
+  
+  return Array.from(unique);
 }
 
 /**

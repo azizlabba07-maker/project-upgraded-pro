@@ -414,6 +414,15 @@ export default function BatchProcessor() {
     toast.success("📥 تم التصدير — جاهز للرفع إلى Adobe Stock!");
   };
 
+  const removeResult = (index: number) => {
+    const newResults = results.filter((_, i) => i !== index);
+    setResults(newResults);
+    try {
+      localStorage.setItem("batch_processor_results", JSON.stringify(newResults));
+    } catch {}
+    toast.success("تم حذف الملف من القائمة");
+  };
+
   const handleCopyAll = async () => {
     const text = results
       .filter((r) => !r.title.startsWith("[Error]"))
@@ -637,12 +646,19 @@ export default function BatchProcessor() {
               }).map((res, i) => (
             <div
               key={i}
-              className={`rounded-2xl border p-4 ${
+              className={`rounded-2xl border p-4 relative group/item ${
                 res.title.startsWith("[Error]")
                   ? "bg-red-500/[0.03] border-red-500/10"
                   : "bg-white/[0.02] border-white/[0.06]"
               }`}
             >
+              <button
+                onClick={() => removeResult(i)}
+                className="absolute top-3 left-3 w-6 h-6 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity flex"
+                title="حذف هذا الملف"
+              >
+                ✕
+              </button>
               <div className="flex items-start gap-3">
                 <span className="text-lg shrink-0">{res.title.startsWith("[Error]") ? "❌" : "✅"}</span>
                 <div className="flex-1 min-w-0">
