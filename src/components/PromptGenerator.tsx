@@ -11,6 +11,7 @@ import { hasOpenAIKey } from "@/lib/openai";
 import { getPromptEvolutionHint } from "@/lib/promptEvolution";
 import { getPromptMemory } from "@/lib/promptMemory";
 import { dispatchPromptGeneration, type UnifiedStockPrompt } from "@/lib/aiDispatcher";
+import { sanitizeForExport, sanitizeKeywordsForExport } from "@/lib/sanitizer";
 import { toast } from "sonner";
 
 const VIDEO_CATEGORIES = [
@@ -448,9 +449,9 @@ export default function PromptGenerator() {
         p.number,
         esc(p.category || ""),
         esc(p.type || ""),
-        esc(p.title || ""),
-        esc((p.keywords || []).join(" | ")),
-        esc(p.prompt || ""),
+        esc(sanitizeForExport(p.title || "")),
+        esc(sanitizeKeywordsForExport(p.keywords || []).join(" | ")),
+        esc(sanitizeForExport(p.prompt || "")),
       ].join(",")
     );
     const csv = [header, ...rows].join("\n");

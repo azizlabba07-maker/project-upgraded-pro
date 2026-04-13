@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { supabase, checkAuthStatus } from "./supabase";
 import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX, ADOBE_IMAGE_NEGATIVE_SUFFIX } from "./adobeStockCompliance";
-import { extractAndParseJSON, withCache, sanitizePromptOrKeywords, sanitizeStringArray } from "@/lib/sanitizer";
+import { extractAndParseJSON, withCache, sanitizePromptOrKeywords, sanitizeStringArray, scanForIPRisks, type IPRiskFlag } from "@/lib/sanitizer";
 
 const GEMINI_STORAGE_KEY = "gemini_api_key";
 const GEMINI_STORAGE_KEYS = "gemini_api_keys";
@@ -543,6 +543,7 @@ FRAMEWORK: [Subject from ${category}] + [Environment] + [Lighting] + [Camera/Com
 - sRGB, 4MP min, 4K for video, sharp focus
 - End each: no humans, no faces, no hands, no text, no logos, fictional AI-generated, commercial royalty-free stock
 - PROHIBITED: artist names, real people, brands, IP (e.g. No "Charcuterie", use "Meat Platter")
+- CRITICAL: NEVER write descriptive placeholders like "generic term", "operating system", "mobile device", "electronics brand", "software company", or "tech company" in any field. Use actual descriptive words instead (e.g. "glass windows", "tablet screen", "car dashboard").
 - EVERY SINGLE PROMPT in the array MUST be entirely different from the others!
 
 Return ONLY a valid JSON array matching this format exactly. 
@@ -581,7 +582,8 @@ Rules:
 - Frequently searched on Adobe Stock.
 - NEVER include technical words like "4K", "Video", "Clip", "Footage", "Cinematic", "High Quality".
 - NEVER include: artist names, real people, fictional characters, copyrighted works, brands, government names, third-party IP.
-- STICK TO GENERIC TERMS: use "meat platter" instead of "charcuterie", "generic smartphone" instead of "iPhone".
+- Use descriptive nouns instead of brand names: "meat platter" not "charcuterie", "smartphone" not "iPhone", "laptop" not "MacBook".
+- ABSOLUTELY NEVER write literal phrases like "generic term", "operating system", "mobile device", "electronics brand", "tech company", or "software company" as keywords or in any output.
 
 One keyword per line, no numbering.`;
 
@@ -658,23 +660,6 @@ ${notePrompt}
     mimeType: file.type
   });
 }
-
-import { scanForIPRisks, type IPRiskFlag, extractAndParseJSON, withCache, sanitizePromptOrKeywords, sanitizeStringArray } from "@/lib/sanitizer";
-
-export interface ImageAnalysisResult {
-  filename: string;
-  title: string;
-  keywords: string[];
-  prompt: string;        // The new AI generated text-to-image prompt
-  colorPalette: string;  // The suggested trending colors
-  compliance?: ComplianceResult; // النتيجة الخاصة بفحص الجودة والامتثال
-  deformationScore?: number; // 0 (flawless) to 100 (highly deformed)
-  estimatedAcceptance?: number; // 0 to 100% acceptance probability
-  uniquenessReview?: string; // Assessment of similarity to existing Adobe Stock items
-  ipRisks?: IPRiskFlag[]; // Flagged IP violations
-}
-
-// ... (keep search/other functions)
 
 export interface ComplianceResult {
   score: number; // 0 to 100

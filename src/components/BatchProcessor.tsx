@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { analyzeImageForStock, hasAnyApiKey, getUserGeminiApiKeys, type ImageAnalysisResult } from "@/lib/gemini";
 import { toast } from "sonner";
 import { exportCsvFile, copyTextSafely } from "@/lib/shared";
+import { sanitizeForExport, sanitizeKeywordsForExport } from "@/lib/sanitizer";
 import ShinyText from "./animations/ShinyText";
 import DecryptedText from "./animations/DecryptedText";
 
@@ -217,9 +218,10 @@ export default function BatchProcessor() {
 
     // Determine concurrency from number of API keys
     const apiKeys = getUserGeminiApiKeys();
-    // Cap concurrency at 8 to prevent browser/OS thermal throttling, even if 10+ keys exist
-    const concurrency = Math.min(8, Math.max(1, apiKeys.length));
-    const delayPerKey = 5000; // Increased to 5s for better stability with 50-keyword loads
+    // Increase cap to 12 for high-performance processing when multiple keys exist
+    const concurrency = Math.min(12, Math.max(1, apiKeys.length));
+    // Reduced delay: with 10 keys, a 2s lane delay means each key rests for ~20s between calls
+    const delayPerKey = apiKeys.length >= 5 ? 2000 : 4000;
 
     const total = files.length;
     const startTime = Date.now();
@@ -320,8 +322,9 @@ export default function BatchProcessor() {
         for (let j = 0; j < fileIndices.length; j++) {
           if (cancelRef.current) break;
 
+          // Faster staggering for 10+ lanes
           if (j === 0 && laneIndex > 0) {
-            await new Promise((r) => setTimeout(r, laneIndex * 800));
+            await new Promise((r) => setTimeout(r, laneIndex * 400));
           }
 
           await processFile(fileIndices[j]);
@@ -400,9 +403,9 @@ export default function BatchProcessor() {
       ["Filename", "Title", "Keywords", "Prompt", "Color Palette", "Category", "Releases"],
       valid.map((r) => [
         r.filename,
-        r.title,
-        r.keywords.join(","),
-        r.prompt || "",
+        sanitizeForExport(r.title),
+        sanitizeKeywordsForExport(r.keywords).join(","),
+        sanitizeForExport(r.prompt || ""),
         r.colorPalette || "",
         "",
         "",

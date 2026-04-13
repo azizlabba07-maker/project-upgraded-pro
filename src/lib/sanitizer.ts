@@ -4,40 +4,45 @@ import { GLOBAL_IP_BLACKLIST, ADOBE_BANNED_METADATA_TERMS } from "./adobeStockCo
  * Smart Swap Map: Maps high-risk brand names to safe generic synonyms.
  */
 const SMART_SWAP_MAP: Record<string, string> = {
-  "apple": "generic tech",
+  // ━━━━━ Tech (multi-word only — single common words removed) ━━━━━
   "iphone": "premium smartphone",
-  "ipad": "tablet",
-  "macbook": "laptop",
+  "ipad": "tablet device",
+  "macbook": "laptop computer",
   "imac": "desktop computer",
   "airpods": "wireless earbuds",
-  "samsung": "electronics brand",
-  "galaxy": "mobile device",
-  "microsoft": "software company",
-  "windows": "operating system",
+  "apple watch": "smart watch",
+  "samsung galaxy": "mobile phone",
+  "microsoft windows": "computer software",
   "xbox": "gaming console",
-  "google": "search engine company",
-  "pixel": "android phone",
+  "google pixel": "smartphone",
+  "chromebook": "laptop computer",
+  "surface tablet": "tablet device",
+  "nintendo switch": "portable game console",
+  // ━━━━━ Automotive ━━━━━
   "tesla": "electric vehicle",
   "bmw": "luxury sedan",
   "mercedes": "premium car",
   "audi": "modern vehicle",
   "ferrari": "sports car",
   "lamborghini": "supercar",
+  // ━━━━━ Fashion & Luxury ━━━━━
   "nike": "athletic footwear",
   "adidas": "sportswear",
   "gucci": "luxury fashion",
   "louis vuitton": "designer bag",
   "rolex": "high-end watch",
+  // ━━━━━ Food & Beverage ━━━━━
   "coca-cola": "cola beverage",
   "pepsi": "soda drink",
-  "mcdonalds": "fast food chain",
+  "mcdonalds": "fast food restaurant",
   "starbucks": "coffeehouse",
   "heinz": "tomato ketchup",
   "tabasco": "pepper sauce",
   "maggi": "instant seasoning",
   "knorr": "bouillon",
-  "kfc": "fried chicken",
-  "subway": "sandwich shop",
+  "kfc": "fried chicken restaurant",
+  "subway": "sandwich restaurant",
+  // ━━━━━ Toys & Household ━━━━━
   "lego": "building blocks",
   "barbie": "fashion doll",
   "moka pot": "stovetop espresso maker",
@@ -52,6 +57,27 @@ const SMART_SWAP_MAP: Record<string, string> = {
   "stanley cup": "insulated tumbler",
   "thermos": "vacuum flask"
 };
+
+/**
+ * Ambiguous words that are common English AND brand names.
+ * These must NEVER go in the blacklist or swap map as single words
+ * because they destroy legitimate stock content about architecture,
+ * food, space, technology, etc.
+ */
+const AMBIGUOUS_SAFE_WORDS = new Set([
+  "windows",   // glass windows in architecture
+  "surface",   // marble surface, water surface
+  "apple",     // fruit, food photography
+  "galaxy",    // astronomy, space content
+  "pixel",     // digital art, resolution
+  "android",   // robot, sci-fi content
+  "switch",    // electrical switch, light switch
+  "meta",      // prefix meaning "about itself"
+  "prime",     // math, general adjective
+  "sprint",    // running, athletics
+  "dell",      // valley (as in dale)
+  "canon",     // photography term (lens type)
+]);
 
 
 /**
@@ -68,23 +94,27 @@ const SMART_SWAP_MAP: Record<string, string> = {
 const ADOBE_STOCK_BLACKLIST = [
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // Major Brands & Tech Companies
+  // NOTE: Single words that are also common English (windows, surface,
+  //       apple, galaxy, pixel, android, switch, meta, dell, canon)
+  //       are EXCLUDED to prevent destroying legitimate content.
+  //       Use multi-word brand forms instead.
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   "nike", "adidas", "puma", "reebok", "under armour",
-  "apple", "iphone", "ipad", "macbook", "imac", "airpods",
-  "microsoft", "windows", "xbox", "surface",
-  "google", "android", "pixel", "chromebook",
-  "samsung", "galaxy",
+  "iphone", "ipad", "macbook", "imac", "airpods", "apple watch",
+  "microsoft windows", "xbox", "surface tablet", "surface pro",
+  "google pixel", "chromebook",
+  "samsung galaxy",
   "disney", "marvel", "dc comics", "star wars", "pixar",
   "coca-cola", "pepsi", "mcdonalds", "burger king", "starbucks",
   "tesla", "spacex", "ferrari", "porsche", "lamborghini",
   "bmw", "mercedes", "audi", "bentley", "rolls royce", "maserati",
   "rolex", "omega", "cartier", "gucci", "louis vuitton", "prada", "chanel",
   "hermes", "versace", "dior", "balenciaga", "yves saint laurent",
-  "amazon", "facebook", "meta", "instagram", "whatsapp", "twitter", "tiktok",
+  "amazon", "facebook", "instagram", "whatsapp", "twitter", "tiktok",
   "netflix", "youtube", "hulu", "spotify", "twitch",
-  "sony", "playstation", "nintendo", "switch",
+  "sony", "playstation", "nintendo switch",
   "ikea", "lego", "mattel", "barbie", "hasbro", "hot wheels", "nerf",
-  "hp", "dell", "lenovo", "asus", "acer",
+  "lenovo", "asus", "acer",
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // Fictional Characters & IP
@@ -165,12 +195,15 @@ export function sanitizePromptOrKeywords(text: string): string {
     sanitized = sanitized.replace(pattern, "");
   }
   
-  // 2. Replace blacklisted words case-insensitively with Smart Swap or Generic term
+  // 2. Replace blacklisted words case-insensitively with Smart Swap or deletion
   // We combine ADOBE_STOCK_BLACKLIST and ADOBE_BANNED_METADATA_TERMS for thorough cleaning
   const masterBlacklist = Array.from(new Set([...ADOBE_STOCK_BLACKLIST, ...ADOBE_BANNED_METADATA_TERMS]));
   
   for (const word of masterBlacklist) {
     const lowerWord = word.toLowerCase();
+    
+    // SKIP ambiguous words that are common English — they must not be sanitized
+    if (AMBIGUOUS_SAFE_WORDS.has(lowerWord)) continue;
     
     // Escape regex special characters in the word
     const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -187,8 +220,7 @@ export function sanitizePromptOrKeywords(text: string): string {
           // 2. If we have a smart swap (e.g. "iPhone" -> "premium smartphone"), use it.
           sanitized = sanitized.replace(regex, swap);
         } else {
-          // 3. For unknown IP risks, replace with nothing or a very neutral descriptive word
-          // Never use the phrase "generic term" literally.
+          // 3. For unknown IP risks, silently remove the term.
           sanitized = sanitized.replace(regex, "");
         }
     }
@@ -204,8 +236,45 @@ export function sanitizePromptOrKeywords(text: string): string {
     sanitized = sanitized.replace(pattern, "[Redacted-IP]");
   }
 
-  // Final cleanup of extra spaces
-  return sanitized.replace(/\s+/g, " ").trim();
+  // 4. POST-SANITIZATION ARTIFACT CLEANUP
+  // Catches legacy artifacts from older code versions that replaced brand names
+  // with literal descriptive phrases that look absurd in stock metadata.
+  // Also catches AI hallucinations where the model literally writes "generic term"
+  // or "operating system" into metadata because of overly literal prompt interpretation.
+  const artifactPatterns = [
+    /\boperating system(s)?\b/gi,       // "windows" was mapped to this — nonsensical in stock content
+    /\bgeneric term(s)?\b/gi,           // AI hallucination from "STICK TO GENERIC TERMS" instruction
+    /\bgeneric tech\b/gi,               // "apple" was mapped to this
+    /\bgeneric (?:surface|background|item|product|object|element|material|concept)\b/gi,
+    /\belectronics brand\b/gi,          // "samsung" was mapped to this
+    /\bsoftware company\b/gi,           // "microsoft" was mapped to this
+    /\bsearch engine company\b/gi,      // "google" was mapped to this
+    /\bandroid phone\b/gi,              // "pixel" was mapped to this
+    /\bmobile device(s)?\b/gi,          // "galaxy" was mapped to this
+    /\btech company\b/gi,
+    /\btech brand\b/gi,
+    /\bfood brand\b/gi,
+    /\bgeneric smartphone\b/gi,         // from prompt instruction leaking into output
+    /\bgeneric brand\b/gi,
+    /\bname brand\b/gi,
+    /\b\[Redacted-IP\]\b/gi,            // internal redaction marker that should never reach CSV
+  ];
+  for (const pattern of artifactPatterns) {
+    sanitized = sanitized.replace(pattern, "");
+  }
+
+  // 5. Fix broken sentence fragments left by removals
+  sanitized = sanitized
+    .replace(/\s*,\s*,/g, ",")         // double commas
+    .replace(/\s+,/g, ",")             // space before comma
+    .replace(/,\s*\./g, ".")           // comma before period
+    .replace(/\.\.+/g, ".")            // multiple periods
+    .replace(/^\s*[,.]\s*/g, "")       // leading comma/period
+    .replace(/\s*[,.]\s*$/g, "")       // trailing comma/period
+    .replace(/\bA\s+-/g, "A")          // "A -down" → "A" (fix broken "top-down" etc.)
+    .replace(/\s+/g, " ").trim();
+
+  return sanitized;
 }
 
 /**
@@ -217,6 +286,63 @@ export function sanitizeStringArray(arr: string[]): string[] {
   return arr
     .map(kw => sanitizePromptOrKeywords(kw))
     .filter(kw => kw.trim().length > 0 && !kw.includes("[Redacted-IP]"));
+}
+
+/**
+ * FINAL EXPORT GATE — sanitizeForExport()
+ * ===========================================
+ * This is the LAST defense before data hits a CSV file.
+ * It runs sanitizePromptOrKeywords() first, then applies
+ * additional hardened checks for any AI hallucination artifacts
+ * that may have slipped through all prior stages.
+ */
+export function sanitizeForExport(text: string): string {
+  if (!text) return "";
+  
+  // Run the standard sanitizer first
+  let cleaned = sanitizePromptOrKeywords(text);
+  
+  // Double-check: catch any remaining artifact phrases with loose matching
+  // (case-insensitive, not relying on word boundaries for compound phrases)
+  const hardPatterns: [RegExp, string][] = [
+    [/generic\s+term/gi, ""],
+    [/operating\s+system/gi, ""],
+    [/mobile\s+device/gi, ""],
+    [/electronics\s+brand/gi, ""],
+    [/software\s+company/gi, ""],
+    [/search\s+engine\s+company/gi, ""],
+    [/tech\s+company/gi, ""],
+    [/tech\s+brand/gi, ""],
+    [/food\s+brand/gi, ""],
+    [/generic\s+smartphone/gi, ""],
+    [/android\s+phone/gi, ""],
+    [/\[Redacted-IP\]/gi, ""],
+  ];
+  for (const [pattern, replacement] of hardPatterns) {
+    cleaned = cleaned.replace(pattern, replacement);
+  }
+  
+  // Final whitespace/fragment cleanup
+  return cleaned
+    .replace(/\s*,\s*,/g, ",")
+    .replace(/\s+,/g, ",")
+    .replace(/,\s*\./g, ".")
+    .replace(/\.\.+/g, ".")
+    .replace(/^\s*[,.]\s*/g, "")
+    .replace(/\s*[,.]\s*$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Sanitize an array of keyword strings for CSV export.
+ * Applies sanitizeForExport to each keyword individually.
+ */
+export function sanitizeKeywordsForExport(keywords: string[]): string[] {
+  if (!Array.isArray(keywords)) return [];
+  return keywords
+    .map(kw => sanitizeForExport(kw))
+    .filter(kw => kw.length > 1); // Remove empty/single-char leftovers
 }
 
 /**

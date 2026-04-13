@@ -3,6 +3,7 @@ import { generateAIKeywords, getTopKeywordsForDomain, hasAnyApiKey, analyzeImage
 import { generateClaudeKeywords, hasClaudeKey } from "@/lib/claude";
 import { trackAiMetric } from "@/lib/aiMetrics";
 import { saveNote, getNotes, deleteNote } from "@/lib/storage";
+import { sanitizeForExport, sanitizeKeywordsForExport } from "@/lib/sanitizer";
 import { toast } from "sonner";
 
 export default function ToolsSection() {
@@ -101,8 +102,8 @@ export default function ToolsSection() {
     
     let csv = "Filename,Title,Keywords,Category,Releases\\n";
     imageResults.forEach(res => {
-      const escapedTitle = res.title.replace(/"/g, '""');
-      const escapedKeywords = res.keywords.join(",").replace(/"/g, '""');
+      const escapedTitle = sanitizeForExport(res.title).replace(/"/g, '""');
+      const escapedKeywords = sanitizeKeywordsForExport(res.keywords).join(",").replace(/"/g, '""');
       csv += `"${res.filename}","${escapedTitle}","${escapedKeywords}","",\n`;
     });
 

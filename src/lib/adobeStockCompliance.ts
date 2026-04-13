@@ -102,11 +102,16 @@ export const ADOBE_SUBMISSION_REMINDERS = [
 export const GLOBAL_IP_BLACKLIST = [
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // Tech & Electronics
+  // NOTE: Ambiguous single words (apple, samsung, galaxy, sony, microsoft,
+  //       windows, surface, google, pixel, android, hp, dell, canon, nikon,
+  //       nintendo, switch) are EXCLUDED — they are common English words
+  //       that destroy architecture, food, space & tech stock content.
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  "apple", "iphone", "ipad", "macbook", "imac", "airpods", "apple watch",
-  "samsung", "galaxy", "sony", "playstation", "nintendo", "switch",
-  "microsoft", "windows", "xbox", "surface", "google", "pixel", "android",
-  "hp", "dell", "lenovo", "asus", "acer", "logitech", "canon", "nikon",
+  "iphone", "ipad", "macbook", "imac", "airpods", "apple watch",
+  "samsung galaxy", "playstation", "nintendo switch",
+  "microsoft windows", "xbox", "surface pro", "surface tablet",
+  "google pixel", "google chrome",
+  "lenovo", "asus", "acer", "logitech",
   
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // Automotive

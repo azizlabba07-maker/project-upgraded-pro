@@ -27,9 +27,14 @@ export async function copyTextSafely(value: string): Promise<boolean> {
 export function exportCsvFile(
   filename: string,
   headers: string[],
-  rows: string[][]
+  rows: (string | number)[][],
+  cellTransform?: (v: string) => string
 ): void {
-  const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  const esc = (v: any) => {
+    let s = String(v);
+    if (cellTransform) s = cellTransform(s);
+    return `"${s.replace(/"/g, '""')}"`;
+  };
   const header = headers.join(",");
   const body = rows.map((row) => row.map(esc).join(",")).join("\n");
   const csv = [header, body].join("\n");
