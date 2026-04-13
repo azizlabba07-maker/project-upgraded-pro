@@ -413,6 +413,17 @@ export default function BatchProcessor() {
     );
     toast.success("📥 تم التصدير — جاهز للرفع إلى Adobe Stock!");
   };
+  
+  const handleClearResults = () => {
+    if (results.length === 0) return;
+    if (confirm("هل أنت متأكد من رغبتك في مسح كافة نتائج التحليل الحالية؟")) {
+      setResults([]);
+      try {
+        localStorage.removeItem("batch_processor_results");
+      } catch {}
+      toast.success("تم مسح القائمة بنجاح");
+    }
+  };
 
   const removeResult = (index: number) => {
     const newResults = results.filter((_, i) => i !== index);
@@ -616,6 +627,9 @@ export default function BatchProcessor() {
                     <button onClick={handleExport} className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs font-semibold hover:scale-105 transition-all shadow-lg shadow-blue-500/20">
                       📥 تصدير CSV (Adobe Ready)
                     </button>
+                    <button onClick={handleClearResults} className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-xs font-bold text-red-400 hover:bg-red-500/20 hover:scale-105 transition-all">
+                      🗑️ مسح الكل
+                    </button>
                   </div>
                   <div className="text-xs font-bold text-slate-400 bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
                     متوسط القبول: <span className="text-blue-400 ml-1">{averageAcceptance}%</span>
@@ -646,19 +660,12 @@ export default function BatchProcessor() {
               }).map((res, i) => (
             <div
               key={i}
-              className={`rounded-2xl border p-4 relative group/item ${
+              className={`rounded-2xl border p-4 relative ${
                 res.title.startsWith("[Error]")
                   ? "bg-red-500/[0.03] border-red-500/10"
                   : "bg-white/[0.02] border-white/[0.06]"
               }`}
             >
-              <button
-                onClick={() => removeResult(i)}
-                className="absolute top-3 left-3 w-6 h-6 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity flex"
-                title="حذف هذا الملف"
-              >
-                ✕
-              </button>
               <div className="flex items-start gap-3">
                 <span className="text-lg shrink-0">{res.title.startsWith("[Error]") ? "❌" : "✅"}</span>
                 <div className="flex-1 min-w-0">
