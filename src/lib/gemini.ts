@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { supabase, checkAuthStatus } from "./supabase";
-import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX, ADOBE_IMAGE_NEGATIVE_SUFFIX } from "./adobeStockCompliance";
+import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX, ADOBE_IMAGE_NEGATIVE_SUFFIX, ADOBE_BANNED_METADATA_TERMS } from "./adobeStockCompliance";
 import { extractAndParseJSON, withCache, sanitizePromptOrKeywords, sanitizeStringArray, scanForIPRisks, type IPRiskFlag } from "@/lib/sanitizer";
 
 const GEMINI_STORAGE_KEY = "gemini_api_key";
@@ -890,12 +890,14 @@ export interface ImageAnalysisResult {
   filename: string;
   title: string;
   keywords: string[];
+  rejectedKeywords?: string[];
   prompt: string;        // The new AI generated text-to-image prompt
   colorPalette: string;  // The suggested trending colors
   compliance?: ComplianceResult; // النتيجة الخاصة بفحص الجودة والامتثال
   deformationScore?: number; // 0 (flawless) to 100 (highly deformed)
   estimatedAcceptance?: number; // 0 to 100% acceptance probability
   uniquenessReview?: string; // Assessment of similarity to existing Adobe Stock items
+  adobeReadinessScore?: number;
 }
 
 export async function analyzeImageForStock(
@@ -920,10 +922,12 @@ If it is a grid, extract the DOMINANT, MOST PROFITABLE pattern/theme connecting 
 
 ${extraRules}
 
+${ADOBE_AI_PROMPT_RULES}
+
 YOUR TASK:
 Generate Adobe Stock metadata.
-1. "keywords": 50 relevant, comma-separated keywords. NO trademarks, people, or IP. Descriptive only. NO technical meta words (4K, Cinematic, etc.).
-2. "title": descriptive title, max 70 chars. NO "video", "clip", "footage", "4k". Subject-only description.
+1. "keywords": 50 relevant, comma-separated keywords. Provide EXACTLY a 70% specific / 30% broad keyword split. NO trademarks, people, or IP. EXPLICITLY FORBIDDEN WORDS: ${ADOBE_BANNED_METADATA_TERMS.slice(0, 15).join(", ")}.
+2. "title": Ultra-specific commercial title, max 70 chars. NO "video", "clip", "footage", "4k". Subject-only description.
 3. "prompt": 60+ word Detailed Text-to-Image PROMPT (Midjourney style).
 4. "colorPalette": Colors.
 5. "deformationScore": 0-100 (AI artifacts).
@@ -959,14 +963,30 @@ JSON ONLY:
   if (!parsed.title && !parsed.keywords.length) throw new Error("Failed to parse Image Analysis AI response");
   
   // Clean keywords
-  const cleanKeywords = sanitizeStringArray(parsed.keywords)
-    .map(k => k.trim().toLowerCase())
-    .slice(0, 49);
+  const rawKeywords = sanitizeStringArray(parsed.keywords).map(k => k.trim().toLowerCase());
+  const rejected: string[] = [];
+  const cleanKeywords: string[] = [];
+
+  for (const k of rawKeywords) {
+    let isBanned = false;
+    for (const banned of ADOBE_BANNED_METADATA_TERMS) {
+      if (k === banned.toLowerCase() || k.includes(banned.toLowerCase())) {
+        isBanned = true;
+        break;
+      }
+    }
+    if (isBanned) {
+      rejected.push(k);
+    } else {
+      cleanKeywords.push(k);
+    }
+  }
 
   return {
     filename: file.name,
     title: sanitizePromptOrKeywords(parsed.title),
-    keywords: cleanKeywords,
+    keywords: cleanKeywords.slice(0, 50),
+    rejectedKeywords: rejected,
     prompt: sanitizePromptOrKeywords(parsed.prompt),
     colorPalette: parsed.colorPalette,
     deformationScore: parsed.deformationScore,

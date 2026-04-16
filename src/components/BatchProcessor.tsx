@@ -262,6 +262,16 @@ export default function BatchProcessor() {
         }
 
         const result = await analyzeImageForStock(file, base64, isPanorama);
+        
+        let score = result.estimatedAcceptance !== undefined ? result.estimatedAcceptance : 100;
+        if (result.title.length < 20) score -= 15;
+        if (result.keywords.length < 10) score -= 20;
+        if (result.keywords.length > 50) score -= 10;
+        if (result.rejectedKeywords && result.rejectedKeywords.length > 0) {
+            score -= result.rejectedKeywords.length * 5;
+        }
+        result.adobeReadinessScore = Math.max(0, Math.min(100, Math.round(score)));
+
         newResults[index] = result;
       } catch (err: any) {
         errors++;
@@ -400,7 +410,7 @@ export default function BatchProcessor() {
     if (valid.length === 0) { toast.error("لا توجد بيانات للتصدير"); return; }
     exportCsvFile(
       `adobe_stock_batch_${Date.now()}.csv`,
-      ["Filename", "Title", "Keywords", "Prompt", "Color Palette", "Category", "Releases"],
+      ["Filename", "Title", "Keywords", "Prompt", "Color Palette", "Category", "Releases", "Adobe_Readiness_Score", "Rejected_Keywords"],
       valid.map((r) => [
         r.filename,
         sanitizeForExport(r.title),
@@ -409,6 +419,8 @@ export default function BatchProcessor() {
         r.colorPalette || "",
         "",
         "",
+        r.adobeReadinessScore?.toString() || "",
+        (r.rejectedKeywords || []).join(", "),
       ])
     );
     toast.success("📥 تم التصدير — جاهز للرفع إلى Adobe Stock!");
@@ -690,6 +702,18 @@ export default function BatchProcessor() {
                       }`}>
                         <span>{res.deformationScore <= 10 ? '✨' : res.deformationScore <= 30 ? '👀' : '👾'}</span>
                         <span>شذوذ AI: {res.deformationScore}%</span>
+                      </div>
+                    )}
+
+                    {/* Adobe Readiness Score */}
+                    {res.adobeReadinessScore !== undefined && (
+                      <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-bold ${
+                        res.adobeReadinessScore >= 85 ? 'bg-green-500/10 text-green-400 border border-green-500/20 shadow-[0_0_8px_rgba(34,197,94,0.2)]' :
+                        res.adobeReadinessScore >= 60 ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
+                        'bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_8px_rgba(239,68,68,0.2)]'
+                      }`}>
+                        <span>{res.adobeReadinessScore >= 85 ? '🟢' : res.adobeReadinessScore >= 60 ? '🟡' : '🔴'}</span>
+                        <span>جاهزية: {res.adobeReadinessScore}%</span>
                       </div>
                     )}
 
