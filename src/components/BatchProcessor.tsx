@@ -6,123 +6,6 @@ import { sanitizeForExport, sanitizeKeywordsForExport } from "@/lib/sanitizer";
 import ShinyText from "./animations/ShinyText";
 import DecryptedText from "./animations/DecryptedText";
 
-// ─────────────────────────────────────────────
-// 🎬  3-Frame Panorama Extraction (الاستخراج الذكي)
-// ─────────────────────────────────────────────
-
-/** Seek to a specific time and draw the frame onto a canvas context */
-function seekAndDraw(
-  video: HTMLVideoElement,
-  time: number,
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  frameW: number,
-  frameH: number
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const onSeeked = () => {
-      video.removeEventListener("seeked", onSeeked);
-      try {
-        ctx.drawImage(video, x, 0, frameW, frameH);
-        resolve();
-      } catch {
-        reject(new Error("Failed to draw frame"));
-      }
-    };
-    video.addEventListener("seeked", onSeeked);
-    video.currentTime = time;
-  });
-}
-
-/**
- * Extracts 3 frames from a video (at 20%, 50%, 80% of duration)
- * and stitches them side-by-side into a single panorama JPEG.
- * This gives the AI a full "motion timeline" of the video.
- */
-const extractPanoramaFromVideo = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const video = document.createElement("video");
-    const url = URL.createObjectURL(file);
-    video.src = url;
-    video.crossOrigin = "anonymous";
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = "auto";
-
-    video.onloadedmetadata = async () => {
-      try {
-        const duration = video.duration;
-        if (!duration || !isFinite(duration) || duration < 0.5) {
-          // Fallback: too short, just grab one frame
-          video.currentTime = 0.1;
-          const waitSeeked = () =>
-            new Promise<void>((res) => {
-              video.addEventListener("seeked", () => res(), { once: true });
-            });
-          await waitSeeked();
-          const c = document.createElement("canvas");
-          c.width = video.videoWidth || 640;
-          c.height = video.videoHeight || 360;
-          c.getContext("2d")?.drawImage(video, 0, 0, c.width, c.height);
-          URL.revokeObjectURL(url);
-          resolve(c.toDataURL("image/jpeg", 0.82));
-          return;
-        }
-
-        // Calculate the 3 timestamps
-        const times = [duration * 0.2, duration * 0.5, duration * 0.8];
-
-        // Frame dimensions – cap width to prevent oversized canvas
-        const maxFrameW = Math.min(video.videoWidth || 640, 640);
-        const scale = maxFrameW / (video.videoWidth || 640);
-        const frameW = maxFrameW;
-        const frameH = Math.round((video.videoHeight || 360) * scale);
-
-        // Create the panorama canvas (3 frames side-by-side with labels)
-        const labelH = 28; // height for the label bar
-        const canvas = document.createElement("canvas");
-        canvas.width = frameW * 3;
-        canvas.height = frameH + labelH;
-        const ctx = canvas.getContext("2d")!;
-
-        // Black background
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Draw each frame
-        for (let i = 0; i < 3; i++) {
-          await seekAndDraw(video, times[i], ctx, i * frameW, frameW, frameH);
-        }
-
-        // Draw labels at top
-        ctx.font = "bold 16px Arial, sans-serif";
-        ctx.textAlign = "center";
-        const labels = ["▶ START (20%)", "■ MIDDLE (50%)", "◼ END (80%)"];
-        const colors = ["#4ade80", "#60a5fa", "#f472b6"];
-        for (let i = 0; i < 3; i++) {
-          // Semi-transparent label background
-          ctx.fillStyle = "rgba(0,0,0,0.7)";
-          ctx.fillRect(i * frameW, frameH, frameW, labelH);
-          // Label text
-          ctx.fillStyle = colors[i];
-          ctx.fillText(labels[i], i * frameW + frameW / 2, frameH + 20);
-        }
-
-        URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
-      } catch (err) {
-        URL.revokeObjectURL(url);
-        reject(err);
-      }
-    };
-
-    video.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("فشل تحميل الفيديو"));
-    };
-  });
-};
-
 /** Read an image file as base64 data URI */
 const readImageBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -131,6 +14,31 @@ const readImageBase64 = (file: File): Promise<string> =>
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+
+/** Extract a single 640x480 max frame for Video processing */
+async function extractFrame(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    const canvas = document.createElement("canvas");
+    video.src = URL.createObjectURL(file);
+    video.muted = true;
+    video.crossOrigin = "anonymous";
+    video.onloadedmetadata = () => { video.currentTime = Math.min(2, video.duration * 0.1); };
+    video.onseeked = () => {
+      const scale = Math.min(640 / video.videoWidth, 480 / video.videoHeight, 1);
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
+      canvas.getContext("2d")!.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+      URL.revokeObjectURL(video.src);
+      resolve(dataUrl);
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(video.src);
+      reject(new Error("فشل استخراج إطار الفيديو"));
+    };
+  });
+}
 
 // ─────────────────────────────────────────────
 // 🔧  Utility
@@ -255,23 +163,13 @@ export default function BatchProcessor() {
         let isPanorama = false;
 
         if (file.type.startsWith("video/")) {
-          base64 = await extractPanoramaFromVideo(file);
-          isPanorama = true;
+          base64 = await extractFrame(file);
         } else {
           base64 = await readImageBase64(file);
         }
 
-        const result = await analyzeImageForStock(file, base64, isPanorama);
+        const result = await analyzeImageForStock(file, base64);
         
-        let score = result.estimatedAcceptance !== undefined ? result.estimatedAcceptance : 100;
-        if (result.title.length < 20) score -= 15;
-        if (result.keywords.length < 10) score -= 20;
-        if (result.keywords.length > 50) score -= 10;
-        if (result.rejectedKeywords && result.rejectedKeywords.length > 0) {
-            score -= result.rejectedKeywords.length * 5;
-        }
-        result.adobeReadinessScore = Math.max(0, Math.min(100, Math.round(score)));
-
         newResults[index] = result;
       } catch (err: any) {
         errors++;

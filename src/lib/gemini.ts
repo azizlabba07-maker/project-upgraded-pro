@@ -903,97 +903,221 @@ export interface ImageAnalysisResult {
   category?: string;
 }
 
+const ADOBE_BANNED_KEYWORDS = [
+  "video", "clip", "footage", "motion", "animation", "cinematography",
+  "stunning", "exclusive", "4k", "8k", "ai-generated", "high-resolution",
+  "masterpiece", "beautiful", "amazing", "perfect", "gorgeous", "incredible",
+  "spectacular", "breathtaking", "cinematic", "hd", "uhd", "ultra hd",
+  "stock", "adobe", "shutterstock", "getty", "istock",
+];
+
+const ADOBE_CATEGORIES = [
+  "Animals", "Buildings and Architecture", "Business", "Drinks", "Environment",
+  "States of Mind", "Food", "Graphic Resources", "Hobbies and Leisure",
+  "Industry", "Landscapes", "Lifestyle", "People", "Plants and Flowers",
+  "Culture and Religion", "Science", "Social Issues", "Sports", "Technology",
+  "Transport and Infrastructure", "Travel",
+];
+
+interface ScoringCriteria {
+  uniqueness: number;
+  commercialValue: number;
+  subjectClarity: number;
+  marketSaturation: number;
+}
+
+function filterBannedKeywords(keywords: string[]): { filtered: string[]; removed: string[] } {
+  const removed: string[] = [];
+  const filtered = keywords.filter((kw) => {
+    const isBanned = ADOBE_BANNED_KEYWORDS.some((b) =>
+      kw.toLowerCase().includes(b.toLowerCase())
+    );
+    if (isBanned) removed.push(kw);
+    return !isBanned;
+  });
+  return { filtered, removed };
+}
+
+function calculateReadinessScore(
+  title: string,
+  keywords: string[],
+  removedKeywords: string[],
+  category: string,
+  criteria: ScoringCriteria
+): { score: number; status: "ready"|"review"|"rejected"; issues: string[]; breakdown: Record<string,number>; estimatedAcceptance: number } {
+  const issues: string[] = [];
+
+  const contentScore = Math.round(
+    (criteria.uniqueness * 0.30 +
+     criteria.commercialValue * 0.30 +
+     criteria.subjectClarity * 0.20 +
+     criteria.marketSaturation * 0.20) * 10
+  );
+
+  let metadataPenalty = 0;
+
+  if (removedKeywords.length > 0) {
+    metadataPenalty += removedKeywords.length * 15;
+    issues.push(`${removedKeywords.length} banned keyword(s) removed: ${removedKeywords.join(", ")}`);
+  }
+  if (title.length < 30) {
+    metadataPenalty += 15;
+    issues.push("Title too short — needs subject + action + context");
+  }
+  if (keywords.length < 25) {
+    metadataPenalty += 20;
+    issues.push(`Only ${keywords.length} keywords — Adobe requires 25-49`);
+  }
+  if (keywords.length > 49) {
+    metadataPenalty += 10;
+    issues.push(`${keywords.length} keywords — Adobe max is 49`);
+  }
+  const titleBanned = ADOBE_BANNED_KEYWORDS.filter((b) => title.toLowerCase().includes(b));
+  if (titleBanned.length > 0) {
+    metadataPenalty += 25;
+    issues.push(`Banned word(s) in title: ${titleBanned.join(", ")}`);
+  }
+  if (!category) {
+    metadataPenalty += 10;
+    issues.push("No category — required by Adobe Stock");
+  }
+  if (criteria.marketSaturation <= 3)
+    issues.push("Highly saturated topic — many similar assets already on Adobe Stock");
+  if (criteria.uniqueness <= 3)
+    issues.push("Low uniqueness — likely rejected as duplicate/similar");
+
+  const finalScore = Math.max(0, Math.min(100, contentScore - metadataPenalty));
+  const status = finalScore >= 80 ? "ready" : finalScore >= 55 ? "review" : "rejected";
+
+  const estimatedAcceptance = Math.round(
+    finalScore >= 80 ? 70 + (finalScore - 80) * 0.75 :
+    finalScore >= 55 ? 40 + (finalScore - 55) * 1.2 :
+    finalScore * 0.72
+  );
+
+  return {
+    score: finalScore,
+    status,
+    issues,
+    breakdown: {
+      uniqueness: criteria.uniqueness * 10,
+      commercialValue: criteria.commercialValue * 10,
+      subjectClarity: criteria.subjectClarity * 10,
+      marketSaturation: criteria.marketSaturation * 10,
+      metadataPenalty: -metadataPenalty,
+    },
+    estimatedAcceptance,
+  };
+}
+
+const GEMINI_PROMPT = (categories: string[]) => `
+You are an expert Adobe Stock reviewer. Analyze this video frame and respond with ONLY valid JSON.
+
+ADOBE CATEGORIES — pick EXACTLY one:
+${categories.map((c, i) => `${i + 1}. ${c}`).join("\\n")}
+
+TITLE RULES:
+- Max 70 chars. Format: [Subject] + [Action/State] + [Environment/Context]
+- GOOD: "Sunlight Filtering Through Pine Forest Canopy at Dawn"
+- BAD: "Beautiful Nature Scene" / "Forest Video Clip"
+- NO adjectives: beautiful, stunning, amazing, perfect, gorgeous, breathtaking
+
+KEYWORD RULES — 30 to 49 keywords:
+- 70% hyper-specific (texture, color, mood, lighting, composition)
+- 30% broader contextual
+- FORBIDDEN (cause instant rejection): footage, motion, video, clip, animation,
+  cinematography, stunning, exclusive, 4k, 8k, ai-generated, high-resolution,
+  masterpiece, beautiful, amazing, perfect, gorgeous, incredible, spectacular,
+  breathtaking, cinematic, hd, uhd, stock, adobe, shutterstock, getty, istock
+- GOOD: "cobblestone pavement", "dappled sunlight", "weathered stone"
+- BAD: "scenic", "outdoor", "nature" (too generic, millions of results)
+
+SCORING — Be strict and honest (these drive real upload decisions):
+- uniqueness (1-10): 10=extremely rare; 1=millions of identical assets on Adobe
+- commercialValue (1-10): 10=high demand from designers/publishers; 1=unusable commercially
+- subjectClarity (1-10): 10=clear subject, perfect composition; 1=blurry/cluttered
+- marketSaturation (1-10): 10=unique topic, few competitors; 1=Cappadocia/Eiffel level saturation
+
+IP: Flag recognizable brands, celebrity faces, landmarks needing property release.
+
+Respond ONLY with this JSON — no markdown, no extra text:
+{
+  "title": "string max 70 chars",
+  "description": "1-2 sentences, commercial language, no banned words",
+  "keywords": ["30-49 specific keywords"],
+  "category": "exact name from the list above",
+  "scoring": {
+    "uniqueness": 1-10,
+    "commercialValue": 1-10,
+    "subjectClarity": 1-10,
+    "marketSaturation": 1-10,
+    "reasoning": "2-3 honest sentences explaining the scores"
+  },
+  "ipConcern": true/false,
+  "ipNote": "description or empty string"
+}`;
+
 export async function analyzeImageForStock(
   file: File,
-  base64Data: string,
-  isPanoramaCollage: boolean = false
+  base64Data: string
 ): Promise<ImageAnalysisResult> {
-  const isVideo = file.type.startsWith("video/") || isPanoramaCollage;
-  const mediaType = isVideo 
-    ? (isPanoramaCollage ? "VIDEO TIMELINE (3 FRAMES COLLAGE)" : "VIDEO FRAME") 
-    : "IMAGE";
-    
-  const extraRules = isVideo 
-    ? `This is a ${mediaType}. ${isPanoramaCollage ? "You are looking at 3 sequenced frames (Start, Middle, End) merged together. Analyze the MOTION, the progression of the scene, and how the subject behaves." : ""} 
-    CRITICAL: NEVER include any of these BANNED words in keywords or title: footage, motion, video, clip, animation, cinematography, cinematic, render, stunning, beautiful, amazing. These words cause automatic rejection on Adobe Stock. Focus on SUBJECT, ENVIRONMENT, MOOD, and COMPOSITION instead.`
-    : "This is a STILL IMAGE.";
-
-  const prompt = `You are an elite Adobe Stock Vision Analyst and Prompt Engineer.
-Analyze the provided ${mediaType} completely.
-Note: The user might upload a SINGLE ${mediaType.toLowerCase()}, OR a SCREENSHOT containing MULTIPLE items.
-If it is a grid, extract the DOMINANT, MOST PROFITABLE pattern/theme connecting them.
-
-${extraRules}
-
-${ADOBE_AI_PROMPT_RULES}
-
-YOUR TASK:
-Generate Adobe Stock metadata.
-1. "keywords": 50 relevant, comma-separated keywords. Provide EXACTLY a 70% specific / 30% broad keyword split. NO trademarks, people, or IP. EXPLICITLY FORBIDDEN WORDS: ${ADOBE_BANNED_METADATA_TERMS.slice(0, 15).join(", ")}.
-2. "title": Ultra-specific commercial title, max 70 chars. NO "video", "clip", "footage", "4k". Subject-only description.
-3. "prompt": 60+ word Detailed Text-to-Image PROMPT (Midjourney style).
-4. "colorPalette": Colors.
-5. "deformationScore": 0-100 (AI artifacts).
-6. "estimatedAcceptance": 0-100 (probability).
-7. "uniquenessReview": Arabic niche assessment.
-
-JSON ONLY:
-{
-  "title": "Clean descriptive title",
-  "keywords": ["kw1", "kw2"],
-  "prompt": "Prompt...",
-  "colorPalette": "Colors",
-  "deformationScore": 15,
-  "estimatedAcceptance": 95,
-  "uniquenessReview": "فكرة ممتازة..."
-}`;
+  const prompt = GEMINI_PROMPT(ADOBE_CATEGORIES);
 
   const result = await generateWithGemini(prompt, 0.4, {
     base64: base64Data,
-    mimeType: isVideo ? "image/jpeg" : file.type
+    mimeType: file.type || "image/jpeg"
   });
+
+  interface RawAnalysisResponse {
+    title: string;
+    description: string;
+    keywords: string[];
+    category: string;
+    scoring: {
+      uniqueness: number;
+      commercialValue: number;
+      subjectClarity: number;
+      marketSaturation: number;
+      reasoning: string;
+    };
+    ipConcern: boolean;
+    ipNote: string;
+  }
   
-  const parsed = extractAndParseJSON<{ title: string; keywords: string[], prompt: string, colorPalette: string, deformationScore: number, estimatedAcceptance: number, uniquenessReview: string }>(result, { 
-    title: "Untitled Stock Element", 
-    keywords: ["stock", "illustration", "vector"],
-    prompt: "A beautiful stock illustration concept, bright colors",
-    colorPalette: "Vibrant",
-    deformationScore: 0,
-    estimatedAcceptance: 80,
-    uniquenessReview: "جاري الفحص..."
+  const parsed = extractAndParseJSON<RawAnalysisResponse>(result, {
+    title: "Untitled Stock Element",
+    description: "",
+    keywords: [],
+    category: "Technology",
+    scoring: { uniqueness: 5, commercialValue: 5, subjectClarity: 5, marketSaturation: 5, reasoning: "" },
+    ipConcern: false,
+    ipNote: ""
   });
 
   if (!parsed.title && !parsed.keywords.length) throw new Error("Failed to parse Image Analysis AI response");
-  
-  // Clean keywords
-  const rawKeywords = sanitizeStringArray(parsed.keywords).map(k => k.trim().toLowerCase());
-  const rejected: string[] = [];
-  const cleanKeywords: string[] = [];
 
-  for (const k of rawKeywords) {
-    let isBanned = false;
-    for (const banned of ADOBE_BANNED_METADATA_TERMS) {
-      if (k === banned.toLowerCase() || k.includes(banned.toLowerCase())) {
-        isBanned = true;
-        break;
-      }
-    }
-    if (isBanned) {
-      rejected.push(k);
-    } else {
-      cleanKeywords.push(k);
-    }
-  }
+  const rawKeywords = sanitizeStringArray(parsed.keywords || []).map(k => k.trim().toLowerCase());
+  const { filtered: cleanKeywords, removed: rejected } = filterBannedKeywords(rawKeywords);
+  
+  const readiness = calculateReadinessScore(
+    parsed.title,
+    cleanKeywords,
+    rejected,
+    parsed.category,
+    parsed.scoring
+  );
 
   return {
     filename: file.name,
     title: sanitizePromptOrKeywords(parsed.title),
-    keywords: cleanKeywords.slice(0, 50),
+    keywords: cleanKeywords.slice(0, 49),
     rejectedKeywords: rejected,
-    prompt: sanitizePromptOrKeywords(parsed.prompt),
-    colorPalette: parsed.colorPalette,
-    deformationScore: parsed.deformationScore,
-    estimatedAcceptance: parsed.estimatedAcceptance,
-    uniquenessReview: parsed.uniquenessReview
+    prompt: sanitizePromptOrKeywords(parsed.description), 
+    colorPalette: "",
+    deformationScore: readiness.score < 60 ? 100 : 0, 
+    estimatedAcceptance: readiness.estimatedAcceptance,
+    uniquenessReview: parsed.scoring.reasoning,
+    adobeReadinessScore: readiness.score,
+    category: parsed.category
   };
 }
