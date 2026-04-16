@@ -214,6 +214,7 @@ export function classifyGeminiError(error: unknown): GeminiErrorType {
     message.includes("referer") || message.includes("api_key_http_referrer_blocked")
   ) return "auth";
   if (message.includes("failed to fetch") || message.includes("networkerror") || message.includes("network request failed")) return "network";
+  if (message.includes("api_error_503") || message.includes("service unavailable") || message.includes("high demand")) return "rate_limit";
   return "unknown";
 }
 
@@ -239,7 +240,7 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 2, de
 
     const errorPayload = (await response.json().catch(() => null)) as GeminiErrorPayload | null;
 
-    if (response.status === 429 && attempt < retries && !isDailyQuotaExceeded(errorPayload)) {
+    if ((response.status === 429 || response.status === 503) && attempt < retries && !isDailyQuotaExceeded(errorPayload)) {
       const retryDelayMs = getRetryDelayFromPayload(errorPayload);
       const waitMs = retryDelayMs ?? delayMs * Math.pow(2, attempt);
       await new Promise((resolve) => setTimeout(resolve, Math.min(waitMs, 30000)));
@@ -392,6 +393,8 @@ export async function generateWithGemini(prompt: string, temperature = 1.4, imag
             msg.includes("api_error_429") ||
             msg.includes("api_error_401") ||
             msg.includes("api_error_403") ||
+            msg.includes("api_error_503") ||
+            msg.includes("api_error_500") ||
             msg.includes("api key not valid")
           ) {
             if (msg.includes("gemini_quota_daily_exceeded")) quotaLimitedKeys++;
@@ -400,6 +403,12 @@ export async function generateWithGemini(prompt: string, temperature = 1.4, imag
               msg.includes("api_error_403") ||
               msg.includes("api key not valid")
             ) authLimitedKeys++;
+            
+            // On server busy/limit, log it and move to next immediately
+            if (msg.includes("503") || msg.includes("429")) {
+                console.warn(`Gemini server busy/limit (${msg}), trying next available key/model...`);
+            }
+            
             shouldMoveToNextKey = true;
             break;
           }
