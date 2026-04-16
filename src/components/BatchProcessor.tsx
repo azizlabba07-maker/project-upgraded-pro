@@ -588,7 +588,11 @@ export default function BatchProcessor() {
               <div className="flex gap-4 items-start">
                 {/* Thumbnail Area */}
                 <div className="w-32 h-20 bg-slate-800 rounded overflow-hidden shrink-0 flex items-center justify-center relative">
-                   <span className="text-3xl">{res.title.startsWith("[Error]") ? "❌" : (res.filename.match(/\.(mp4|mov)$/i) ? "🎬" : "🖼️")}</span>
+                   {res.thumbnail ? (
+                     <img src={res.thumbnail} alt="Thumbnail" className="w-full h-full object-cover" />
+                   ) : (
+                     <span className="text-3xl">{res.title.startsWith("[Error]") ? "❌" : (res.filename.match(/\.(mp4|mov)$/i) ? "🎬" : "🖼️")}</span>
+                   )}
                    {res.adobeReadinessScore !== undefined && res.adobeReadinessScore < 60 && (
                      <div className="absolute inset-0 bg-red-900/40 mix-blend-multiply pointer-events-none" />
                    )}

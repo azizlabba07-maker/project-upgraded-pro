@@ -893,6 +893,7 @@ export interface ImageAnalysisResult {
   title: string;
   keywords: string[];
   rejectedKeywords?: string[];
+  thumbnail?: string;      // The base64 or URL for the thumbnail
   prompt: string;        // The new AI generated text-to-image prompt
   colorPalette: string;  // The suggested trending colors
   compliance?: ComplianceResult; // النتيجة الخاصة بفحص الجودة والامتثال
@@ -1113,6 +1114,7 @@ export async function analyzeImageForStock(
     title: sanitizePromptOrKeywords(parsed.title),
     keywords: cleanKeywords.slice(0, 49),
     rejectedKeywords: rejected,
+    thumbnail: base64Data,
     prompt: sanitizePromptOrKeywords(parsed.description), 
     colorPalette: "",
     deformationScore: readiness.score < 60 ? 100 : 0, 
