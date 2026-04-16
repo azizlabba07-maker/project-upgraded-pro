@@ -1,8 +1,11 @@
 import { useState, useCallback, useRef } from "react";
-import { analyzeImageForStock, hasAnyApiKey, getUserGeminiApiKeys, type ImageAnalysisResult } from "@/lib/gemini";
+import { hasAnyApiKey, getUserGeminiApiKeys } from "@/lib/gemini";
+import { analyzeImageForStock } from "@/lib/analyze";
+import { extractVideoFrame } from "@/lib/videoUtils";
+import { prepareCsvRow } from "@/lib/csvExport";
+import { type ImageAnalysisResult } from "../types";
 import { toast } from "sonner";
 import { exportCsvFile, copyTextSafely } from "@/lib/shared";
-import { sanitizeForExport, sanitizeKeywordsForExport } from "@/lib/sanitizer";
 import ShinyText from "./animations/ShinyText";
 import DecryptedText from "./animations/DecryptedText";
 
@@ -14,31 +17,6 @@ const readImageBase64 = (file: File): Promise<string> =>
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
-
-/** Extract a single 640x480 max frame for Video processing */
-async function extractFrame(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const video = document.createElement("video");
-    const canvas = document.createElement("canvas");
-    video.src = URL.createObjectURL(file);
-    video.muted = true;
-    video.crossOrigin = "anonymous";
-    video.onloadedmetadata = () => { video.currentTime = Math.min(2, video.duration * 0.1); };
-    video.onseeked = () => {
-      const scale = Math.min(640 / video.videoWidth, 480 / video.videoHeight, 1);
-      canvas.width = Math.round(video.videoWidth * scale);
-      canvas.height = Math.round(video.videoHeight * scale);
-      canvas.getContext("2d")!.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
-      URL.revokeObjectURL(video.src);
-      resolve(dataUrl);
-    };
-    video.onerror = () => {
-      URL.revokeObjectURL(video.src);
-      reject(new Error("فشل استخراج إطار الفيديو"));
-    };
-  });
-}
 
 // ─────────────────────────────────────────────
 // 🔧  Utility
@@ -160,10 +138,10 @@ export default function BatchProcessor() {
 
       try {
         let base64: string;
-        let isPanorama = false;
 
         if (file.type.startsWith("video/")) {
-          base64 = await extractFrame(file);
+          const videoData = await extractVideoFrame(file);
+          base64 = videoData.base64;
         } else {
           base64 = await readImageBase64(file);
         }
@@ -309,17 +287,7 @@ export default function BatchProcessor() {
     exportCsvFile(
       `adobe_stock_batch_${Date.now()}.csv`,
       ["Filename", "Title", "Keywords", "Prompt", "Color Palette", "Category", "Releases", "Adobe_Readiness_Score", "Rejected_Keywords"],
-      valid.map((r) => [
-        r.filename,
-        sanitizeForExport(r.title),
-        sanitizeKeywordsForExport(r.keywords).join(","),
-        sanitizeForExport(r.prompt || ""),
-        r.colorPalette || "",
-        r.category || "",
-        "",
-        r.adobeReadinessScore?.toString() || "",
-        (r.rejectedKeywords || []).join(", "),
-      ])
+      valid.map((r) => prepareCsvRow(r))
     );
     toast.success("📥 تم التصدير — جاهز للرفع إلى Adobe Stock!");
   };
