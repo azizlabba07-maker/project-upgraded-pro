@@ -900,6 +900,7 @@ export interface ImageAnalysisResult {
   estimatedAcceptance?: number; // 0 to 100% acceptance probability
   uniquenessReview?: string; // Assessment of similarity to existing Adobe Stock items
   adobeReadinessScore?: number;
+  category?: string;
 }
 
 export async function analyzeImageForStock(

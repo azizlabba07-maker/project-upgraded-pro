@@ -417,7 +417,7 @@ export default function BatchProcessor() {
         sanitizeKeywordsForExport(r.keywords).join(","),
         sanitizeForExport(r.prompt || ""),
         r.colorPalette || "",
-        "",
+        r.category || "",
         "",
         r.adobeReadinessScore?.toString() || "",
         (r.rejectedKeywords || []).join(", "),
@@ -435,6 +435,15 @@ export default function BatchProcessor() {
       } catch {}
       toast.success("تم مسح القائمة بنجاح");
     }
+  };
+
+  const handleUpdateCategory = (index: number, category: string) => {
+    const newResults = [...results];
+    newResults[index].category = category;
+    setResults(newResults);
+    try {
+      localStorage.setItem("batch_processor_results", JSON.stringify(newResults));
+    } catch {}
   };
 
   const removeResult = (index: number) => {
@@ -672,134 +681,143 @@ export default function BatchProcessor() {
               }).map((res, i) => (
             <div
               key={i}
-              className={`rounded-2xl border p-4 relative ${
+              className={`rounded-xl border p-4 relative flex flex-col gap-3 ${
                 res.title.startsWith("[Error]")
                   ? "bg-red-500/[0.03] border-red-500/10"
-                  : "bg-white/[0.02] border-white/[0.06]"
+                  : "bg-[#111318] border-white/[0.04] hover:bg-[#15171e] shadow-sm transition-all"
               }`}
             >
-              <div className="flex items-start gap-3">
-                <span className="text-lg shrink-0">{res.title.startsWith("[Error]") ? "❌" : "✅"}</span>
+              <div className="flex gap-4 items-start">
+                {/* Thumbnail Area */}
+                <div className="w-32 h-20 bg-slate-800 rounded overflow-hidden shrink-0 flex items-center justify-center relative">
+                   <span className="text-3xl">{res.title.startsWith("[Error]") ? "❌" : (res.filename.match(/\.(mp4|mov)$/i) ? "🎬" : "🖼️")}</span>
+                   {res.adobeReadinessScore !== undefined && res.adobeReadinessScore < 60 && (
+                     <div className="absolute inset-0 bg-red-900/40 mix-blend-multiply pointer-events-none" />
+                   )}
+                </div>
+                
+                {/* Main Content */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] text-slate-400 mb-1 cursor-crosshair" title="قم بالتمرير لفك التشفير أو إخفائه">
-                    <DecryptedText text={res.filename} speed={70} maxIterations={25} animateOn="hover" />
-                  </p>
-                  <p className="text-xs text-white font-semibold mb-1.5 cursor-crosshair">
-                    <DecryptedText text={res.title} speed={70} maxIterations={30} animateOn="view" />
-                  </p>
-                  {res.colorPalette && (
-                    <p className="text-[10px] text-blue-400 mb-1">🎨 {res.colorPalette}</p>
-                  )}
-                  
-                  {/* Quality & Compliance Intelligence */}
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    {/* Deformation Score */}
-                    {res.deformationScore !== undefined && (
-                      <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-bold ${
-                        res.deformationScore <= 10 ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-                        res.deformationScore <= 30 ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
-                        'bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_8px_rgba(239,68,68,0.2)]'
-                      }`}>
-                        <span>{res.deformationScore <= 10 ? '✨' : res.deformationScore <= 30 ? '👀' : '👾'}</span>
-                        <span>شذوذ AI: {res.deformationScore}%</span>
-                      </div>
-                    )}
-
-                    {/* Adobe Readiness Score */}
-                    {res.adobeReadinessScore !== undefined && (
-                      <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-bold ${
-                        res.adobeReadinessScore >= 85 ? 'bg-green-500/10 text-green-400 border border-green-500/20 shadow-[0_0_8px_rgba(34,197,94,0.2)]' :
-                        res.adobeReadinessScore >= 60 ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
-                        'bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_8px_rgba(239,68,68,0.2)]'
-                      }`}>
-                        <span>{res.adobeReadinessScore >= 85 ? '🟢' : res.adobeReadinessScore >= 60 ? '🟡' : '🔴'}</span>
-                        <span>جاهزية: {res.adobeReadinessScore}%</span>
-                      </div>
-                    )}
-
-                    {/* Estimated Acceptance */}
-                    {res.estimatedAcceptance !== undefined && (
-                      <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-bold ${
-                        res.estimatedAcceptance >= 90 ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-[0_0_8px_rgba(59,130,246,0.2)]' :
-                        res.estimatedAcceptance >= 70 ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-                        'bg-orange-500/10 text-orange-400 border border-orange-500/20'
-                      }`}>
-                        <span>{res.estimatedAcceptance >= 90 ? '📈' : res.estimatedAcceptance >= 70 ? '📊' : '📉'}</span>
-                        <span>فرصة القبول: {res.estimatedAcceptance}%</span>
-                      </div>
-                    )}
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className={`text-[11px] ${res.title.startsWith("[Error]") ? "text-red-500" : "text-green-500"}`}>
+                      {res.title.startsWith("[Error]") ? "❌" : "✓"}
+                    </span>
+                    <p className="text-[11px] text-slate-400 font-mono truncate max-w-[200px]" title={res.filename}>
+                      {res.filename}
+                    </p>
                     
-                    {/* Legacy Compliance shield if no estimatedAcceptance */}
-                    {!res.estimatedAcceptance && res.compliance && (
-                      <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-bold w-fit ${
-                        res.compliance.status === 'safe' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-                        res.compliance.status === 'warning' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
-                        'bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                    {/* Readiness Score Pill */}
+                    {res.adobeReadinessScore !== undefined && (
+                      <div className={`px-2 py-[1px] rounded text-[10px] font-bold tracking-wider ${
+                        res.adobeReadinessScore >= 85 ? 'bg-green-500/10 text-green-500 border border-green-500/20' :
+                        res.adobeReadinessScore >= 70 ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                        res.adobeReadinessScore >= 60 ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' :
+                        'bg-red-500/10 text-red-500 border border-red-500/20'
                       }`}>
-                        <span className="text-xs">
-                          {res.compliance.status === 'safe' ? '🛡️' : res.compliance.status === 'warning' ? '⚠️' : '🚫'}
-                        </span>
-                        <span>
-                          {res.compliance.status === 'safe' ? 'آمن للرفع' : res.compliance.status === 'warning' ? 'تنبيه جودة' : 'خطر رفض مرتفع'}
-                        </span>
-                        <span className="opacity-40">|</span>
-                        <span>{res.compliance.score}%</span>
+                         {res.adobeReadinessScore >= 85 ? '✓ A' : res.adobeReadinessScore >= 70 ? '✓ B' : res.adobeReadinessScore >= 60 ? '! C' : 'X D'} {res.adobeReadinessScore}%
                       </div>
                     )}
                   </div>
                   
-                  {/* Uniqueness Review */}
-                  {res.uniquenessReview && (
-                    <p className="text-[10px] text-accent mb-2 font-mono flex items-start gap-1">
-                      <span className="shrink-0 text-amber-400">💡 الجودة التسويقية:</span> 
-                      {res.uniquenessReview}
+                  <p className="text-[14px] text-gray-100 font-semibold mb-2 leading-snug pr-4">
+                    {res.title}
+                  </p>
+                  
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    {/* Keywords Count */}
+                    <span className="px-2 py-0.5 rounded bg-[#004e36] text-[#00e676] text-[10px] border border-[#00e676]/20">
+                      كلمة مفتاحية {res.keywords.length}
+                    </span>
+                    
+                    {/* Category if selected */}
+                    {res.category && (
+                      <span className="px-2 py-0.5 rounded bg-blue-900/30 text-blue-400 text-[10px] border border-blue-500/20">
+                        {res.category.toLowerCase()}
+                      </span>
+                    )}
+
+                    {/* Rejected Keywords Count */}
+                    {res.rejectedKeywords && res.rejectedKeywords.length > 0 && (
+                      <span className="px-2 py-0.5 rounded bg-[#3e1212] text-[#ff5252] text-[10px] border border-[#ff5252]/20">
+                        كلمة محظورة: خافت {res.rejectedKeywords.length}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Warnings Section */}
+                  {(res.rejectedKeywords && res.rejectedKeywords.length > 0) ? (
+                    <div className="text-[10px] text-[#ff5252] mt-2 space-y-0.5">
+                      {res.rejectedKeywords.map((rk, idx) => (
+                        <p key={idx}>❌ {rk} :كلمة محظورة تم حذفها</p>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {res.adobeReadinessScore !== undefined && res.adobeReadinessScore < 70 && (
+                    <p className="text-[11px] text-[#ffb74d] mt-1.5 font-bold">
+                      ! احتمال رفض عالي — موضوع مشبع جداً في Adobe Stock
                     </p>
                   )}
 
-                  {res.compliance?.issues && res.compliance.issues.length > 0 && (
-                    <div className="mb-2 p-2 rounded-lg bg-red-500/5 border border-red-500/10">
-                      <p className="text-[8px] uppercase font-bold text-red-400/60 mb-1 tracking-wider">مشاكل تم رصدها:</p>
-                      <ul className="space-y-0.5">
-                        {res.compliance.issues.map((issue, idx) => (
-                          <li key={idx} className="text-[9px] text-red-400/90 flex items-start gap-1 leading-tight">
-                            <span className="shrink-0">•</span> {issue}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                  {res.uniquenessReview && (
+                    <p className="text-[10px] text-yellow-500/80 mt-1">
+                      ! {res.uniquenessReview}
+                    </p>
                   )}
+                </div>
 
-                  {res.prompt && (
-                    <p className="text-[10px] text-slate-500 italic mb-2 line-clamp-2">{res.prompt}</p>
-                  )}
-                  {res.keywords.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {res.keywords.slice(0, 12).map((kw, ki) => (
-                        <span key={ki} className="text-[9px] bg-white/[0.04] border border-white/[0.06] text-slate-500 px-1.5 py-0.5 rounded">{kw}</span>
-                      ))}
-                      {res.keywords.length > 12 && <span className="text-[9px] text-slate-600">+{res.keywords.length - 12}</span>}
-                    </div>
-                  )}
+                {/* Right Side Controls */}
+                <div className="flex flex-col items-end gap-3 shrink-0 ml-auto">
+                  <button onClick={() => removeResult(i)} className="text-slate-600 hover:text-red-400">✕</button>
+                  
                   {!res.title.startsWith("[Error]") && (
-                    <div className="flex gap-1.5 mt-2">
-                      <button
-                        onClick={() => copyTextSafely(res.keywords.join(", ")).then(ok => ok && toast.success("تم نسخ Keywords!"))}
-                        className="text-[9px] bg-white/[0.04] border border-white/[0.06] text-slate-500 px-2 py-1 rounded hover:text-white transition-colors"
-                      >
-                        📋 Keywords
-                      </button>
-                      {res.prompt && (
-                        <button
-                          onClick={() => copyTextSafely(res.prompt).then(ok => ok && toast.success("تم نسخ Prompt!"))}
-                          className="text-[9px] bg-white/[0.04] border border-white/[0.06] text-slate-500 px-2 py-1 rounded hover:text-white transition-colors"
-                        >
-                          📋 Prompt
-                        </button>
-                      )}
-                    </div>
+                    <select 
+                      value={res.category || ""}
+                      onChange={(e) => handleUpdateCategory(i, e.target.value)}
+                      className="bg-[#1a1d24] border border-white/10 text-gray-300 text-[10px] rounded px-3 py-1.5 outline-none focus:border-blue-500 min-w-[140px] appearance-none"
+                    >
+                      <option value="" disabled>اختر الفئة...</option>
+                      <option value="Animals">Animals</option>
+                      <option value="Buildings and Architecture">Buildings and Architecture</option>
+                      <option value="Business">Business</option>
+                      <option value="Drink">Drink</option>
+                      <option value="The Environment">The Environment</option>
+                      <option value="States of Mind">States of Mind</option>
+                      <option value="Food">Food</option>
+                      <option value="Graphic Resources">Graphic Resources</option>
+                      <option value="Hobbies and Leisure">Hobbies and Leisure</option>
+                      <option value="Industry">Industry</option>
+                      <option value="Landscapes">Landscapes</option>
+                      <option value="Lifestyle">Lifestyle</option>
+                      <option value="People">People</option>
+                      <option value="Plants and Flowers">Plants and Flowers</option>
+                      <option value="Culture and Religion">Culture and Religion</option>
+                      <option value="Science">Science</option>
+                      <option value="Social Issues">Social Issues</option>
+                      <option value="Sports">Sports</option>
+                      <option value="Technology">Technology</option>
+                      <option value="Transport">Transport</option>
+                      <option value="Travel">Travel</option>
+                    </select>
                   )}
                 </div>
               </div>
+
+              {/* Keyword Pills List (Bottom) */}
+              {res.keywords.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1 border-t border-white/[0.03] pt-3">
+                  {res.keywords.slice(0, 16).map((kw, ki) => (
+                    <span key={ki} className="text-[10px] bg-[#1a1d24] text-slate-400 border border-white/[0.05] px-2 py-0.5 rounded-md hover:text-white transition-colors cursor-default">
+                      {kw}
+                    </span>
+                  ))}
+                  {res.keywords.length > 16 && (
+                    <span className="text-[10px] bg-[#1a1d24] text-slate-500 px-2 py-0.5 rounded-md">
+                      +{res.keywords.length - 16}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           ))}
           </div>
