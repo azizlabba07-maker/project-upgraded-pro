@@ -1063,9 +1063,10 @@ export async function analyzeImageForStock(
 ): Promise<ImageAnalysisResult> {
   const prompt = GEMINI_PROMPT(ADOBE_CATEGORIES);
 
+  const isVideo = file.type.startsWith("video/");
   const result = await generateWithGemini(prompt, 0.4, {
     base64: base64Data,
-    mimeType: file.type || "image/jpeg"
+    mimeType: isVideo ? "image/jpeg" : (file.type || "image/jpeg")
   });
 
   interface RawAnalysisResponse {
