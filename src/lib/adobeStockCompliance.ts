@@ -165,3 +165,14 @@ export const GLOBAL_IP_BLACKLIST = [
   "keurig", "volvic", "evian", "perrier", "san pellegrino",
 ];
 
+/**
+ * Standard Adobe Stock Categories
+ */
+export const ADOBE_CATEGORIES = [
+  "Animals", "Buildings and Architecture", "Business", "Drinks", "Environment",
+  "States of Mind", "Food", "Graphic Resources", "Hobbies and Leisure",
+  "Industry", "Landscapes", "Lifestyle", "People", "Plants and Flowers",
+  "Culture and Religion", "Science", "Social Issues", "Sports", "Technology",
+  "Transport and Infrastructure", "Travel",
+];
+

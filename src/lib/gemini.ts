@@ -1,7 +1,9 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { supabase, checkAuthStatus } from "./supabase";
-import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX, ADOBE_IMAGE_NEGATIVE_SUFFIX, ADOBE_BANNED_METADATA_TERMS } from "./adobeStockCompliance";
+import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX, ADOBE_IMAGE_NEGATIVE_SUFFIX, ADOBE_BANNED_METADATA_TERMS, ADOBE_CATEGORIES } from "./adobeStockCompliance";
+export { ADOBE_CATEGORIES };
 import { extractAndParseJSON, withCache, sanitizePromptOrKeywords, sanitizeStringArray, scanForIPRisks, type IPRiskFlag } from "@/lib/sanitizer";
+export { extractAndParseJSON };
 
 const GEMINI_STORAGE_KEY = "gemini_api_key";
 const GEMINI_STORAGE_KEYS = "gemini_api_keys";
