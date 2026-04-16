@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { generateAIKeywords, getTopKeywordsForDomain, hasAnyApiKey, analyzeImageForStock, type ImageAnalysisResult } from "@/lib/gemini";
+import { generateAIKeywords, getTopKeywordsForDomain, hasAnyApiKey } from "@/lib/gemini";
+import { analyzeImageForStock } from "@/lib/analyze";
+import { type ImageAnalysisResult } from "../types";
 import { generateClaudeKeywords, hasClaudeKey } from "@/lib/claude";
 import { trackAiMetric } from "@/lib/aiMetrics";
 import { saveNote, getNotes, deleteNote } from "@/lib/storage";
