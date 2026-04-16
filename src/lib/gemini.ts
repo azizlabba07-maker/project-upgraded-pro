@@ -7,12 +7,14 @@ const GEMINI_STORAGE_KEY = "gemini_api_key";
 const GEMINI_STORAGE_KEYS = "gemini_api_keys";
 const GEMINI_STORAGE_LAST_KEY_INDEX = "gemini_api_last_key_index";
 const GEMINI_MODELS = [
-  "gemini-2.5-flash-lite", // أعلى حصة مجانية: 1000 طلب/يوم
+  "gemini-2.5-flash-lite-preview-06-17",
+  "gemini-2.5-flash",
   "gemini-2.0-flash",
-  "gemini-1.5-flash-latest",
+  "gemini-2.0-flash-lite",
   "gemini-1.5-flash",
+  "gemini-1.5-flash-8b",
 ];
-const GEMINI_API_VERSIONS = ["v1", "v1beta"];
+const GEMINI_API_VERSIONS = ["v1beta", "v1"];
 
 function readStoredGeminiApiKey(): string {
   try {
@@ -912,7 +914,7 @@ export async function analyzeImageForStock(
     
   const extraRules = isVideo 
     ? `This is a ${mediaType}. ${isPanoramaCollage ? "You are looking at 3 sequenced frames (Start, Middle, End) merged together. Analyze the MOTION, the progression of the scene, and how the subject behaves." : ""} 
-    Include high-converting video-specific keywords (e.g., footage, motion, video, clip, animation, cinematography). AVOID static words like vector, illustration, painting.`
+    CRITICAL: NEVER include any of these BANNED words in keywords or title: footage, motion, video, clip, animation, cinematography, cinematic, render, stunning, beautiful, amazing. These words cause automatic rejection on Adobe Stock. Focus on SUBJECT, ENVIRONMENT, MOOD, and COMPOSITION instead.`
     : "This is a STILL IMAGE.";
 
   const prompt = `You are an elite Adobe Stock Vision Analyst and Prompt Engineer.
