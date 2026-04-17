@@ -454,7 +454,7 @@ export async function generateAIVideoPrompts(
 ): Promise<VideoPromptResult[]> {
   // نطلب count+3 لتعويض أي فلترة لاحقة
   const requestCount = count + 3;
-  const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}-${crypto.getRandomValues(new Uint32Array(1))[0]}`;
+  const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.floor(Math.random() * 1000000)}`;
   const strictRules = CATEGORY_STRICT_RULES.replace(/\{CATEGORY\}/g, category);
   const prompt = `You are an expert Adobe Stock video prompt engineer specialized in Gemini Business AI video generation (8-second clips, Veo 2 model).
 ${strictRules}
@@ -835,7 +835,7 @@ export interface MarketOracleItem {
  * أوراكل السوق الموحد - يجمع بين التراندات الحالية والتوقعات المستقبلية والموسمية
  */
 export async function getUnifiedMarketOracle(): Promise<MarketOracleItem[]> {
-  const seed = `ORACLE-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const seed = `ORACLE-${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.floor(Math.random() * 99999)}`;
   const date = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 
   const prompt = `You are the ultimate Adobe Stock Predictive Oracle. 

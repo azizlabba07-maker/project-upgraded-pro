@@ -240,6 +240,30 @@ function getDailyMarketData(): MarketTrend[] {
 
 export const marketData: MarketTrend[] = getDailyMarketData();
 
+export const categories = [
+  { label: "الذكاء الاصطناعي (AI)", value: "AI" },
+  { label: "الاستدامة (Sustainability)", value: "Sustainability" },
+  { label: "الأعمال والعمل (Work)", value: "Work" },
+  { label: "الصحة والرفاهية (Wellness)", value: "Wellness" },
+  { label: "التنوع والشمول (Diversity)", value: "Diversity" },
+  { label: "التصميم والتجريد (Design)", value: "Design" },
+  { label: "الطبيعة والبيئة (Nature)", value: "Nature" },
+  { label: "الغذاء والمشروبات (Food)", value: "Food" },
+  { label: "التكنولوجيا (Technology)", value: "Technology" },
+  { label: "العلوم (Science)", value: "Science" },
+  { label: "الأعمال (Business)", value: "Business" },
+];
+
+export const seasonalEvents: (SeasonalEvent & { impact: string })[] = [
+  { event: "رمضان والعيد", month: "مارس - إبريل", images: "Islamic geometric, crescent moon, lantern light, prayer space", impact: "High" },
+  { event: "موسم الصيف", month: "يونيو - أغسطس", images: "Beach luxury, outdoor adventure, travel, fresh food", impact: "High" },
+  { event: "العودة للمدارس", month: "سبتمبر", images: "Education tech, workspace, notebooks, focus ritual", impact: "Medium" },
+  { event: "الهالوين", month: "أكتوبر", images: "Dark atmospheric, abstract horror-adjacent, moody nature", impact: "Medium" },
+  { event: "الجمعة السوداء", month: "نوفمبر", images: "Commerce, shopping abstract, discount concept, business", impact: "Extremely High" },
+  { event: "رأس السنة والكريسماس", month: "ديسمبر", images: "Minimalist winter, cozy interior, warm light bokeh", impact: "Extremely High" },
+  { event: "يوم الحب", month: "فبراير", images: "Romantic abstract, heart shapes, red and pink aesthetics", impact: "Medium" },
+];
+
 export const dailyTips = [
   "🎯 الفيديوهات بين 10-30 ثانية مع حركة كاميرا بطيئة تحقق أعلى مبيعات في 2025",
   "📊 أضف 47-49 كلمة مفتاحية دائماً — تزيد نسبة الظهور 3x مقارنة بـ 25 كلمة",
@@ -253,15 +277,18 @@ export const dailyTips = [
   "💎 Space Tourism محتوى نادر يصعب المنافسة فيه — احتمالية قبول 90%+",
 ];
 
-export const seasonalEvents: SeasonalEvent[] = [
-  { event: "رمضان", month: "مارس", images: "Islamic geometric, crescent moon, lantern light, prayer space" },
-  { event: "العيد", month: "أبريل", images: "Celebration, family, traditional attire, festive food" },
-  { event: "الصيف", month: "يونيو", images: "Beach luxury, outdoor adventure, travel, fresh food" },
-  { event: "العودة للمدرسة", month: "أغسطس", images: "Education tech, workspace, notebooks, focus ritual" },
-  { event: "الهالوين", month: "أكتوبر", images: "Dark atmospheric, abstract horror-adjacent, moody nature" },
-  { event: "البلاك فرايدي", month: "نوفمبر", images: "Commerce, shopping abstract, discount concept, business" },
-  { event: "الكريسماس", month: "ديسمبر", images: "Minimalist winter, cozy interior, warm light bokeh" },
-  { event: "رأس السنة", month: "يناير", images: "Particle explosion, light trails, new beginning abstract" },
-];
 
 export const topicPromptData: Record<string, { subjects: string[]; environments: string[]; details: string[] }> = {};
+
+export const checklistItems = [
+  "تأكد من عدم وجود أي شعارات أو علامات تجارية مخفية.",
+  "تحقق من حدة التفاصيل (Sharpness) في الإطارات الرئيسية.",
+  "تأكد من خلو العمل من أي نصوص أو أرقام.",
+  "راجع تنوع الكلمات المفتاحية وعدم تكرارها.",
+  "تحقق من أن العنوان وصفي بحت ولا يحتوي على كلمات تقنية.",
+  "تأكد من اختيار الفئة الصحيحة (Category) في متصفح Adobe.",
+  "راجع توازن الألوان والإضاءة في المشهد.",
+  "المحتوى المولد بالذكاء الاصطناعي يجب أن يُعلم عليه كـ 'Illustrated' أو 'Generative AI'.",
+  "تجنب الوجوه البشرية التي يمكن التعرف عليها بدون Release.",
+  "تحقق من أن مدة الفيديو مناسبة (8-30 ثانية)."
+];

@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { marketData as initialMarketData, dailyTips, seasonalEvents, type MarketTrend } from "@/data/marketData";
-import { EMERGING_TRENDS_2026 } from "@/data/trends2026";
+import { marketData as initialMarketData, dailyTips, type MarketTrend } from "@/data/marketData";
 import { createSourcePulse, pulseLocalTrends } from "@/lib/livePulse";
 import { generateAITrends, hasAnyApiKey, getUnifiedMarketOracle, type MarketOracleItem } from "@/lib/gemini";
 import { clearAllCache } from "@/lib/sanitizer";
@@ -12,8 +11,10 @@ import OneClickOpportunity from "@/components/OneClickOpportunity";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, RadarChart, Radar, PolarGrid,
-  PolarAngleAxis, PolarRadiusAxis, LineChart, Line, Area, AreaChart
+  PolarAngleAxis, PolarRadiusAxis
 } from "recharts";
+
+const TICK_STYLE = { fill: "#70d0ff", fontFamily: "monospace", fontSize: 10 };
 
 const RADIAN = Math.PI / 180;
 const COLORS = ['#00D4FF', '#FF6B6B', '#4ECDC4', '#FFD93D', '#FF8C42'];
@@ -50,7 +51,10 @@ export default function Dashboard() {
   const goldOpportunities = useMemo(() => marketData.filter((i) => i.demand === "high" && i.competition === "low").length, [marketData]);
   const avgProfit = useMemo(() => Math.round(marketData.reduce((s, i) => s + i.profitability, 0) / (marketData.length || 1)), [marketData]);
   const rareNiches = useMemo(() => marketData.filter((i) => i.profitability >= 90).length, [marketData]);
-  const topTrend = useMemo(() => marketData.length > 0 ? marketData.reduce((max, i) => (i.searches > max.searches ? i : max)) : { topic: "" }, [marketData]);
+  const topTrend = useMemo(() => {
+    if (marketData.length === 0) return { topic: "N/A", searches: 0, profitability: 0, demand: 'low', competition: 'low', category: 'N/A' } as MarketTrend;
+    return marketData.reduce((max, i) => (i.searches > max.searches ? i : max));
+  }, [marketData]);
   
   const isLive = marketData !== initialMarketData;
   const isCached = hasAnyApiKey() && isLive;
@@ -231,7 +235,6 @@ export default function Dashboard() {
     }));
   }, [marketData]);
 
-  const TICK_STYLE = { fill: "#70d0ff", fontFamily: "monospace", fontSize: 10 };
 
   const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: any) => {
     if (percent < 0.1) return null;
