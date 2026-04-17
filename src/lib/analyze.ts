@@ -1,139 +1,44 @@
-import { generateWithGemini, ADOBE_CATEGORIES, extractAndParseJSON } from "./gemini";
-import { sanitizePromptOrKeywords, sanitizeStringArray } from "./sanitizer";
-import { type ImageAnalysisResult, type ScoreBreakdown, type VisualDNA, type ReleaseInfo } from "../types";
+import { generateWithGemini, extractAndParseJSON } from "./gemini";
+import { type AnalysisResult, type ScoreBreakdown, type ReleaseInfo } from "../types";
+import { 
+  ADOBE_CATEGORIES, 
+  ADOBE_BANNED_KEYWORDS, 
+  RISING_TRENDS_2026,
+  MIN_KEYWORDS,
+  OPTIMAL_TITLE_MIN,
+  MAX_KEYWORDS
+} from "./constants";
 
-// ════════════════════════════════════════════════════════════
-// ADOBE BANNED KEYWORDS — Extended List (2025)
-// ════════════════════════════════════════════════════════════
-const ADOBE_BANNED_KEYWORDS = [
-  // Media descriptors
-  "video", "clip", "footage", "motion", "animation", "cinematography",
-  "timelapse", "time-lapse", "hyperlapse", "slow motion", "slowmotion",
-  // Resolution & technical
-  "4k", "8k", "hd", "uhd", "ultra hd", "high-resolution", "high resolution",
-  "ai-generated", "ai generated", "artificial intelligence generated",
-  // Subjective adjectives
-  "beautiful", "stunning", "amazing", "perfect", "gorgeous", "incredible",
-  "spectacular", "breathtaking", "masterpiece", "exclusive", "cinematic",
-  "awesome", "fantastic", "wonderful", "magnificent", "superb",
-  "best", "top", "great", "excellent", "finest",
-  // Commercial / Source
-  "stock", "adobe", "shutterstock", "getty", "istock", "royalty free",
-  "royalty-free", "free", "download", "buy", "sale", "editorial",
-  // Design / Technical
-  "template", "sample", "preview", "watermark", "render", "3d render",
-  "photo", "photograph", "image", "picture", "wallpaper", "background image",
-  // Generic low-value
-  "new", "latest", "trending", "popular", "viral", "modern",
-];
+// Use a Set for ultra-fast word-boundary matching
+const BANNED_WORDS_SET = new Set(ADOBE_BANNED_KEYWORDS.map(w => w.toLowerCase()));
 
-// ════════════════════════════════════════════════════════════
-// MARKET TREND INTELLIGENCE — Updated 2025/2026
-// ════════════════════════════════════════════════════════════
-const RISING_TRENDS = [
-  "ai human interaction", "sustainable lifestyle", "mental health awareness",
-  "remote work lifestyle", "digital nomad", "neurodiversity representation",
-  "gen z aesthetics", "y2k revival", "analog nostalgia", "solarpunk",
-  "dark academia", "cottagecore", "urban farming", "creator economy",
-  "climate anxiety", "micro living", "longevity wellness", "biohacking",
-  "community building", "cultural identity", "gender fluidity", "artisanal craft"
-];
-
-const OVERSATURATED_TOPICS = [
-  "sunset over mountains", "coffee on desk", "handshake in office",
-  "person typing on laptop", "generic city skyline", "autumn leaves falling",
-  "hot air balloon cappadocia", "eiffel tower paris", "santorini greece",
-  "generic yoga on beach", "business team meeting", "doctor in white coat",
-];
-
-// ════════════════════════════════════════════════════════════
-// THE PROFESSIONAL PROMPT — Anti-Similarity System
-// ════════════════════════════════════════════════════════════
-const buildPrompt = (): string => `
-You are a Senior Adobe Stock Intelligence Specialist — combining 15+ years of stock 
-curation with deep knowledge of market gaps and emerging buyer trends. 
-Your mission: generate metadata that MAXIMIZES discovery while MINIMIZING similarity score.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PHASE 1 — VISUAL DNA EXTRACTION (think before writing anything)
-□ uniqueVisualElement: identify the SINGLE most specific detail that differentiates this frame (e.g., "rim lighting creating orange halo around wet cobblestones" not "street")
-□ colorPalette: 2-3 precise colors (e.g., "desaturated sage green", "oxidized copper")
-□ lightingCharacter: precise description (e.g., "harsh fluorescent overhead cast")
-□ emotionalRegister: the primary mood in 3-5 words
-□ trendAlignment: pick matching trends from this list: ${RISING_TRENDS.join(", ")}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PHASE 2 — TITLE ENGINEERING
-• Exactly 55-70 characters (NEVER shorter)
-• Formula: [Specific Subject + Action] [Rare Visual Detail] [Commercial Context]
-• MUST include: one color/tone descriptor, one lighting/atmosphere descriptor
-• MUST target commercial buyer searches (e.g., Creative Directors)
-Good Example: "Exhausted Female Doctor Reviewing Charts Under Harsh Fluorescent Light"
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PHASE 3 — ANTI-SIMILARITY KEYWORDS (47-49 words exactly)
-Layer A (1-12): Visual Fingerprint — 3-5 word phrases of exact details. (e.g., "diffused window light casting soft elongated shadows")
-Layer B (13-22): Subject Identity — who, age, ethnicity, state. (e.g., "middle-aged south asian woman concentrating")
-Layer C (23-32): Environment — hyper-specific place. (e.g., "cluttered creative studio with exposed brick wall" not "office")
-Layer D (33-42): Trend & Commercial — ربط بالترندات الصاعدة + cases ("website hero image", "editorial illustration")
-Layer E (43-49): Concepts & Emotions — "resilience", "quiet ambition", "unseen labor"
-
-MANDATORY: NO single-word generic terms like "nature", "people", "business".
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PHASE 4 — HONEST COMPETITIVE SCORING
-Compare to Adobe's actual 400M+ asset library:
-uniqueness (1-10): 10 = exists in <100 assets; 1 = exists in >5,000,000 assets (generic).
-commercialValue, subjectClarity, marketSaturation (1-10 each).
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PHASE 5 — IP & RELEASE ANALYSIS
-Check for humans, private property, trademarked landmarks, brand logos, artworks.
- releases: { modelRelease, propertyRelease, editorialOnly, copyrightConcern, releaseNote, avoidanceHint }
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-RESPOND WITH ONLY THIS JSON:
-{
-  "visualDNA": {
-    "uniqueVisualElement": "string",
-    "colorPalette": "string",
-    "lightingCharacter": "string",
-    "emotionalRegister": "string",
-    "trendAlignment": ["string"]
-  },
-  "title": "string 55-70 chars",
-  "description": "2-3 sentences",
-  "keywords": ["array of 47-49"],
-  "category": "exact name from official list",
-  "competitiveGap": "1-2 sentences explaining market gap",
-  "scoring": {
-    "uniqueness": 0, "commercialValue": 0, "subjectClarity": 0, "marketSaturation": 0, "reasoning": "string"
-  },
-  "releases": {
-    "modelRelease": false, "propertyRelease": false, "editorialOnly": false, "copyrightConcern": false,
-    "releaseNote": "string", "avoidanceHint": "string"
-  }
-}`;
-
-function deduplicateKeywords(keywords: string[]): string[] {
-  const seen = new Set<string>();
-  return keywords.filter((kw) => {
-    const normalized = kw.toLowerCase().trim();
-    if (seen.has(normalized)) return false;
-    seen.add(normalized);
-    return true;
-  });
-}
-
+/**
+ * Filter keywords using strict word-boundary matching to prevent partial matches.
+ * e.g., "hd" will be caught, but "shade" will not.
+ */
 function filterBannedKeywords(keywords: string[]): { filtered: string[]; removed: string[] } {
   const removed: string[] = [];
   const filtered = keywords.filter((kw) => {
-    const lower = kw.toLowerCase();
-    const isBanned = ADOBE_BANNED_KEYWORDS.some((b) => lower.includes(b.toLowerCase()));
+    // Normalization for matching: remove extra spaces and common symbols used for evasion
+    const normalized = kw.toLowerCase().replace(/[-\s]+/g, "");
+    const words = kw.toLowerCase().split(/[\s,._-]+/);
+    
+    const isBanned = words.some((w) => BANNED_WORDS_SET.has(w)) || BANNED_WORDS_SET.has(normalized);
+    
     if (isBanned) removed.push(kw);
     return !isBanned;
   });
   return { filtered, removed };
+}
+
+function deduplicateKeywords(keywords: string[]): string[] {
+  const seen = new Set<string>();
+  return keywords.filter((kw) => {
+    const key = kw.toLowerCase().trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function calculateReadinessScore(
@@ -144,7 +49,7 @@ function calculateReadinessScore(
   criteria: any,
   releases: ReleaseInfo,
   hasCompetitiveGap: boolean,
-  trendAlignmentCount: number
+  trendCount: number,
 ): {
   score: number;
   status: "ready" | "review" | "rejected";
@@ -156,53 +61,83 @@ function calculateReadinessScore(
   let metadataPenalty = 0;
   let bonuses = 0;
 
+  // Mid-range conservative fallback
+  const uniqueness = criteria.uniqueness || 3;
+  const commercial = criteria.commercialValue || 3;
+  const clarity = criteria.subjectClarity || 3;
+  const saturation = criteria.marketSaturation || 3;
+
   const contentScore = Math.round(
-    (criteria.uniqueness   * 0.30 +
-     criteria.commercialValue * 0.30 +
-     criteria.subjectClarity  * 0.20 +
-     criteria.marketSaturation * 0.20) * 10
+    (uniqueness   * 0.30 +
+     commercial * 0.30 +
+     clarity  * 0.20 +
+     saturation * 0.20) * 10
   );
 
+  // ── Penalties
   if (removedKeywords.length > 0) {
     metadataPenalty += removedKeywords.length * 12;
-    issues.push(`${removedKeywords.length} banned keyword(s) removed`);
+    issues.push(`${removedKeywords.length} كلمة مفتاحية محظورة تم حذفها: ${removedKeywords.join(", ")}`);
   }
 
-  // Raise short title limit: 40 chars penalty
   if (title.length < 40) {
     metadataPenalty += 18;
-    issues.push("Title too short (<40 chars)");
-  } else if (title.length < 55) {
+    issues.push(`العنوان قصير جداً (${title.length} حرف) — استهدف 55-70 حرفاً لزيادة ظهورك في البحث`);
+  } else if (title.length < OPTIMAL_TITLE_MIN) {
     metadataPenalty += 8;
-    issues.push("Title length below optimal 55-70 chars");
+    issues.push(`العنوان (${title.length} حرف) — أضف المزيد من التفاصيل (الهدف 55-70)`);
   }
 
-  // Raise word limit
   if (keywords.length < 40) {
     metadataPenalty += 20;
-    issues.push(`Low keyword count (${keywords.length}) — target 47-49`);
-  } else if (keywords.length < 45) {
+    issues.push(`عدد الكلمات قليل (${keywords.length}) — استهدف 47-49 كلمة لأقصى قدر من الانتشار`);
+  } else if (keywords.length < MIN_KEYWORDS) {
     metadataPenalty += 8;
-    issues.push("Almost at optimal keyword range");
+    issues.push(`عدد الكلمات (${keywords.length}) — أضف المزيد للوصول للنطاق المثالي`);
   }
 
-  if (keywords.length > 49) {
+  if (keywords.length > MAX_KEYWORDS) {
     metadataPenalty += 10;
-    issues.push("Keywords exceed Adobe max of 49");
+    issues.push(`عدد الكلمات (${keywords.length}) يتجاوز الحد المسموح به في Adobe (49)`);
   }
 
-  if (releases.modelRelease) issues.push("⚠️ Model Release required");
-  if (releases.propertyRelease) issues.push("⚠️ Property Release required");
-  if (releases.editorialOnly) issues.push("⚠️ Editorial Only — logos detected");
-  if (releases.copyrightConcern) issues.push("⚠️ Copyright Concern detected");
+  const titleWords = title.toLowerCase().split(/[\s,._-]+/);
+  const titleBanned = titleWords.filter(w => BANNED_WORDS_SET.has(w));
+  if (titleBanned.length > 0) {
+    metadataPenalty += 25;
+    issues.push(`يحتوي العنوان على كلمات محظورة: ${titleBanned.join(", ")}`);
+  }
 
-  // Bonuses
+  if (!category || category === "Unknown") {
+    metadataPenalty += 10;
+    issues.push("لم يتم تحديد الفئة — مطلوب من Adobe Stock");
+  }
+
+  // Visual/Saturation warnings
+  if (saturation <= 2) {
+    metadataPenalty += 10;
+    issues.push("تشبع عالي جداً — هذا الموضوع يضم ملايين الملفات؛ تحتاج زاوية فريدة جداً");
+  }
+
+  if (uniqueness <= 2) {
+    metadataPenalty += 10;
+    issues.push("تفرد منخفض جداً — من المرجح وجود أصول متطابقة تقريباً، خطر رفض عالٍ");
+  }
+
+  // ── Release warnings (Informational only, no points deduction as per request)
+  if (releases.modelRelease) issues.push("⚠️ Model Release Required");
+  if (releases.propertyRelease) issues.push("⚠️ Property Release Required");
+  if (releases.editorialOnly) issues.push("⚠️ Editorial Use Only — Brand/Logo detected");
+  if (releases.copyrightConcern) issues.push("⚠️ Copyright Concern — Protected work visible");
+
+  // ── Strategic Bonuses
   if (hasCompetitiveGap) bonuses += 5;
-  if (trendAlignmentCount >= 2) bonuses += 5;
-  else if (trendAlignmentCount >= 1) bonuses += 3;
+  if (trendCount >= 2) bonuses += 5;
+  else if (trendCount === 1) bonuses += 3;
 
   const finalScore = Math.max(0, Math.min(100, contentScore - metadataPenalty + bonuses));
   const status = finalScore >= 80 ? "ready" : finalScore >= 55 ? "review" : "rejected";
+
   const estimatedAcceptance = Math.round(
     finalScore >= 80 ? 70 + (finalScore - 80) * 0.75 :
     finalScore >= 55 ? 40 + (finalScore - 55) * 1.2 :
@@ -215,23 +150,93 @@ function calculateReadinessScore(
     issues,
     estimatedAcceptance,
     breakdown: {
-      uniqueness: criteria.uniqueness * 10,
-      commercialValue: criteria.commercialValue * 10,
-      subjectClarity: criteria.subjectClarity * 10,
-      marketSaturation: criteria.marketSaturation * 10,
+      uniqueness: uniqueness * 10,
+      commercialValue: commercial * 10,
+      subjectClarity: clarity * 10,
+      marketSaturation: saturation * 10,
       metadataPenalty: -metadataPenalty,
       bonuses,
     },
   };
 }
 
+const buildPrompt = (): string => `
+You are a Senior Adobe Stock Intelligence Specialist — 15+ years curating, approving and 
+rejecting submissions. Your mission: generate metadata that MAXIMIZES buyer discovery 
+while MINIMIZING similarity with the 400M+ assets already on Adobe Stock.
+
+Today: ${new Date().toISOString().slice(0, 10)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1 — VISUAL DNA (Internal Analysis)
+Identify:
+• uniqueVisualElement: the ONE detail in this frame that <0.5% of similar assets share.
+• colorPalette: 2-3 exact descriptors (e.g., "desaturated sage green", "warm ochre").
+• lightingCharacter: precise description (e.g., "harsh overhead fluorescent", "low-key dramatic chiaroscuro").
+• emotionalRegister: primary mood in 3-5 words.
+• trendAlignment: pick from these 2025-2026 trends: ${RISING_TRENDS_2026.join(", ")}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2 — COMPETITIVE GAP
+Explain in 1-2 sentences what specific market hole this image fills. If none, set uniqueness low.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 3 — TITLE (55-70 characters)
+Formula: [Hyper-specific Subject + State] [Rare Visual Detail] [Commercial Signal]
+MUST include: 1 color/tone + 1 lighting descriptor + 1 commercial context descriptor.
+NO generic adjectives like "beautiful", "stunning".
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 4 — KEYWORDS (EXACTLY 47-49)
+Layer A (1-12): Visual Fingerprint — 3-5 word specific details.
+Layer B (13-22): Subject Identity — who, age, ethnicity, state, actions.
+Layer C (23-32): Environment — hyper-specific context (architectural style, time, season).
+Layer D (33-42): Trends & Commercial — alignment with Steps 1-2 + commercial uses.
+Layer E (43-49): Concepts & Emotions — "resilience", "unseen labor", "quiet ambition".
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 5 — SCORING (Library-Calibrated)
+uniqueness, commercialValue, subjectClarity, marketSaturation (1-10 each).
+Scale: 10 = Golden Gap/Elite | 7 = High Quality | 5 = Average | 3 = Generic/Saturated | 1 = Spam risk.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 6 — RELEASES & IP
+Check for recognizable faces, property, brands, or artworks.
+If concern found, provide an avoidanceHint for cropping.
+
+ADOBE OFFICIAL CATEGORIES (pick exact name):
+${ADOBE_CATEGORIES.join(", ")}
+
+RESPOND WITH ONLY JSON:
+{
+  "visualDNA": {
+    "uniqueVisualElement": "string",
+    "colorPalette": "string",
+    "lightingCharacter": "string",
+    "emotionalRegister": "string",
+    "trendAlignment": ["array"]
+  },
+  "competitiveGap": "string",
+  "title": "55-70 chars",
+  "description": "2-3 sensory and commercial sentences",
+  "keywords": ["array of 47-49"],
+  "category": "string",
+  "scoring": {
+    "uniqueness": 0, "commercialValue": 0, "subjectClarity": 0, "marketSaturation": 0, "reasoning": "string"
+  },
+  "releases": {
+    "modelRelease": false, "propertyRelease": false, "editorialOnly": false, "copyrightConcern": false,
+    "releaseNote": "string", "avoidanceHint": "string"
+  }
+}`;
+
 export async function analyzeImageForStock(
   file: File,
   base64Data: string
-): Promise<ImageAnalysisResult> {
+): Promise<AnalysisResult> {
   const prompt = buildPrompt();
-
   const isVideo = file.type.startsWith("video/");
+
   const result = await generateWithGemini(prompt, 0.4, {
     base64: base64Data,
     mimeType: isVideo ? "image/jpeg" : (file.type || "image/jpeg")
@@ -240,8 +245,8 @@ export async function analyzeImageForStock(
   const parsed = extractAndParseJSON<any>(result, {});
 
   const deduped = deduplicateKeywords(parsed.keywords || []);
-  const { filtered: cleanKeywords, removed: removed } = filterBannedKeywords(deduped);
-  
+  const { filtered: cleanKeywords, removed } = filterBannedKeywords(deduped);
+
   const trendCount = (parsed.visualDNA?.trendAlignment ?? []).length;
   const hasGap = !!(parsed.competitiveGap && parsed.competitiveGap.length > 20);
 
@@ -258,33 +263,31 @@ export async function analyzeImageForStock(
     parsed.title || file.name,
     cleanKeywords.slice(0, 49),
     removed,
-    parsed.category || "Technology",
-    parsed.scoring || { uniqueness: 5, commercialValue: 5, subjectClarity: 5, marketSaturation: 5 },
+    parsed.category || "Unknown",
+    parsed.scoring || {},
     releases,
     hasGap,
     trendCount
   );
 
   return {
-    filename: file.name,
-    title: sanitizePromptOrKeywords(parsed.title || file.name),
-    keywords: cleanKeywords.slice(0, 49),
-    rejectedKeywords: removed,
-    thumbnail: base64Data,
-    prompt: sanitizePromptOrKeywords(parsed.description || ""), 
-    colorPalette: parsed.visualDNA?.colorPalette || "",
+    id: Date.now().toString(36),
+    name: file.name,
+    title: parsed.title || file.name,
+    description: parsed.description || "",
+    keywords: cleanKeywords.slice(0, MAX_KEYWORDS),
+    removedKeywords: removed,
+    category: parsed.category || "Technology",
     estimatedAcceptance: readiness.estimatedAcceptance,
-    uniquenessReview: parsed.scoring?.reasoning || "",
     adobeReadinessScore: readiness.score,
     adobeReadinessStatus: readiness.status,
     adobeReadinessIssues: readiness.issues,
-    category: parsed.category || "Technology",
-    uniqueElement: parsed.visualDNA?.uniqueVisualElement || "",
+    scoreBreakdown: readiness.breakdown,
+    scoringReasoning: parsed.scoring?.reasoning || "",
     visualDNA: parsed.visualDNA,
     competitiveGap: parsed.competitiveGap,
     releases,
     ipConcern: releases.modelRelease || releases.propertyRelease || releases.editorialOnly || releases.copyrightConcern,
-    ipNote: releases.releaseNote || "",
-    scoreBreakdown: readiness.breakdown
+    ipNote: releases.releaseNote || releases.avoidanceHint || ""
   };
 }

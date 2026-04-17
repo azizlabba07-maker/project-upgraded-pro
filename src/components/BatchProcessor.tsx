@@ -1,699 +1,298 @@
-import { useState, useCallback, useRef } from "react";
-import { hasAnyApiKey, getUserGeminiApiKeys } from "@/lib/gemini";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { toast } from "sonner";
 import { analyzeImageForStock } from "@/lib/analyze";
 import { extractVideoFrame } from "@/lib/videoUtils";
-import { prepareCsvRow } from "@/lib/csvExport";
-import { type ImageAnalysisResult } from "../types";
-import { toast } from "sonner";
-import { exportCsvFile, copyTextSafely } from "@/lib/shared";
+import { exportToCsv } from "@/lib/csvExport";
+import { type AnalysisResult, type VideoFile } from "../types";
+import { copyTextSafely } from "@/lib/shared";
+import { hasAnyApiKey, getUserGeminiApiKeys } from "@/lib/gemini";
+
+// Modular Components
+import DropZone from "./DropZone";
+import StatsBar from "./StatsBar";
+import ApiKeyModal from "./ApiKeyModal";
 import ShinyText from "./animations/ShinyText";
-import DecryptedText from "./animations/DecryptedText";
 
-/** Read an image file as base64 data URI */
-const readImageBase64 = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
-// ─────────────────────────────────────────────
-// 🔧  Utility
-// ─────────────────────────────────────────────
-
-function formatEta(seconds: number): string {
-  if (!isFinite(seconds) || seconds <= 0) return "—";
-  const m = Math.floor(seconds / 60);
-  const s = Math.ceil(seconds % 60);
-  return m > 0 ? `${m}د ${s}ث` : `${s}ث`;
-}
-
-// ─────────────────────────────────────────────
-// 🧩  Component
-// ─────────────────────────────────────────────
-
-interface BatchStats {
-  completed: number;
-  total: number;
-  errors: number;
-  activeLanes: number;
-  maxLanes: number;
-  eta: string;
-  startTime: number;
-}
-
+/**
+ * 🚀 Adobe Stock Batch Processor Pro
+ * Optimized for high-concurrency and deep visual analysis.
+ */
 export default function BatchProcessor() {
-  const [files, setFiles] = useState<File[]>([]);
-  const [results, setResults] = useState<ImageAnalysisResult[]>(() => {
+  const [videos, setVideos] = useState<VideoFile[]>(() => {
     try {
-      const saved = localStorage.getItem("batch_processor_results");
+      const saved = localStorage.getItem("batch_processor_results_v2");
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
+  
   const [processing, setProcessing] = useState(false);
-  const [stats, setStats] = useState<BatchStats>({
-    completed: 0, total: 0, errors: 0,
-    activeLanes: 0, maxLanes: 1, eta: "—", startTime: 0,
-  });
-  const [currentFiles, setCurrentFiles] = useState<string[]>([]);
+  const [infoModalOpen, setInfoModalOpen] = useState(false);
   const [riskFilter, setRiskFilter] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const cancelRef = useRef(false);
 
-  const progress = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+  // Stats calculation
+  const completedCount = videos.filter(v => v.status === "ready" || v.status === "review" || v.status === "rejected").length;
+  const errorCount = videos.filter(v => v.status === "error").length;
+  const pendingCount = videos.filter(v => v.frameBase64 && v.status === "pending").length;
+  const totalCount = videos.length;
+  
+  const progressPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const droppedFiles = Array.from(e.dataTransfer.files).filter(
-      (f) => f.type.startsWith("image/") || f.type.startsWith("video/")
+  // Persist results
+  useEffect(() => {
+    try {
+      localStorage.setItem("batch_processor_results_v2", JSON.stringify(videos));
+    } catch {}
+  }, [videos]);
+
+  const handleFilesSelected = useCallback(async (files: File[]) => {
+    const newEntries: VideoFile[] = files.map(file => ({
+      id: Math.random().toString(36).substring(2, 9),
+      file,
+      name: file.name,
+      size: file.size,
+      status: "pending",
+    }));
+
+    setVideos(prev => [...prev, ...newEntries]);
+
+    // Extract frames in parallel for performance
+    await Promise.allSettled(
+      newEntries.map(async (vid) => {
+        try {
+          // If already has frame, skip
+          if (vid.frameBase64) return;
+
+          let data: { base64: string; mimeType: string; thumbnailUrl: string };
+          
+          if (vid.file.type.startsWith("video/")) {
+            data = await extractVideoFrame(vid.file);
+          } else {
+            // For images, simple read
+            data = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve({
+                base64: (reader.result as string).split(",")[1],
+                mimeType: vid.file.type,
+                thumbnailUrl: reader.result as string
+              });
+              reader.onerror = reject;
+              reader.readAsDataURL(vid.file);
+            });
+          }
+
+          setVideos(prev => prev.map(v => 
+            v.id === vid.id ? { ...v, frameBase64: data.base64, frameMimeType: data.mimeType, thumbnailUrl: data.thumbnailUrl } : v
+          ));
+        } catch (err) {
+          setVideos(prev => prev.map(v => 
+            v.id === vid.id ? { ...v, status: "error", error: err instanceof Error ? err.message : "فشل استخراج الصورة" } : v
+          ));
+        }
+      })
     );
-    setFiles((prev) => [...prev, ...droppedFiles]);
-    toast.success(`تم إضافة ${droppedFiles.length} ملف`);
   }, []);
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = Array.from(e.target.files || []).filter(
-      (f) => f.type.startsWith("image/") || f.type.startsWith("video/")
-    );
-    setFiles((prev) => [...prev, ...selected]);
-    if (e.target) e.target.value = "";
-  };
-
-  const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  // ─────────────────────────────────────────
-  //  🚀  Core Concurrent Processing Engine
-  // ─────────────────────────────────────────
-
   const handleProcess = async () => {
-    if (!hasAnyApiKey()) {
-      toast.error("أضف مفتاح Gemini API من الإعدادات ⚙️");
-      return;
-    }
-    if (files.length === 0) {
-      toast.error("أضف صوراً أولاً");
+    const toAnalyze = videos.filter(v => v.frameBase64 && v.status === "pending");
+    
+    if (toAnalyze.length === 0) {
+      toast.info("لا توجد ملفات جاهزة للتحليل");
       return;
     }
 
-    cancelRef.current = false;
     setProcessing(true);
-    setResults([]);
+    cancelRef.current = false;
+    
+    const concurrency = Math.max(1, Math.min(getUserGeminiApiKeys().length, 5));
+    const queue = [...toAnalyze];
+    
+    const worker = async () => {
+      while (queue.length > 0 && !cancelRef.current) {
+        const vid = queue.shift();
+        if (!vid) break;
 
-    // Determine concurrency from number of API keys
-    const apiKeys = getUserGeminiApiKeys();
-    // Increase cap to 12 for high-performance processing when multiple keys exist
-    const concurrency = Math.min(12, Math.max(1, apiKeys.length));
-    // Reduced delay: with 10 keys, a 2s lane delay means each key rests for ~20s between calls
-    const delayPerKey = apiKeys.length >= 5 ? 2000 : 4000;
+        setVideos(prev => prev.map(v => v.id === vid.id ? { ...v, status: "processing" } : v));
 
-    const total = files.length;
-    const startTime = Date.now();
-    let completed = 0;
-    let errors = 0;
-
-    setStats({
-      completed: 0, total, errors: 0,
-      activeLanes: 0, maxLanes: concurrency,
-      eta: "جاري التحليل...", startTime,
-    });
-
-    // Use common array for all lanes
-    const newResults: ImageAnalysisResult[] = results.length === total ? [...results] : new Array(total).fill(null);
-
-    // Process a single file
-    const processFile = async (index: number) => {
-      if (cancelRef.current) return;
-      
-      // Skip if already processed successfully
-      if (newResults[index] && !newResults[index].title.startsWith("[Error]")) {
-        completed++;
-        return;
-      }
-
-      const file = files[index];
-      setCurrentFiles((prev) => [...prev, file.name]);
-
-      try {
-        let base64: string;
-
-        if (file.type.startsWith("video/")) {
-          const videoData = await extractVideoFrame(file);
-          base64 = videoData.base64;
-        } else {
-          base64 = await readImageBase64(file);
-        }
-
-        const result = await analyzeImageForStock(file, base64);
-        
-        newResults[index] = result;
-      } catch (err: any) {
-        errors++;
-        newResults[index] = {
-          filename: file.name,
-          title: `[Error] ${err.message}`,
-          keywords: [],
-          prompt: "",
-          colorPalette: "",
-        };
-      } finally {
-        completed++;
-        setCurrentFiles((prev) => prev.filter((n) => n !== file.name));
-
-        // Calculate ETA
-        const elapsed = (Date.now() - startTime) / 1000;
-        const rate = (completed || 1) / elapsed;
-        const remaining = total - completed;
-        const etaSeconds = rate > 0 ? remaining / rate : 0;
-
-        setStats(prev => ({
-          ...prev,
-          completed, errors,
-          activeLanes: Math.min(concurrency, total - completed),
-          eta: formatEta(etaSeconds),
-        }));
-
-        // Update results progressively
-        const currentBatch = [...newResults.filter(Boolean)];
-        setResults(currentBatch);
-        
-        // Progressive persistence
         try {
-          localStorage.setItem("batch_processor_results", JSON.stringify(currentBatch));
-        } catch {}
+          const result = await analyzeImageForStock(vid.file, vid.frameBase64!);
+          setVideos(prev => prev.map(v => 
+            v.id === vid.id ? { ...v, status: result.adobeReadinessStatus, result } : v
+          ));
+        } catch (err) {
+          setVideos(prev => prev.map(v => 
+            v.id === vid.id ? { ...v, status: "error", error: err instanceof Error ? err.message : "فشل التحليل" } : v
+          ));
+        }
       }
     };
 
-    // Chunk files into batches based on concurrency
-    // Each lane processes files sequentially with a delay between them
-    if (concurrency <= 1) {
-      // Sequential mode (single key)
-      for (let i = 0; i < total; i++) {
-        if (cancelRef.current) break;
-        setStats((prev) => ({ ...prev, activeLanes: 1 }));
-        await processFile(i);
-        if (i < total - 1 && !cancelRef.current) {
-          await new Promise((r) => setTimeout(r, delayPerKey));
-        }
-      }
-    } else {
-      const lanes: number[][] = Array.from({ length: concurrency }, () => []);
-      for (let i = 0; i < total; i++) {
-        lanes[i % concurrency].push(i);
-      }
-
-      const lanePromises = lanes.map(async (fileIndices, laneIndex) => {
-        for (let j = 0; j < fileIndices.length; j++) {
-          if (cancelRef.current) break;
-
-          // Faster staggering for 10+ lanes
-          if (j === 0 && laneIndex > 0) {
-            await new Promise((r) => setTimeout(r, laneIndex * 400));
-          }
-
-          await processFile(fileIndices[j]);
-
-          if (j < fileIndices.length - 1 && !cancelRef.current) {
-            await new Promise((r) => setTimeout(r, delayPerKey));
-          }
-        }
-      });
-
-      await Promise.all(lanePromises);
-    }
-
-    const finalResults = newResults.filter(Boolean);
-    setResults(finalResults);
-    setStats((prev) => ({ ...prev, activeLanes: 0, eta: "—" }));
-    setProcessing(false);
-    setCurrentFiles([]);
-
-    try {
-      localStorage.setItem("batch_processor_results", JSON.stringify(finalResults));
-    } catch {}
-
-    const successCount = finalResults.filter((r) => !r.title.startsWith("[Error]")).length;
-    if (cancelRef.current) {
-      toast.info(`⏹️ تم الإيقاف — ${successCount} ناجحة من ${completed} معالَجة`);
-    } else {
-      if (errors > 0) {
-        toast.warning(`⚠️ اكتمل مع ${errors} أخطاء. استخدم زر "إعادة محاولة الفاشلة".`);
-      } else {
-        toast.success(`✅ تم تحليل ${successCount}/${total} ملف بنجاح!`);
-      }
-    }
-  };
-
-  const handleRetryFailed = () => {
-    const failedExist = results.some(r => r.title.startsWith("[Error]"));
-    if (!failedExist) {
-      toast.info("لا توجد ملفات فاشلة ✨");
-      return;
-    }
-    toast.info("🔄 إعادة محاولة الملفات الفاشلة...");
-    handleProcess();
-  };
-
-  const handleCancel = () => {
-    cancelRef.current = true;
-    toast.info("⏹️ جاري الإيقاف...");
-  };
-
-  const handleAutoFilter = () => {
-    const originalCount = results.length;
-    const filtered = results.filter(r => 
-      !r.title.startsWith("[Error]") && 
-      (r.estimatedAcceptance !== undefined ? r.estimatedAcceptance >= 80 : true) && 
-      (r.deformationScore !== undefined ? r.deformationScore <= 30 : true)
-    );
-    setResults(filtered);
-    try {
-      localStorage.setItem("batch_processor_results", JSON.stringify(filtered));
-    } catch {}
+    await Promise.all(Array(concurrency).fill(null).map(worker));
     
-    const removedCount = originalCount - filtered.length;
-    if (removedCount > 0) {
-      toast.success(`تم التصفية 🧹! تم استبعاد ${removedCount} ملف ذي جودة منخفضة.`);
-    } else {
-      toast.info("كل الملفات اجتازت الفلتر المشدد! ✨");
-    }
+    setProcessing(false);
+    if (cancelRef.current) toast.info("تم إيقاف العملية");
+    else toast.success("اكتمل التحليل بنجاح ✨");
+  };
+
+  const handleReanalyze = useCallback((id: string) => {
+    setVideos(prev => prev.map(v => 
+      v.id === id ? { ...v, status: "pending", result: undefined, error: undefined } : v
+    ));
+    toast.info("تمت إعادة تعيين الملف للتحليل");
+  }, []);
+
+  const removeVideo = (id: string) => {
+    setVideos(prev => prev.filter(v => v.id !== id));
   };
 
   const handleExport = () => {
-    const valid = results.filter((r) => !r.title.startsWith("[Error]"));
-    if (valid.length === 0) { toast.error("لا توجد بيانات للتصدير"); return; }
-    exportCsvFile(
-      `adobe_stock_batch_${Date.now()}.csv`,
-      ["Filename", "Title", "Keywords", "Prompt", "Color Palette", "Category", "Releases", "Adobe_Readiness_Score", "Rejected_Keywords"],
-      valid.map((r) => prepareCsvRow(r))
-    );
-    toast.success("📥 تم التصدير — جاهز للرفع إلى Adobe Stock!");
-  };
-  
-  const handleClearResults = () => {
-    if (results.length === 0) return;
-    if (confirm("هل أنت متأكد من رغبتك في مسح كافة نتائج التحليل الحالية؟")) {
-      setResults([]);
-      try {
-        localStorage.removeItem("batch_processor_results");
-      } catch {}
-      toast.success("تم مسح القائمة بنجاح");
+    const results = videos.filter(v => v.result).map(v => v.result!);
+    if (results.length === 0) {
+      toast.error("لا توجد نتائج للتصدير");
+      return;
     }
-  };
-
-  const handleUpdateCategory = (index: number, category: string) => {
-    const newResults = [...results];
-    newResults[index].category = category;
-    setResults(newResults);
-    try {
-      localStorage.setItem("batch_processor_results", JSON.stringify(newResults));
-    } catch {}
-  };
-
-  const removeResult = (index: number) => {
-    const newResults = results.filter((_, i) => i !== index);
-    setResults(newResults);
-    try {
-      localStorage.setItem("batch_processor_results", JSON.stringify(newResults));
-    } catch {}
-    toast.success("تم حذف الملف من القائمة");
-  };
-
-  const handleCopyAll = async () => {
-    const text = results
-      .filter((r) => !r.title.startsWith("[Error]"))
-      .map((r) => `${r.filename}\nTitle: ${r.title}\nKeywords: ${r.keywords.join(", ")}\n`)
-      .join("\n---\n");
-    const ok = await copyTextSafely(text);
-    if (ok) toast.success("تم النسخ!");
+    exportToCsv(results);
+    toast.success("تم تصدير ملف CSV بنجاح 📥");
   };
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* Upload Zone */}
-      <div
-        className="rounded-2xl bg-white/[0.02] border-2 border-dashed border-white/[0.08] p-8 text-center hover:border-blue-500/30 hover:bg-blue-500/[0.02] transition-all cursor-pointer relative"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={handleDrop}
-      >
-        <input
-          type="file"
-          multiple
-          accept="image/*,video/*"
-          onChange={handleFileInput}
-          className="absolute inset-0 opacity-0 cursor-pointer"
-        />
-        <div className="text-4xl mb-3">📦</div>
-        <h2 className="text-lg font-bold text-white mb-2">معالج الدفعات المتقدم</h2>
-        <p className="text-sm text-slate-500 mb-1">اسحب وأفلت الصور والفيديوهات هنا أو اضغط لاختيارها</p>
-        <p className="text-[10px] text-slate-600">يدعم PNG, JPG, MP4, MOV — الفيديوهات تستخرج منها 3 لقطات ذكية تلقائياً 🎬</p>
+    <div className="max-w-7xl mx-auto space-y-8 pb-20">
+      {/* Header Area */}
+      <div className="flex items-center justify-between bg-slate-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center border border-blue-500/20 shadow-lg shadow-blue-500/10">
+            <span className="text-xl">🛠️</span>
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-white tracking-tight">معالج الدفعات الذكي</h2>
+            <p className="text-[10px] text-slate-500 font-medium">التحليل المتزامن لضمان قبول Adobe Stock</p>
+          </div>
+        </div>
+        
+        <button 
+          onClick={() => setInfoModalOpen(true)}
+          className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 transition-all group"
+        >
+          <span className="text-lg group-hover:rotate-12 transition-transform block">⚙️</span>
+        </button>
       </div>
 
-      {/* File List */}
-      {files.length > 0 && (
-        <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-white">📁 {files.length} ملف جاهز</h3>
-            <div className="flex gap-2 items-center">
-              {!processing && (
-                <span className="text-[10px] text-slate-600">
-                  ⚡ {Math.max(1, Math.min(getUserGeminiApiKeys().length, 5))} مسارات متزامنة
-                </span>
-              )}
-              <button onClick={() => setFiles([])} className="text-[10px] text-red-400 hover:text-red-300 transition-colors">مسح الكل</button>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 max-h-[200px] overflow-y-auto custom-scrollbar">
-            {files.map((file, i) => (
-              <div key={`${file.name}-${i}`} className="relative group rounded-xl bg-white/[0.03] border border-white/[0.06] p-2 text-center">
-                <button
-                  onClick={() => removeFile(i)}
-                  className="absolute top-1 left-1 w-5 h-5 rounded-full bg-red-500/80 text-white text-[9px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                >
-                  ✕
-                </button>
-                <div className="text-lg mb-1">{file.type.startsWith("video/") ? "🎬" : "🖼️"}</div>
-                <p className="text-[9px] text-slate-500 truncate">{file.name}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Main Action Area */}
+      <DropZone onFilesSelected={handleFilesSelected} processing={processing} />
+
+      {/* Stats and Results Summary */}
+      {totalCount > 0 && (
+        <StatsBar 
+          results={videos.filter(v => v.result).map(v => v.result!)}
+          onExport={handleExport}
+          onClear={() => {
+            if (confirm("هل تريد مسح كافة النتائج؟")) setVideos([]);
+          }}
+          onFilterRisk={setRiskFilter}
+          riskFilter={riskFilter}
+          onAutoFilter={() => {
+            const filtered = videos.filter(v => v.status === "ready" || v.status === "review");
+            setVideos(filtered);
+            toast.success("تمت التصفية التلقائية بنجاح");
+          }}
+        />
       )}
 
-      {/* Start Processing */}
-      {files.length > 0 && !processing && (
-        <div className="flex gap-2">
-          <button
-            onClick={handleProcess}
-            className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold hover:scale-[1.01] active:scale-[0.99] transition-all shadow-xl shadow-blue-500/20"
-          >
-            🚀 {results.length > 0 ? "إعادة تحليل الدفعة" : "ابدأ التحليل الجماعي"} ({files.length} ملف)
-          </button>
-          
-          {results.some(r => r.title.startsWith("[Error]")) && (
-            <button
-              onClick={handleRetryFailed}
-              className="px-6 py-2.5 rounded-2xl bg-orange-600/20 border border-orange-600/30 text-orange-400 text-xs font-bold hover:bg-orange-600/30 transition-all"
-            >
-              🔄 إعادة محاولة الفاشلة
-            </button>
-          )}
-
-          {results.length > 0 && (
-            <button
-              onClick={() => {
-                setResults([]);
-                localStorage.removeItem("batch_processor_results");
-                toast.success("تم مسح النتائج");
-              }}
-              className="px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold hover:bg-red-500/20 transition-all"
-            >
-              🗑️ مسح
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Progress — Enhanced with concurrency stats */}
+      {/* Processing Status */}
       {processing && (
-        <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-white">⏳ جاري التحليل...</span>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-blue-400 font-bold">{progress}%</span>
-              <button
-                onClick={handleCancel}
-                className="text-[10px] px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all"
-              >
-                ⏹️ إيقاف
-              </button>
-            </div>
+        <div className="bg-slate-900/60 border border-white/10 rounded-3xl p-6 animate-in slide-in-from-bottom-4">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-bold flex items-center gap-2">
+              <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+              جاري التحليل... {progressPct}%
+            </span>
+            <button onClick={() => { cancelRef.current = true; }} className="text-xs text-red-400 hover:underline">إيقاف مؤقت</button>
           </div>
-
-          {/* Progress bar */}
-          <div className="w-full h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
+          <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${progressPct}%` }} />
           </div>
-
-          {/* Stats row */}
-          <div className="flex items-center justify-between text-[10px] text-slate-500">
-            <div className="flex gap-4">
-              <span>✅ {stats.completed}/{stats.total}</span>
-              {stats.errors > 0 && <span className="text-red-400">❌ {stats.errors} أخطاء</span>}
-              <span>⚡ {stats.activeLanes}/{stats.maxLanes} مسارات نشطة</span>
-            </div>
-            <span>⏱️ ETA: {stats.eta}</span>
-          </div>
-
-          {/* Currently processing files */}
-          {currentFiles.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {currentFiles.map((name, i) => (
-                <span key={i} className="text-[9px] bg-blue-500/10 border border-blue-500/20 text-blue-400 px-2 py-0.5 rounded-lg animate-pulse">
-                  📸 {name}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
-      {/* Results */}
-      {results.length > 0 && !processing && (
-        <div className="space-y-4">
-          {(() => {
-            const successList = results.filter(r => !r.title.startsWith("[Error]"));
-            const errorsCount = results.length - successList.length;
-            const accepted = successList.filter(r => (r.estimatedAcceptance !== undefined ? r.estimatedAcceptance >= 80 : true) && (r.deformationScore !== undefined ? r.deformationScore <= 30 : true));
-            const perfectQualityCount = successList.filter(r => (r.estimatedAcceptance !== undefined ? r.estimatedAcceptance >= 95 : false)).length;
-            const highRiskCount = successList.filter(r => (r.estimatedAcceptance !== undefined ? r.estimatedAcceptance < 60 : false) || (r.deformationScore !== undefined ? r.deformationScore > 50 : false)).length;
-            const averageAcceptance = successList.length > 0 ? Math.round(successList.reduce((acc, r) => acc + (r.estimatedAcceptance || 0), 0) / successList.length) : 0;
-            
-            return (
-              <div className="rounded-3xl bg-slate-900/60 border border-white/10 p-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl opacity-50" />
-                <h3 className="text-lg font-bold mb-5 flex items-center gap-2 relative z-10">
-                  <span>📊</span> <ShinyText text="تقرير فحص الجودة الشامل" speed={4} />
-                </h3>
-                
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5 relative z-10">
-                  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
-                    <div className="text-2xl font-bold text-white mb-1">{successList.length} <span className="text-xs text-slate-500">/ {results.length}</span></div>
-                    <div className="text-[10px] text-slate-400">تم تحليله بنجاح</div>
-                  </div>
-                  <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-4 text-center">
-                    <div className="text-2xl font-bold text-green-400 mb-1">{accepted.length}</div>
-                    <div className="text-[10px] text-green-500/70">مقبول ومطابق</div>
-                  </div>
-                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 text-center">
-                    <div className="text-2xl font-bold text-blue-400 mb-1">{perfectQualityCount}</div>
-                    <div className="text-[10px] text-blue-500/70">تصنيف امتياز (+95%)</div>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      setRiskFilter(prev => !prev);
-                      if (!riskFilter) setDetailsOpen(true);
-                    }}
-                    className={`bg-red-500/10 border ${riskFilter ? 'border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)] scale-105' : 'border-red-500/20'} rounded-2xl p-4 text-center cursor-pointer hover:bg-red-500/20 transition-all`}
-                  >
-                    <div className="text-2xl font-bold text-red-400 mb-1">{highRiskCount}</div>
-                    <div className="text-[10px] text-red-500/70">{riskFilter ? "إلغاء فلتر الخطر ✖" : "اضغط لعرض الخطرة فقط"}</div>
-                  </button>
-                </div>
+      {/* Controls */}
+      {pendingCount > 0 && !processing && (
+        <button 
+          onClick={handleProcess}
+          className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-sm shadow-xl shadow-blue-500/20 hover:scale-[1.01] transition-all"
+        >
+          🚀 ابدأ تحليل {pendingCount} ملف جاهز
+        </button>
+      )}
 
-                <div className="flex flex-wrap items-center justify-between mt-2 pt-4 border-t border-white/10 relative z-10 gap-3">
-                  <div className="flex items-center gap-3">
-                    <button onClick={handleAutoFilter} className="px-4 py-2 rounded-xl bg-orange-500/10 border border-orange-500/30 text-xs font-bold text-orange-400 hover:bg-orange-500/20 hover:scale-105 transition-all shadow-lg shadow-orange-500/10">
-                      🧹 تصفية المرفوض ({successList.length - accepted.length})
-                    </button>
-                    <button onClick={handleExport} className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs font-semibold hover:scale-105 transition-all shadow-lg shadow-blue-500/20">
-                      📥 تصدير CSV (Adobe Ready)
-                    </button>
-                    <button onClick={handleClearResults} className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-xs font-bold text-red-400 hover:bg-red-500/20 hover:scale-105 transition-all">
-                      🗑️ مسح الكل
-                    </button>
-                  </div>
-                  <div className="text-xs font-bold text-slate-400 bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
-                    متوسط القبول: <span className="text-blue-400 ml-1">{averageAcceptance}%</span>
-                  </div>
-                </div>
+      {/* Results Detail List */}
+      <details open={detailsOpen} onToggle={e => setDetailsOpen(e.currentTarget.open)} className="group">
+        <summary className="flex items-center justify-between cursor-pointer p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] transition-all list-none">
+          <span className="text-sm font-bold flex items-center gap-3">
+             <span className={`transition-transform ${detailsOpen ? "rotate-90" : ""}`}>▶</span>
+             📋 مراجعة تفاصيل الملفات ({totalCount})
+          </span>
+        </summary>
+        
+        <div className="pt-4 space-y-3">
+          {videos.map((vid) => (
+            <div key={vid.id} className="bg-slate-900/40 border border-white/5 p-4 rounded-2xl flex items-start gap-4 hover:border-white/10 transition-all">
+              <div className="w-24 h-16 bg-slate-800 rounded-xl overflow-hidden shrink-0 border border-white/5">
+                {vid.thumbnailUrl ? (
+                  <img src={vid.thumbnailUrl} alt="Preview" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-xs text-slate-500">جاري المعالجة</div>
+                )}
               </div>
-            );
-          })()}
-
-          <details className="group" open={detailsOpen} onToggle={(e) => setDetailsOpen(e.currentTarget.open)}>
-            <summary className="flex items-center justify-between cursor-pointer p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] transition-all list-none">
-              <span className="text-sm font-bold text-white flex items-center gap-3">
-                <span className={`w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs transition-transform text-slate-400 shadow-inner ${detailsOpen ? 'rotate-90' : ''}`}>▶</span>
-                📋 {riskFilter ? "مراجعة الملفات الخطرة فقط" : "استعراض كافة تفاصيل الملفات المحللة"}
-              </span>
-              <button 
-                onClick={(e) => { e.preventDefault(); handleCopyAll(); }} 
-                className="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-xs text-slate-400 hover:text-white transition-all shadow-sm"
-              >
-                📋 نسخ الكل
-              </button>
-            </summary>
-            
-            <div className="pt-4 space-y-3">
-              {results.filter(res => {
-                if (!riskFilter) return true;
-                return (!res.title.startsWith("[Error]") && ((res.estimatedAcceptance !== undefined ? res.estimatedAcceptance < 60 : false) || (res.deformationScore !== undefined ? res.deformationScore > 50 : false)));
-              }).map((res, i) => (
-            <div
-              key={i}
-              className={`rounded-xl border p-4 relative flex flex-col gap-3 ${
-                res.title.startsWith("[Error]")
-                  ? "bg-red-500/[0.03] border-red-500/10"
-                  : "bg-[#111318] border-white/[0.04] hover:bg-[#15171e] shadow-sm transition-all"
-              }`}
-            >
-              <div className="flex gap-4 items-start">
-                {/* Thumbnail Area */}
-                <div className="w-32 h-20 bg-slate-800 rounded overflow-hidden shrink-0 flex items-center justify-center relative">
-                   {res.thumbnail ? (
-                     <img src={res.thumbnail} alt="Thumbnail" className="w-full h-full object-cover" />
-                   ) : (
-                     <span className="text-3xl">{res.title.startsWith("[Error]") ? "❌" : (res.filename.match(/\.(mp4|mov)$/i) ? "🎬" : "🖼️")}</span>
-                   )}
-                   {res.adobeReadinessScore !== undefined && res.adobeReadinessScore < 60 && (
-                     <div className="absolute inset-0 bg-red-900/40 mix-blend-multiply pointer-events-none" />
-                   )}
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="text-xs font-bold text-slate-300 truncate">{vid.name}</h4>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                      vid.status === "ready" ? "bg-green-500/10 text-green-500" :
+                      vid.status === "review" ? "bg-yellow-500/10 text-yellow-500" :
+                      vid.status === "error" ? "bg-red-500/10 text-red-500" :
+                      "bg-blue-500/10 text-blue-500"
+                    }`}>
+                      {vid.status}
+                    </span>
+                    <button onClick={() => removeVideo(vid.id)} className="text-slate-600 hover:text-red-400 text-sm">✕</button>
+                  </div>
                 </div>
                 
-                {/* Main Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className={`text-[11px] ${res.title.startsWith("[Error]") ? "text-red-500" : "text-green-500"}`}>
-                      {res.title.startsWith("[Error]") ? "❌" : "✓"}
-                    </span>
-                    <p className="text-[11px] text-slate-400 font-mono truncate max-w-[200px]" title={res.filename}>
-                      {res.filename}
-                    </p>
-                    
-                    {/* Readiness Score Pill */}
-                    {res.adobeReadinessScore !== undefined && (
-                      <div className={`px-2 py-[1px] rounded text-[10px] font-bold tracking-wider ${
-                        res.adobeReadinessScore >= 85 ? 'bg-green-500/10 text-green-500 border border-green-500/20' :
-                        res.adobeReadinessScore >= 70 ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                        res.adobeReadinessScore >= 60 ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' :
-                        'bg-red-500/10 text-red-500 border border-red-500/20'
-                      }`}>
-                         {res.adobeReadinessScore >= 85 ? '✓ A' : res.adobeReadinessScore >= 70 ? '✓ B' : res.adobeReadinessScore >= 60 ? '! C' : 'X D'} {res.adobeReadinessScore}%
-                      </div>
-                    )}
-                  </div>
-                  
-                  <p className="text-[14px] text-gray-100 font-semibold mb-2 leading-snug pr-4">
-                    {res.title}
-                  </p>
-                  
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    {/* Keywords Count */}
-                    <span className="px-2 py-0.5 rounded bg-[#004e36] text-[#00e676] text-[10px] border border-[#00e676]/20">
-                      كلمة مفتاحية {res.keywords.length}
-                    </span>
-                    
-                    {/* Category if selected */}
-                    {res.category && (
-                      <span className="px-2 py-0.5 rounded bg-blue-900/30 text-blue-400 text-[10px] border border-blue-500/20">
-                        {res.category.toLowerCase()}
-                      </span>
-                    )}
-
-                    {/* Rejected Keywords Count */}
-                    {res.rejectedKeywords && res.rejectedKeywords.length > 0 && (
-                      <span className="px-2 py-0.5 rounded bg-[#3e1212] text-[#ff5252] text-[10px] border border-[#ff5252]/20">
-                        كلمة محظورة: خافت {res.rejectedKeywords.length}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Warnings Section */}
-                  {(res.rejectedKeywords && res.rejectedKeywords.length > 0) ? (
-                    <div className="text-[10px] text-[#ff5252] mt-2 space-y-0.5">
-                      {res.rejectedKeywords.map((rk, idx) => (
-                        <p key={idx}>❌ {rk} :كلمة محظورة تم حذفها</p>
-                      ))}
+                {vid.result ? (
+                  <div className="space-y-1">
+                    <p className="text-[11px] text-white font-medium line-clamp-1">{vid.result.title}</p>
+                    <div className="flex gap-2">
+                       <span className="text-[9px] text-slate-500">Score: {vid.result.adobeReadinessScore}%</span>
+                       <span className="text-[9px] text-blue-500">Acceptance: {vid.result.estimatedAcceptance}%</span>
                     </div>
-                  ) : null}
-
-                  {res.adobeReadinessScore !== undefined && res.adobeReadinessScore < 70 && (
-                    <p className="text-[11px] text-[#ffb74d] mt-1.5 font-bold">
-                      ! احتمال رفض عالي — موضوع مشبع جداً في Adobe Stock
-                    </p>
-                  )}
-
-                  {res.uniquenessReview && (
-                    <p className="text-[10px] text-yellow-500/80 mt-1">
-                      ! {res.uniquenessReview}
-                    </p>
-                  )}
-                </div>
-
-                {/* Right Side Controls */}
-                <div className="flex flex-col items-end gap-3 shrink-0 ml-auto">
-                  <button onClick={() => removeResult(i)} className="text-slate-600 hover:text-red-400">✕</button>
-                  
-                  {!res.title.startsWith("[Error]") && (
-                    <select 
-                      value={res.category || ""}
-                      onChange={(e) => handleUpdateCategory(i, e.target.value)}
-                      className="bg-[#1a1d24] border border-white/10 text-gray-300 text-[10px] rounded px-3 py-1.5 outline-none focus:border-blue-500 min-w-[140px] appearance-none"
-                    >
-                      <option value="" disabled>اختر الفئة...</option>
-                      <option value="Animals">Animals</option>
-                      <option value="Buildings and Architecture">Buildings and Architecture</option>
-                      <option value="Business">Business</option>
-                      <option value="Drink">Drink</option>
-                      <option value="The Environment">The Environment</option>
-                      <option value="States of Mind">States of Mind</option>
-                      <option value="Food">Food</option>
-                      <option value="Graphic Resources">Graphic Resources</option>
-                      <option value="Hobbies and Leisure">Hobbies and Leisure</option>
-                      <option value="Industry">Industry</option>
-                      <option value="Landscapes">Landscapes</option>
-                      <option value="Lifestyle">Lifestyle</option>
-                      <option value="People">People</option>
-                      <option value="Plants and Flowers">Plants and Flowers</option>
-                      <option value="Culture and Religion">Culture and Religion</option>
-                      <option value="Science">Science</option>
-                      <option value="Social Issues">Social Issues</option>
-                      <option value="Sports">Sports</option>
-                      <option value="Technology">Technology</option>
-                      <option value="Transport">Transport</option>
-                      <option value="Travel">Travel</option>
-                    </select>
-                  )}
-                </div>
+                  </div>
+                ) : vid.error ? (
+                  <p className="text-[10px] text-red-400">{vid.error}</p>
+                ) : (
+                  <p className="text-[10px] text-slate-600">في انتظار التحليل...</p>
+                )}
               </div>
-
-              {/* Keyword Pills List (Bottom) */}
-              {res.keywords.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1 border-t border-white/[0.03] pt-3">
-                  {res.keywords.slice(0, 16).map((kw, ki) => (
-                    <span key={ki} className="text-[10px] bg-[#1a1d24] text-slate-400 border border-white/[0.05] px-2 py-0.5 rounded-md hover:text-white transition-colors cursor-default">
-                      {kw}
-                    </span>
-                  ))}
-                  {res.keywords.length > 16 && (
-                    <span className="text-[10px] bg-[#1a1d24] text-slate-500 px-2 py-0.5 rounded-md">
-                      +{res.keywords.length - 16}
-                    </span>
-                  )}
-                </div>
-              )}
+              
+              <div className="flex items-center gap-2 ml-auto">
+                 {vid.result && (
+                   <button 
+                     onClick={() => handleReanalyze(vid.id)}
+                     className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:text-white transition-all text-xs"
+                     title="إعادة تحليل"
+                   >
+                     🔄
+                   </button>
+                 )}
+              </div>
             </div>
           ))}
-          </div>
-        </details>
         </div>
-      )}
+      </details>
+      
+      <ApiKeyModal open={infoModalOpen} onOpenChange={setInfoModalOpen} />
     </div>
   );
 }

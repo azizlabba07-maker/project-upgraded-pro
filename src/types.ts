@@ -1,3 +1,19 @@
+export type AdobeReadinessStatus =
+  "ready" | "review" | "rejected" | "pending" | "processing" | "error";
+
+export interface VideoFile {
+  id: string;
+  file: File;
+  name: string;
+  size: number;
+  thumbnailUrl?: string;
+  frameBase64?: string;
+  frameMimeType?: string;
+  status: AdobeReadinessStatus;
+  result?: AnalysisResult;
+  error?: string;
+}
+
 export interface ScoreBreakdown {
   uniqueness: number;
   commercialValue: number;
@@ -24,24 +40,27 @@ export interface ReleaseInfo {
   avoidanceHint: string;
 }
 
-export interface ImageAnalysisResult {
-  filename: string;
+export interface AnalysisResult {
+  id: string;
+  name: string;
   title: string;
+  description: string;
   keywords: string[];
-  rejectedKeywords?: string[];
-  thumbnail?: string;
-  prompt: string;
-  colorPalette: string;
-  deformationScore?: number;
-  estimatedAcceptance?: number;
-  uniquenessReview?: string;
-  adobeReadinessScore?: number;
-  category?: string;
-  uniqueElement?: string;
+  removedKeywords: string[];
+  category: string;
+  estimatedAcceptance: number;
+  adobeReadinessScore: number;
+  adobeReadinessStatus: "ready" | "review" | "rejected";
+  adobeReadinessIssues: string[];
+  scoreBreakdown?: ScoreBreakdown;
+  scoringReasoning?: string;
   visualDNA?: VisualDNA;
   competitiveGap?: string;
   releases?: ReleaseInfo;
   ipConcern: boolean;
   ipNote: string;
-  scoreBreakdown?: ScoreBreakdown;
 }
+
+// For compatibility with older code that might import ImageAnalysisResult
+export type ImageAnalysisResult = AnalysisResult;
+export type ScoringCriteria = ScoreBreakdown;

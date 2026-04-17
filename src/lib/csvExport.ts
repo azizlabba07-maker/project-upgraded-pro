@@ -1,88 +1,122 @@
-import { type ImageAnalysisResult } from "../types";
+import type { AnalysisResult } from "../types";
 
 /**
- * Logic to determine the "Releases" column value for Adobe Stock CSV.
+ * Escapes a string for CSV, using semicolon as an internal separator for multi-value cells.
  */
-export function getReleasesString(r: ImageAnalysisResult): string {
-  const rel = r.releases;
-  if (!rel) return "None Required";
-
-  const requirements: string[] = [
-    rel.modelRelease ? "Model Release" : "",
-    rel.propertyRelease ? "Property Release" : "",
-    rel.editorialOnly ? "Editorial Only" : "",
-    rel.copyrightConcern ? "Copyright Concern" : "",
-  ].filter(Boolean);
-
-  return requirements.length > 0 ? requirements.join("; ") : "None Required";
+function csvCell(value: string | number | null | undefined): string {
+  const str = String(value ?? "");
+  // If the string contains any CSV-sensitive characters, wrap in quotes
+  if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes(";")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
 }
 
-/**
- * Helper to prepare a row for export.
- * Note: Headers are currently managed in the UI components (e.g., BatchProcessor.tsx).
- * New columns are appended at the end.
- */
-export function prepareCsvRow(r: ImageAnalysisResult): (string | number)[] {
-  const rel = r.releases;
-  const dna = r.visualDNA;
-
-  return [
-    r.filename,                                    // Filename
-    r.title,                                       // Title
-    r.keywords.join(", "),                         // Keywords
-    r.prompt || "",                                // Description (was Prompt)
-    r.colorPalette || "",                          // Color Palette
-    r.category || "",                              // Category
-    getReleasesString(r),                          // Releases
-    r.adobeReadinessScore?.toString() || "",       // Adobe_Readiness_Score
-    (r.rejectedKeywords || []).join(", "),         // Rejected_Keywords
-    
-    // --- New Columns (Appended) ---
-    rel?.modelRelease ? "Yes" : "No",             // Model_Release
-    rel?.propertyRelease ? "Yes" : "No",           // Property_Release
-    r.adobeReadinessStatus || "",                  // Adobe_Readiness_Status
-    (r.estimatedAcceptance?.toString() || "0") + "%", // Estimated_Acceptance_%
-    (r.adobeReadinessIssues || []).join("; "),     // Readiness_Issues
-    r.competitiveGap || "",                        // Competitive_Gap
-    (dna?.trendAlignment || []).join("; "),        // Trend_Alignment
-    r.uniqueElement || "",                         // Unique_Visual_Element
-    r.ipConcern ? "Yes" : "No",                    // IP_Concern
-    r.ipNote || "",                                // IP_Note
-    rel?.avoidanceHint || "",                      // IP_Avoidance_Hint
-    r.keywords.length.toString()                   // Keyword_Count
-  ];
-}
-
-/**
- * Full export logic as requested (can be used to replace direct calls if UI is updated later)
- */
-export function exportToCsv(results: ImageAnalysisResult[]): void {
+export function exportToCsv(results: AnalysisResult[]): void {
   const headers = [
-    "Filename", "Title", "Keywords", "Description", "Color_Palette", "Category", 
-    "Releases", "Adobe_Readiness_Score", "Removed_Keywords",
-    "Model_Release", "Property_Release", "Adobe_Readiness_Status", 
-    "Estimated_Acceptance_%", "Readiness_Issues", "Competitive_Gap", 
-    "Trend_Alignment", "Unique_Visual_Element", "IP_Concern", 
-    "IP_Note", "IP_Avoidance_Hint", "Keyword_Count"
+    "Filename", 
+    "Title", 
+    "Title_Length",
+    "Description", 
+    "Keywords", 
+    "Keyword_Count", 
+    "Category",
+    "Releases", 
+    "Model_Release", 
+    "Property_Release", 
+    "Editorial_Only", 
+    "Copyright_Concern",
+    "IP_Avoidance_Hint",
+    "Adobe_Score", 
+    "Adobe_Status", 
+    "Estimated_Acceptance_%",
+    "Issues",
+    "Score_Uniqueness", 
+    "Score_Commercial", 
+    "Score_Clarity", 
+    "Score_Saturation",
+    "Score_Metadata_Penalty", 
+    "Score_Bonuses",
+    "Competitive_Gap", 
+    "Trend_Alignment",
+    "Unique_Visual_Element", 
+    "Color_Palette", 
+    "Lighting_Character", 
+    "Emotional_Register",
+    "Removed_Keywords", 
+    "Scoring_Reasoning",
   ];
 
-  const rows = results.map(r => prepareCsvRow(r));
+  const rows = results.map((r) => {
+    const rel = r.releases;
+    const dna = r.visualDNA;
+    const sb = r.scoreBreakdown;
+
+    const releaseSummary = [
+      rel?.modelRelease ? "Model Release" : "",
+      rel?.propertyRelease ? "Property Release" : "",
+      rel?.editorialOnly ? "Editorial Only" : "",
+      rel?.copyrightConcern ? "Copyright Concern" : "",
+    ].filter(Boolean).join("; ") || "None Required";
+
+    return [
+      csvCell(r.name),
+      csvCell(r.title),
+      csvCell(r.title.length),
+      csvCell(r.description),
+      csvCell(r.keywords.join("; ")), // Use semicolons so CSV doesn't break
+      csvCell(r.keywords.length),
+      csvCell(r.category),
+      csvCell(releaseSummary),
+      csvCell(rel?.modelRelease ? "Yes" : "No"),
+      csvCell(rel?.propertyRelease ? "Yes" : "No"),
+      csvCell(rel?.editorialOnly ? "Yes" : "No"),
+      csvCell(rel?.copyrightConcern ? "Yes" : "No"),
+      csvCell(rel?.avoidanceHint || ""),
+      csvCell(r.adobeReadinessScore),
+      csvCell(r.adobeReadinessStatus),
+      csvCell(`${r.estimatedAcceptance}%`),
+      csvCell(r.adobeReadinessIssues.join(" | ")),
+      csvCell(sb?.uniqueness ?? ""),
+      csvCell(sb?.commercialValue ?? ""),
+      csvCell(sb?.subjectClarity ?? ""),
+      csvCell(sb?.marketSaturation ?? ""),
+      csvCell(sb?.metadataPenalty ?? ""),
+      csvCell(sb?.bonuses ?? ""),
+      csvCell(r.competitiveGap || ""),
+      csvCell((dna?.trendAlignment || []).join("; ")),
+      csvCell(dna?.uniqueVisualElement || ""),
+      csvCell(dna?.colorPalette || ""),
+      csvCell(dna?.lightingCharacter || ""),
+      csvCell(dna?.emotionalRegister || ""),
+      csvCell(r.removedKeywords.join("; ")),
+      csvCell(r.scoringReasoning || ""),
+    ];
+  });
+
   const csvContent = [
     headers.join(","),
-    ...rows.map(row => row.map(cell => {
-      const s = String(cell);
-      if (s.includes(",") || s.includes('"') || s.includes("\n")) {
-        return `"${s.replace(/"/g, '""')}"`;
-      }
-      return s;
-    }).join(","))
+    ...rows.map((row) => row.join(",")),
   ].join("\n");
 
   const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
+  
+  const date = new Date().toISOString().slice(0, 10);
+  const filename = `adobe_stock_${date}_${results.length}files.csv`;
+
   const link = document.createElement("a");
   link.href = url;
-  link.download = `adobe_stock_pro_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
+  
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+/**
+ * Compatibility helper for existing BatchProcessor code
+ */
+export function prepareCsvRow(r: AnalysisResult): (string | number)[] {
+  // This is now less relevant as exportToCsv handles the full mapping
+  return [r.name, r.title, r.keywords.join(", ")];
 }
