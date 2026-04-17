@@ -8,22 +8,32 @@ import {
   OPTIMAL_TITLE_MIN,
   MAX_KEYWORDS
 } from "./constants";
+import { ADOBE_AI_PROMPT_RULES } from "./adobeStockCompliance";
+import { sanitizeStringArray, sanitizePromptOrKeywords } from "./sanitizer";
 
-// Use a Set for ultra-fast word-boundary matching
+// Set للكشف السريع عن الكلمات المحظورة البسيطة
 const BANNED_WORDS_SET = new Set(ADOBE_BANNED_KEYWORDS.map(w => w.toLowerCase()));
 
 /**
- * Filter keywords using strict word-boundary matching to prevent partial matches.
- * e.g., "hd" will be caught, but "shade" will not.
+ * فلترة الكلمات المحظورة مع دعم المصطلحات المركّبة (multi-word).
+ * تعمل جنباً إلى جنب مع sanitizeStringArray من sanitizer.ts
+ * لضمان فلترة مزدوجة: قائمة constants + قائمة IP الكاملة.
  */
 function filterBannedKeywords(keywords: string[]): { filtered: string[]; removed: string[] } {
   const removed: string[] = [];
   const filtered = keywords.filter((kw) => {
-    // Normalization for matching: remove extra spaces and common symbols used for evasion
-    const normalized = kw.toLowerCase().replace(/[-\s]+/g, "");
-    const words = kw.toLowerCase().split(/[\s,._-]+/);
+    const normalized = kw.toLowerCase().trim();
     
-    const isBanned = words.some((w) => BANNED_WORDS_SET.has(w)) || BANNED_WORDS_SET.has(normalized);
+    // 1. تحقق من المصطلح كاملاً (لمعالجة "ai-generated", "high-resolution", "coca-cola")
+    const normalizedNoDash = normalized.replace(/[-\s]+/g, "");
+    if (BANNED_WORDS_SET.has(normalized) || BANNED_WORDS_SET.has(normalizedNoDash)) {
+      removed.push(kw);
+      return false;
+    }
+    
+    // 2. تحقق من كل كلمة منفردة
+    const words = normalized.split(/[\s,._-]+/).filter(Boolean);
+    const isBanned = words.some((w) => BANNED_WORDS_SET.has(w));
     
     if (isBanned) removed.push(kw);
     return !isBanned;
@@ -61,20 +71,19 @@ function calculateReadinessScore(
   let metadataPenalty = 0;
   let bonuses = 0;
 
-  // Mid-range conservative fallback
   const uniqueness = criteria.uniqueness || 3;
   const commercial = criteria.commercialValue || 3;
   const clarity = criteria.subjectClarity || 3;
   const saturation = criteria.marketSaturation || 3;
 
   const contentScore = Math.round(
-    (uniqueness   * 0.30 +
-     commercial * 0.30 +
-     clarity  * 0.20 +
-     saturation * 0.20) * 10
+    (uniqueness  * 0.30 +
+     commercial  * 0.30 +
+     clarity     * 0.20 +
+     saturation  * 0.20) * 10
   );
 
-  // ── Penalties
+  // ── عقوبات
   if (removedKeywords.length > 0) {
     metadataPenalty += removedKeywords.length * 12;
     issues.push(`${removedKeywords.length} كلمة مفتاحية محظورة تم حذفها: ${removedKeywords.join(", ")}`);
@@ -113,7 +122,6 @@ function calculateReadinessScore(
     issues.push("لم يتم تحديد الفئة — مطلوب من Adobe Stock");
   }
 
-  // Visual/Saturation warnings
   if (saturation <= 2) {
     metadataPenalty += 10;
     issues.push("تشبع عالي جداً — هذا الموضوع يضم ملايين الملفات؛ تحتاج زاوية فريدة جداً");
@@ -124,15 +132,15 @@ function calculateReadinessScore(
     issues.push("تفرد منخفض جداً — من المرجح وجود أصول متطابقة تقريباً، خطر رفض عالٍ");
   }
 
-  // ── Release warnings (Informational only, no points deduction as per request)
-  if (releases.modelRelease) issues.push("⚠️ Model Release Required");
+  // ── تحذيرات الحقوق (إعلامية فقط، لا تؤثر على النقاط)
+  if (releases.modelRelease)    issues.push("⚠️ Model Release Required");
   if (releases.propertyRelease) issues.push("⚠️ Property Release Required");
-  if (releases.editorialOnly) issues.push("⚠️ Editorial Use Only — Brand/Logo detected");
+  if (releases.editorialOnly)   issues.push("⚠️ Editorial Use Only — Brand/Logo detected");
   if (releases.copyrightConcern) issues.push("⚠️ Copyright Concern — Protected work visible");
 
-  // ── Strategic Bonuses
+  // ── مكافآت استراتيجية
   if (hasCompetitiveGap) bonuses += 5;
-  if (trendCount >= 2) bonuses += 5;
+  if (trendCount >= 2)   bonuses += 5;
   else if (trendCount === 1) bonuses += 3;
 
   const finalScore = Math.max(0, Math.min(100, contentScore - metadataPenalty + bonuses));
@@ -150,9 +158,9 @@ function calculateReadinessScore(
     issues,
     estimatedAcceptance,
     breakdown: {
-      uniqueness: uniqueness * 10,
+      uniqueness:      uniqueness * 10,
       commercialValue: commercial * 10,
-      subjectClarity: clarity * 10,
+      subjectClarity:  clarity   * 10,
       marketSaturation: saturation * 10,
       metadataPenalty: -metadataPenalty,
       bonuses,
@@ -164,8 +172,9 @@ const buildPrompt = (): string => `
 You are a Senior Adobe Stock Intelligence Specialist — 15+ years curating, approving and 
 rejecting submissions. Your mission: generate metadata that MAXIMIZES buyer discovery 
 while MINIMIZING similarity with the 400M+ assets already on Adobe Stock.
-
 Today: ${new Date().toISOString().slice(0, 10)}
+
+${ADOBE_AI_PROMPT_RULES}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 1 — VISUAL DNA (Internal Analysis)
@@ -184,15 +193,22 @@ Explain in 1-2 sentences what specific market hole this image fills. If none, se
 STEP 3 — TITLE (55-70 characters)
 Formula: [Hyper-specific Subject + State] [Rare Visual Detail] [Commercial Signal]
 MUST include: 1 color/tone + 1 lighting descriptor + 1 commercial context descriptor.
-NO generic adjectives like "beautiful", "stunning".
+NO generic adjectives like "beautiful", "stunning", "4K", "video", "clip", "footage".
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 4 — KEYWORDS (EXACTLY 47-49)
-Layer A (1-12): Visual Fingerprint — 3-5 word specific details.
-Layer B (13-22): Subject Identity — who, age, ethnicity, state, actions.
-Layer C (23-32): Environment — hyper-specific context (architectural style, time, season).
-Layer D (33-42): Trends & Commercial — alignment with Steps 1-2 + commercial uses.
-Layer E (43-49): Concepts & Emotions — "resilience", "unseen labor", "quiet ambition".
+Layer A (1-12):  Visual Fingerprint — 3-5 word specific visual details found ONLY in this frame.
+Layer B (13-22): Subject Identity — who, age, ethnicity, state, actions, relationship.
+Layer C (23-32): Environment — hyper-specific context (architectural style, time, season, country).
+Layer D (33-42): Trends & Commercial — 2025-2026 buyer-intent terms + commercial use cases.
+Layer E (43-49): Concepts & Emotions — "resilience", "unseen labor", "quiet ambition", "solitude".
+
+KEYWORD RULES:
+- NO brand names, artist names, fictional characters, AI platform names (midjourney, dall-e, etc.)
+- NO promotional terms: stunning, amazing, beautiful, exclusive, best, premium, top
+- NO technical terms: 4k, 8k, uhd, hd, high resolution, video, clip, footage, motion, cinematic
+- NO AI disclosure terms: ai generated, ai-generated, created by ai, stable diffusion
+- Use descriptive synonyms instead of brand names (e.g., "electric vehicle" not "tesla")
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 5 — SCORING (Library-Calibrated)
@@ -201,34 +217,42 @@ Scale: 10 = Golden Gap/Elite | 7 = High Quality | 5 = Average | 3 = Generic/Satu
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 6 — RELEASES & IP
-Check for recognizable faces, property, brands, or artworks.
-If concern found, provide an avoidanceHint for cropping.
+Check for recognizable faces, branded property, trademarks, or copyrighted artworks.
+If concern found, provide an avoidanceHint for cropping or reshooting.
 
 ADOBE OFFICIAL CATEGORIES (pick exact name):
 ${ADOBE_CATEGORIES.join(", ")}
 
-RESPOND WITH ONLY JSON:
+RESPOND WITH ONLY VALID JSON — NO MARKDOWN, NO EXPLANATION:
 {
   "visualDNA": {
     "uniqueVisualElement": "string",
     "colorPalette": "string",
     "lightingCharacter": "string",
     "emotionalRegister": "string",
-    "trendAlignment": ["array"]
+    "trendAlignment": ["array of matching 2025-2026 trends"]
   },
   "competitiveGap": "string",
-  "title": "55-70 chars",
+  "title": "55-70 chars, NO banned words",
   "description": "2-3 sensory and commercial sentences",
-  "keywords": ["array of 47-49"],
-  "category": "string",
+  "keywords": ["array of EXACTLY 47-49 keywords, NO banned terms"],
+  "category": "exact Adobe category name",
   "scoring": {
-    "uniqueness": 0, "commercialValue": 0, "subjectClarity": 0, "marketSaturation": 0, "reasoning": "string"
+    "uniqueness": 0,
+    "commercialValue": 0,
+    "subjectClarity": 0,
+    "marketSaturation": 0,
+    "reasoning": "1-2 sentences explaining the scores"
   },
   "releases": {
-    "modelRelease": false, "propertyRelease": false, "editorialOnly": false, "copyrightConcern": false,
-    "releaseNote": "string", "avoidanceHint": "string"
+    "modelRelease": false,
+    "propertyRelease": false,
+    "editorialOnly": false,
+    "copyrightConcern": false,
+    "releaseNote": "string",
+    "avoidanceHint": "string"
   }
-}`;
+}`.trim();
 
 export async function analyzeImageForStock(
   file: File,
@@ -244,24 +268,31 @@ export async function analyzeImageForStock(
 
   const parsed = extractAndParseJSON<any>(result, {});
 
-  const deduped = deduplicateKeywords(parsed.keywords || []);
+  // ── طبقة فلترة مزدوجة:
+  // 1. sanitizeStringArray: يزيل العلامات التجارية الكاملة (IP Blacklist من sanitizer.ts)
+  // 2. filterBannedKeywords: يزيل المصطلحات التقنية/الترويجية (constants.ts)
+  const sanitizedFirst = sanitizeStringArray(parsed.keywords || []);
+  const deduped = deduplicateKeywords(sanitizedFirst);
   const { filtered: cleanKeywords, removed } = filterBannedKeywords(deduped);
+
+  // تنظيف العنوان أيضاً
+  const cleanTitle = sanitizePromptOrKeywords(parsed.title || file.name);
 
   const trendCount = (parsed.visualDNA?.trendAlignment ?? []).length;
   const hasGap = !!(parsed.competitiveGap && parsed.competitiveGap.length > 20);
 
   const releases: ReleaseInfo = {
-    modelRelease: !!parsed.releases?.modelRelease,
-    propertyRelease: !!parsed.releases?.propertyRelease,
-    editorialOnly: !!parsed.releases?.editorialOnly,
+    modelRelease:     !!parsed.releases?.modelRelease,
+    propertyRelease:  !!parsed.releases?.propertyRelease,
+    editorialOnly:    !!parsed.releases?.editorialOnly,
     copyrightConcern: !!parsed.releases?.copyrightConcern,
-    releaseNote: parsed.releases?.releaseNote || "",
+    releaseNote:   parsed.releases?.releaseNote  || "",
     avoidanceHint: parsed.releases?.avoidanceHint || "",
   };
 
   const readiness = calculateReadinessScore(
-    parsed.title || file.name,
-    cleanKeywords.slice(0, 49),
+    cleanTitle,
+    cleanKeywords.slice(0, MAX_KEYWORDS),
     removed,
     parsed.category || "Unknown",
     parsed.scoring || {},
@@ -273,7 +304,7 @@ export async function analyzeImageForStock(
   return {
     id: Date.now().toString(36),
     name: file.name,
-    title: parsed.title || file.name,
+    title: cleanTitle,
     description: parsed.description || "",
     keywords: cleanKeywords.slice(0, MAX_KEYWORDS),
     removedKeywords: removed,
