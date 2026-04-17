@@ -448,40 +448,55 @@ CRITICAL - CATEGORY ADHERENCE (DO NOT VIOLATE):
 - Double-check: each prompt must make the category obvious to a reader.
 `;
 
-export async function generateAIVideoPrompts(category: string, count: number): Promise<VideoPromptResult[]> {
+export async function generateAIVideoPrompts(
+  category: string,
+  count: number
+): Promise<VideoPromptResult[]> {
+  // نطلب count+3 لتعويض أي فلترة لاحقة
+  const requestCount = count + 3;
   const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}-${crypto.getRandomValues(new Uint32Array(1))[0]}`;
   const strictRules = CATEGORY_STRICT_RULES.replace(/\{CATEGORY\}/g, category);
-
-  const prompt = `You are an expert Adobe Stock video prompt engineer. Generate EXACTLY ${count} video prompts.
-
+  const prompt = `You are an expert Adobe Stock video prompt engineer specialized in Gemini Business AI video generation (8-second clips, Veo 2 model).
 ${strictRules}
-
-REQUIRED OUTPUT CATEGORY: "${category}" — ALL prompts MUST be about this topic only.
-
-DIVERSITY SEED: ${seed}
-
+REQUIRED OUTPUT CATEGORY: "${category}" — ALL ${requestCount} prompts MUST be about this topic ONLY.
+UNIQUENESS SEED: ${seed}
 ${ADOBE_AI_PROMPT_RULES}
-
-FORMULA: [Subject - MUST be from ${category}] + [Environment] + [Lighting] + [Camera Movement] + [Speed] + [Duration] + [Style] + [Commercial Appeal] + [Constraints]
-
-TECHNICAL:
-- 4K (3840x2160), 15-30 seconds, 24-30fps, sRGB
-- Camera: slow smooth pan, static tripod, slow tracking, subtle slow dolly, slow aerial drift. NO chaotic motion.
-- Each prompt MUST end with: ${ADOBE_VIDEO_NEGATIVE_SUFFIX}
-- NO artist names, real people, fictional characters, copyrighted works, brands
-- Each prompt: UNIQUE subject and environment within "${category}"
-
-Return ONLY valid JSON array, no markdown: [{"number":1,"category":"${category}","prompt":"FULL PROMPT HERE"}]`;
-
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎬 GEMINI VEO 2 — 8-SECOND VIDEO OPTIMIZATION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Veo 2 generates 8-second clips. Every prompt MUST be designed for this constraint:
+- ONE single visual action that completes naturally in 8 seconds
+- SLOW MOTION subjects (water, particles, smoke, plants) fill 8s perfectly
+- SEAMLESS LOOP potential: the clip should look natural as a loop
+- NO complex narratives: 8 seconds = one moment, not a story
+- IDEAL subjects: fluid dynamics, macro textures, subtle environmental motion, slow chemical reactions
+FORMULA: [Single Subject from ${category}] + [Exact Material/Texture Detail] + [One Fluid Motion] + [Lighting Setup] + [Camera: static OR very slow pan] + [Speed: slow/ultra-slow/real-time] + [Style]
+UNIQUENESS PER PROMPT:
+1. Each prompt: completely different subject within "${category}"
+2. Cycle through: macro close-up → medium shot → overhead → eye-level → low angle
+3. Cycle through lighting: golden hour → moody rim → studio softbox → natural ambient → neon
+4. Cycle through motion: water flow → smoke drift → particle fall → plant sway → liquid pour → crystal growth
+5. Mix durations/speeds: ultra-slow-motion → normal → slow → time-lapse-style
+NEGATIVE CONSTRAINTS (mandatory end of every prompt):
+${ADOBE_VIDEO_NEGATIVE_SUFFIX}
+CRITICAL COUNT RULE: Return EXACTLY ${requestCount} distinct prompts. No fewer, no more.
+The JSON array MUST have exactly ${requestCount} objects.
+Return ONLY valid JSON array, no markdown:
+[{"number":1,"category":"${category}","prompt":"FULL DETAILED PROMPT, minimum 60 words, optimized for 8-second Veo 2 clip"}]`;
   const result = await generateWithGemini(prompt, 0.85);
   const parsed = extractAndParseJSON<VideoPromptResult[]>(result, []);
   if (!parsed || parsed.length === 0) throw new Error("Failed to parse AI response");
-  return parsed.map((p, i) => ({ 
-    ...p, 
-    number: i + 1, 
-    category,
-    prompt: sanitizePromptOrKeywords(p.prompt)
-  }));
+  
+  // نعيد بالضبط العدد المطلوب أصلاً من المستخدم
+  return parsed
+    .slice(0, count + 3)
+    .map((p, i) => ({
+      ...p,
+      number: i + 1,
+      category,
+      prompt: sanitizePromptOrKeywords(p.prompt)
+    }))
+    .slice(0, count); // ضمان العدد الصحيح
 }
 
 /** Gemini version of Claude's StockImagePrompt - full structure like Claude */
@@ -504,75 +519,84 @@ export async function generateGeminiStockPrompts(
   topicHint?: string,
   generationHistory?: string
 ): Promise<GeminiStockPrompt[]> {
+  // نطلب عدداً إضافياً لضمان وصول العدد المطلوب بعد الفلترة
+  const requestCount = count + 3;
   const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const strictRules = CATEGORY_STRICT_RULES.replace(/\{CATEGORY\}/g, category);
-
-  const typeReq = outputType === "image" ? "IMAGE prompts ONLY" :
-    outputType === "video" ? "VIDEO prompts ONLY (camera movement, 10-30s)" :
-    "MIX of image AND video, labeled";
-
-  const compReq = competition === "low" ? "ultra-niche, low competition" :
-    competition === "medium" ? "low-to-medium competition" :
-    "avoid oversaturated generic topics";
-
-  const trendsStr = trends.length > 0 ? `Trends to incorporate: ${trends.join(", ")}.` : "";
+  const typeReq = outputType === "image" ? "IMAGE prompts ONLY (static composition, no camera movement)" :
+    outputType === "video" ? "VIDEO prompts ONLY — optimized for Gemini Veo 2 (8-second clips, single fluid motion)" :
+    "MIX: half IMAGE + half VIDEO, clearly labeled";
+  const compReq = competition === "low" ? "ultra-niche, low competition — avoid anything in Adobe's top 1M results" :
+    competition === "medium" ? "low-to-medium competition — fresh angle on known subjects" :
+    "avoid oversaturated generic topics — must have unique differentiator";
+  const trendsStr = trends.length > 0 ? `MANDATORY TREND ALIGNMENT — incorporate 1-2 of these 2025-2026 trends per prompt: ${trends.join(", ")}.` : "";
   const topicConstraint = topicHint?.trim()
-    ? `USER TITLE/TOPIC TO FOLLOW STRICTLY: "${topicHint.trim()}". Every prompt must stay aligned with this title and category.`
+    ? `USER TOPIC (STRICT): "${topicHint.trim()}". Every single prompt MUST revolve around this specific topic within "${category}".`
     : "";
-
-
-  const prompt = `You are an expert Adobe Stock prompt engineer. Generate exactly ${count} prompts.
-
+  const prompt = `You are an expert Adobe Stock prompt engineer specialized in Gemini Business AI (Veo 2 for video, Imagen 3 for images).
 ${strictRules}
-
 REQUIRED CATEGORY: "${category}" — EVERY prompt MUST be about this topic ONLY.
-
 UNIQUENESS SEED: ${seed}
 OUTPUT TYPE: ${typeReq}
-COMPETITION: ${compReq}
+COMPETITION LEVEL: ${compReq}
 ${trendsStr}
 ${topicConstraint}
-${generationHistory ? `\nCRITICAL MEMORY KNOWLEDGE:\n${generationHistory}\n` : ""}
-
-CRITICAL DIVERSITY INSTRUCTION:
-Even though you are strictly following the assigned topic, YOU MUST MAKE EVERY SINGLE PROMPT COMPLETELY UNIQUE.
-1. FOR EACH PROMPT in the array, you MUST pick a DIFFERENT visual style (e.g., Cinematic, Documentary, Editorial, Minimalist, Cyberpunk, Moody).
-2. FOR EACH PROMPT, you MUST pick a DIFFERENT camera setup (e.g., Drone Aerial, Macro Close-up, Wide-angle, 50mm Eye-level, Low-angle dynamic).
-3. Change the lighting totally for each (e.g., bright sunlight, golden hour, neon interior, stark studio, misty dawn).
-4. If you see the CRITICAL MEMORY KNOWLEDGE above, you MUST NOT repeat those scenarios. Invent new ones.
-
-ULTRA CRITICAL RULE — NO SPAM:
-- DO NOT INCLUDE technical words like "Video", "Clip", "Footage", "Motion", "4K", "Ultra HD" in the "title" field.
-- The title MUST be a pure description of the SUBJECT only.
-- Example BAD title: "Pizza Dough Stretching Video Clip"
-- Example GOOD title: "Chef Hands Stretching Fresh Pizza Dough on Marble"
-
-- For KEYWORDS: Generate between 35 to 50 HIGH-QUALITY keywords per asset.
-- DO NOT repeat the same keywords across the different prompts in this batch. Diversify!
-
+${generationHistory ? `\n⛔ ALREADY USED (DO NOT REPEAT THESE SCENARIOS):\n${generationHistory}\n` : ""}
 ${ADOBE_AI_PROMPT_RULES}
-
-FRAMEWORK: [Subject from ${category}] + [Environment] + [Lighting] + [Camera/Composition] + [Motion if video] + [Style] + [Commercial] + [Copy space]
-- sRGB, 4MP min, 4K for video, sharp focus
-- End each: no humans, no faces, no hands, no text, no logos, fictional AI-generated, commercial royalty-free stock
-- PROHIBITED: artist names, real people, brands, IP (e.g. No "Charcuterie", use "Meat Platter")
-- CRITICAL: NEVER write descriptive placeholders like "generic term", "operating system", "mobile device", "electronics brand", "software company", or "tech company" in any field. Use actual descriptive words instead (e.g. "glass windows", "tablet screen", "car dashboard").
-- EVERY SINGLE PROMPT in the array MUST be entirely different from the others!
-
-Return ONLY a valid JSON array matching this format exactly. 
-CRUCIAL: The array MUST contain EXACTLY ${count} distinct objects. Do not stop at less than ${count}.
-[{"number":1,"category":"${category}","type":"${outputType === 'video' ? 'video' : 'image'}","demand":"low","prompt":"FULL DETAILED PROMPT 60+ words","title":"SEO title max 70 chars (NO 'VIDEO'/'CLIP' WORDS)","keywords":["kw1","kw2","kw3", "...total 40 keywords..."]}]`;
-
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎬 FOR VIDEO PROMPTS — VEO 2 (8-SECOND) OPTIMIZATION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- 8 seconds = ONE fluid action, not a story
+- Best for Veo 2: slow-motion water, particle systems, smoke/mist, macro textures, subtle plant/crystal growth
+- Camera: static OR ultra-slow pan/dolly. NO fast movements, NO cuts.
+- End with: ${ADOBE_VIDEO_NEGATIVE_SUFFIX}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RADICAL DIVERSITY — MANDATORY PER PROMPT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Completely different SUBJECT (not just angle variation)
+2. Different CAMERA ANGLE: overhead flat lay → extreme macro → 45° side → low-angle → eye-level
+3. Different LIGHTING: airy studio → dark moody → golden ambient → neon interior → hard industrial
+4. Different COLOR STORY: warm earth → cool Nordic → vibrant tropical → monochromatic → jewel tones
+5. Different COMPOSITION: symmetrical → rule of thirds → negative space → abstract splatter → minimalist
+TITLE RULES (CRITICAL):
+- NEVER write: "Video Clip", "Footage", "4K", "HD", "AI Generated" in the title
+- Title = pure descriptive subject: "Chef Hands Stretching Fresh Pasta Dough on Marble" ✓
+- NOT: "Pizza Dough Stretching Video Clip 4K" ✗
+KEYWORD RULES:
+- Generate 47-49 keywords per prompt
+- ORDER BY BUYER INTENT (strongest/most-searched first)
+  Layer 1 (positions 1-10): Exact visual details a buyer would search for
+  Layer 2 (positions 11-25): Subject, context, environment terms
+  Layer 3 (positions 26-40): Commercial use terms, mood, style
+  Layer 4 (positions 41-49): Emotional/conceptual tags
+- NO brand names, NO AI platform names, NO promotional terms
+CRITICAL COUNT RULE:
+Generate EXACTLY ${requestCount} prompts. The JSON array MUST contain EXACTLY ${requestCount} objects. Count carefully.
+Return ONLY valid JSON array:
+[{
+  "number": 1,
+  "category": "${category}",
+  "type": "${outputType === 'video' ? 'video' : 'image'}",
+  "demand": "low",
+  "prompt": "FULL DETAILED PROMPT (min 60 words) for ${outputType === 'video' ? '8-second Veo 2 video' : 'Imagen 3 image'}",
+  "title": "SEO title max 70 chars — NO technical words",
+  "keywords": ["47 to 49 keywords ordered by buyer intent strength"]
+}]`;
   const result = await generateWithGemini(prompt, 0.8);
   const parsed = extractAndParseJSON<GeminiStockPrompt[]>(result, []);
   if (!parsed || parsed.length === 0) throw new Error("Failed to parse AI response");
-  return parsed.slice(0, count).map((p, i) => ({ 
-    ...p, 
-    number: i + 1, 
-    category,
-    title: p.title ? sanitizePromptOrKeywords(p.title) : undefined,
-    keywords: p.keywords ? sanitizeStringArray(p.keywords) : []
-  }));
+  
+  // نضمن الحصول على العدد المطلوب أصلاً بعد الفلترة
+  return parsed
+    .slice(0, requestCount)
+    .map((p, i) => ({
+      ...p,
+      number: i + 1,
+      category,
+      title: p.title ? sanitizePromptOrKeywords(p.title) : undefined,
+      keywords: p.keywords ? sanitizeStringArray(p.keywords) : []
+    }))
+    .slice(0, count); // العدد الدقيق المطلوب
 }
 
 function escapeRegex(value: string): string {

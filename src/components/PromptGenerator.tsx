@@ -347,11 +347,17 @@ export default function PromptGenerator() {
           );
         }
         const validated = allResults.filter((item) => isPromptCategoryValid(item.prompt, category));
-        const finalList = (validated.length > 0 ? validated : allResults).map((item, idx) => ({ ...item, number: idx + 1 }));
+        // منطق العتبة (70%): إذا كانت النتائج المفلترة كافية نعتمدها، وإذا كانت قليلة جداً نعتمد الكل لتجنب نقص العدد
+        const threshold = Math.ceil(promptCount * 0.7);
+        const finalList = (validated.length >= threshold ? validated : allResults).map((item, idx) => ({ ...item, number: idx + 1 }));
+        
         setPrompts(finalList);
         try { localStorage.setItem("gemini_saved_prompts", JSON.stringify(finalList)); } catch {}
-        if (validated.length !== allResults.length) {
-          toast.warning(`تمت فلترة ${allResults.length - validated.length} برومبت خارج الفئة المختارة.`);
+        
+        if (validated.length < allResults.length && validated.length >= threshold) {
+          toast.warning(`تمت فلترة ${allResults.length - validated.length} برومبت غير دقيق، وبقي ${validated.length} برومبت ممتاز.`);
+        } else if (validated.length < threshold && allResults.length > 0) {
+          toast.info("تم الحفاظ على كامل العدد لضمان استمرارية الدفعة رغم ضعف دقة التصنيف.");
         }
         toast.success(`✅ تم توليد ${finalList.length} برومبت لـ ${batchTitles.length} عنوان`);
       } else if (useAI && hasAnyKey && advancedMode) {
@@ -362,11 +368,14 @@ export default function PromptGenerator() {
           topicHint, historyContext
         );
         let validated = (result as DisplayPrompt[]).filter((item) => isPromptCategoryValid(item.prompt, category));
-        const finalList = validated.length > 0 ? validated : (result as DisplayPrompt[]);
+        const threshold = Math.ceil(promptCount * 0.7);
+        const finalList = (validated.length >= threshold ? validated : (result as DisplayPrompt[]));
+        
         setPrompts(finalList);
         try { localStorage.setItem("gemini_saved_prompts", JSON.stringify(finalList)); } catch {}
-        if (validated.length !== (result as DisplayPrompt[]).length && validated.length > 0) {
-          toast.warning("تمت فلترة بعض البرومبتات غير المطابقة للفئة.");
+        
+        if (validated.length < (result as DisplayPrompt[]).length && validated.length >= threshold) {
+          toast.warning("تمت تنقية النتائج لضمان مطابقة الفئة بنسبة 100%.");
         }
         const engineLabel = engineUsed === "local" ? "محلياً" : engineUsed.toUpperCase();
         toast.success(`✅ تم توليد ${finalList.length} برومبت (${engineLabel})`);
