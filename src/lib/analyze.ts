@@ -135,11 +135,23 @@ function calculateReadinessScore(
     issues.push("Similar Content — Too similar to existing Adobe Stock assets");
   }
 
-  // ── تحذيرات الحقوق
-  if (releases.modelRelease)    issues.push("⚠️ Model Release Required");
-  if (releases.propertyRelease) issues.push("⚠️ Property Release Required");
-  if (releases.editorialOnly)   issues.push("⚠️ Editorial Use Only — Brand/Logo detected");
-  if (releases.copyrightConcern) issues.push("⚠️ Copyright Concern — Protected work visible");
+  // ── تحذيرات الحقوق (عقوبات صارمة)
+  if (releases.modelRelease) {
+    metadataPenalty += 20;
+    issues.push("⚠️ Model Release Required");
+  }
+  if (releases.propertyRelease) {
+    metadataPenalty += 20;
+    issues.push("⚠️ Property Release Required");
+  }
+  if (releases.editorialOnly) {
+    metadataPenalty += 50; // Force rejection
+    issues.push("⚠️ Editorial Use Only — Brand/Logo detected");
+  }
+  if (releases.copyrightConcern) {
+    metadataPenalty += 60; // Force immediate rejection
+    issues.push("⚠️ Copyright Concern — Protected work visible (Logo/Text)");
+  }
 
   // ── مكافآت استراتيجية
   if (hasCompetitiveGap) bonuses += 5;
@@ -188,12 +200,12 @@ ${batchContext}
 ${ADOBE_AI_PROMPT_RULES}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚨 VISUAL QUALITY & AI ARTIFACTS (CRITICAL):
-Adobe Stock has ZERO TOLERANCE for AI artifacts. Check for:
-- Hallucinations: Extra limbs, distorted faces, floating objects, warped textures.
-- Technical issues: Excessive noise, compression artifacts, blurred key subjects.
-- IP Violations: Visible logos, trademarked designs, recognizable brand products.
-If any of these are present, set uniqueness and quality scores to 1.
+🚨 VISUAL QUALITY & IP TRAP-HUNTING (CRITICAL):
+Adobe Stock has ZERO TOLERANCE for text, logos, or AI artifacts.
+- IP TRAP: Look for ANY letters, numbers, or symbols on products (e.g., "GO" on a glass, "NI" on a shoe).
+- If ANY text/logo is visible: set `copyrightConcern: true`, `editorialOnly: true`, and `visualQuality: 1`.
+- Hallucinations: Check for distorted anatomy, warped textures, or gravity-defying objects.
+- If artifacts found: set `visualQuality: 1`.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 STEP 1 — VISUAL DNA
