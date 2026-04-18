@@ -212,22 +212,15 @@ Identify:
 STEP 3 — TITLE (55-70 characters)
 Formula: [Hyper-specific Subject + State] + [Rare Visual Detail] + [Commercial Signal]
 MUST include: 1 color/tone + 1 lighting descriptor + 1 commercial context.
-NEVER use: "beautiful", "stunning", "4K", "video", "clip", "footage", "HD", "amazing".
+NEVER use: "design", "quality", "HD", "4K", "video", "footage", "brochure", "clip", "amazing", "stunning".
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 4 — KEYWORDS (EXACTLY 47-49)
+STEP 4 — KEYWORDS (EXACTLY 49)
 ⚠️ CRITICAL ORDERING RULE: Keywords MUST be ordered from STRONGEST buyer-intent to WEAKEST.
-A buyer types the strongest keywords first in Adobe Stock search.
 ORDERED LAYERS:
-Positions 1-10  (HIGHEST BUYER INTENT): 3-5 word exact phrases a buyer types when ready to purchase.
-                Examples: "slow motion coffee pour macro", "isolated white background product shot"
-Positions 11-20 (HIGH INTENT): Subject + action/state. "water splash close up", "green leaf texture"
-Positions 21-32 (MEDIUM INTENT): Context/environment. "modern kitchen interior", "golden hour forest"
-Positions 33-42 (COMMERCIAL USE): "corporate presentation background", "social media template", "website hero"
-Positions 43-49 (CONCEPTUAL/EMOTIONAL): "tranquility", "innovation", "abundance", "resilience"
-FORBIDDEN in keywords: brand names, AI platform names (midjourney, dall-e, stable diffusion),
-promotional terms (stunning, amazing, beautiful, exclusive, best, premium, top),
-technical metadata (4k, 8k, uhd, hd, high resolution, video, clip, footage, cinematic),
-AI disclosure (ai generated, ai-generated, created by ai)
+Positions 1-10  (HIGHEST BUYER INTENT): Exact phrases.
+Positions 11-40 (MEDIUM INTENT): Subject/Action/Context.
+Positions 41-49 (CONCEPTUAL): Emotion/Mood.
+FORBIDDEN: "design", "quality", "brochure", "template", "stock", "ai", "video", "footage", "4k", "hd".
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 5 — REAL-WORLD SCORING (1-10 each)
 uniqueness: 10=Golden Gap | 7=Differentiated | 5=Average | 1=SPAM/SIMILAR

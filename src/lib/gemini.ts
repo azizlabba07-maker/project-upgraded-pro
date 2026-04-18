@@ -472,18 +472,14 @@ Veo 2 generates 8-second clips. Every prompt MUST be designed for this constrain
 - SILENT VIDEO: Absolutely NO audio, NO music, NO sound effects. This is a mandatory safety requirement.
 - IDEAL subjects: fluid dynamics, macro textures, subtle environmental motion, slow chemical reactions
 FORMULA: [Single Subject from ${category}] + [Exact Material/Texture Detail] + [One Fluid Motion] + [Lighting Setup] + [Camera: static OR very slow pan] + [Speed: slow/ultra-slow/real-time] + [Style] + [Constraint: Silent Video, No Audio]
-UNIQUENESS PER PROMPT:
-1. Each prompt: completely different subject within "${category}"
-2. Cycle through: macro close-up → medium shot → overhead → eye-level → low angle
-3. Cycle through lighting: golden hour → moody rim → studio softbox → natural ambient → neon
-4. Cycle through motion: water flow → smoke drift → particle fall → plant sway → liquid pour → crystal growth
-5. Mix durations/speeds: ultra-slow-motion → normal → slow → time-lapse-style
+TITLE RULES: Max 70 chars. NO quotes. NEVER use: "design", "quality", "HD", "4K", "video", "footage", "brochure", "clip".
+KEYWORD RULES: Generate EXACTLY 49 keywords. NO "design", "quality", "stock", "ai".
 NEGATIVE CONSTRAINTS (mandatory end of every prompt):
 ${ADOBE_VIDEO_NEGATIVE_SUFFIX}, sound, music, audio, noise, soundtrack
 CRITICAL COUNT RULE: Return EXACTLY ${requestCount} distinct prompts. No fewer, no more.
 The JSON array MUST have exactly ${requestCount} objects.
 Return ONLY valid JSON array, no markdown:
-[{"number":1,"category":"${category}","prompt":"FULL DETAILED PROMPT, minimum 60 words, optimized for 8-second Veo 2 clip. Ensure prompt mentions the video is silent."}]`;
+[{"number":1,"category":"${category}","prompt":"FULL DETAILED PROMPT... Ensure prompt mentions the video is silent."}]`;
   const result = await generateWithGemini(prompt, 0.85);
   const parsed = extractAndParseJSON<VideoPromptResult[]>(result, []);
   if (!parsed || parsed.length === 0) throw new Error("Failed to parse AI response");
@@ -561,13 +557,13 @@ RADICAL DIVERSITY — MANDATORY PER PROMPT:
 4. Different COLOR STORY: warm earth → cool Nordic → vibrant tropical → monochromatic → jewel tones
 5. Different COMPOSITION: symmetrical → rule of thirds → negative space → abstract splatter → minimalist
 TITLE RULES (CRITICAL):
-- NEVER write: "Video Clip", "Footage", "4K", "HD", "AI Generated", "With Music" in the title
+- NEVER write: "Video Clip", "Footage", "4K", "HD", "AI Generated", "With Music", "Design", "Brochure", "Quality", "Template" in the title
 - Title = pure descriptive subject: "Chef Hands Stretching Fresh Pasta Dough on Marble" ✓
 - NOT: "Pizza Dough Stretching Video Clip 4K" ✗
 KEYWORD RULES:
-- Generate 47-49 keywords per prompt
+- Generate EXACTLY 49 keywords per prompt (MANDATORY)
 - ORDER BY BUYER INTENT (strongest/most-searched first)
-- NO brand names, NO AI platform names, NO promotional terms, NO music-related keywords unless abstract visuals
+- NO brand names, NO AI platform names, NO promotional terms, NO music-related keywords, NO "design", NO "quality"
 CRITICAL COUNT RULE:
 Generate EXACTLY ${requestCount} prompts. The JSON array MUST contain EXACTLY ${requestCount} objects. Count carefully.
 Return ONLY valid JSON array:
@@ -577,8 +573,8 @@ Return ONLY valid JSON array:
   "type": "${outputType === 'video' ? 'video' : 'image'}",
   "demand": "low",
   "prompt": "FULL DETAILED PROMPT (min 60 words) for ${outputType === 'video' ? '8-second silent Veo 2 video' : 'Imagen 3 image'}. Must include: Silent video, no audio.",
-  "title": "SEO title max 70 chars — NO technical words",
-  "keywords": ["47 to 49 keywords ordered by buyer intent strength"]
+  "title": "SEO title max 70 chars — NO restricted words (design, quality, brochure, 4k)",
+  "keywords": ["EXACTLY 49 keywords ordered by buyer intent strength"]
 }]`;
   const result = await generateWithGemini(prompt, 0.8);
   const parsed = extractAndParseJSON<GeminiStockPrompt[]>(result, []);

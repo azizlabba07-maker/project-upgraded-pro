@@ -1,5 +1,7 @@
 import { GLOBAL_IP_BLACKLIST, ADOBE_BANNED_METADATA_TERMS } from "./adobeStockCompliance";
 
+const EXTRA_BANNED_TERMS = ["design", "quality", "brochure", "template", "mockup", "high res", "high resolution"];
+
 /**
  * Smart Swap Map: Maps high-risk brand names to safe generic synonyms.
  */
@@ -197,7 +199,7 @@ export function sanitizePromptOrKeywords(text: string): string {
   
   // 2. Replace blacklisted words case-insensitively with Smart Swap or deletion
   // We combine ADOBE_STOCK_BLACKLIST and ADOBE_BANNED_METADATA_TERMS for thorough cleaning
-  const masterBlacklist = Array.from(new Set([...ADOBE_STOCK_BLACKLIST, ...ADOBE_BANNED_METADATA_TERMS]));
+  const masterBlacklist = Array.from(new Set([...ADOBE_STOCK_BLACKLIST, ...ADOBE_BANNED_METADATA_TERMS, ...EXTRA_BANNED_TERMS]));
   
   for (const word of masterBlacklist) {
     const lowerWord = word.toLowerCase();

@@ -239,6 +239,39 @@ export default function BatchProcessor() {
         />
       )}
 
+      {/* Rejected Assets Cleanup — NEW FEATURE */}
+      {videos.some(v => v.status === "rejected") && (
+        <div className="bg-red-500/5 p-4 rounded-2xl border border-red-500/10 backdrop-blur-sm animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-red-400">تنظيف الملفات المرفوضة</span>
+              <span className="text-[10px] bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full border border-red-500/10">Action Required</span>
+            </div>
+            <button 
+              onClick={() => {
+                const rejectedFiles = videos.filter(v => v.status === "rejected").map(v => `"${v.name}"`);
+                const command = `rm ${rejectedFiles.join(", ")}`;
+                copyTextSafely(command);
+                toast.success("تم نسخ أمر الحذف! الصقه في PowerShell في مجلد الفيديوهات.");
+              }}
+              className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-[11px] font-bold border border-red-500/20 transition-all"
+            >
+              📋 نسخ أمر حذف الملفات ({videos.filter(v => v.status === "rejected").length})
+            </button>
+          </div>
+          <p className="text-[10px] text-red-300/60 leading-relaxed mb-2">
+            اكتشف النظام ملفات غير متوافقة مع معايير Adobe Stock. يمكنك نسخ الأمر أعلاه وتشغيله في مجلد الفيديوهات لحذفها فوراً.
+          </p>
+          <div className="flex flex-wrap gap-2 max-h-20 overflow-y-auto pr-2">
+            {videos.filter(v => v.status === "rejected").map(v => (
+              <span key={v.id} className="text-[9px] bg-red-500/10 text-red-400/80 px-2 py-1 rounded-md border border-red-500/5">
+                {v.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Diversity Analytics */}
       {videos.filter(v => v.result).length > 1 && !processing && (
         <div className="bg-slate-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm animate-in fade-in slide-in-from-top-2">
