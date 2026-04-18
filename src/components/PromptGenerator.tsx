@@ -17,7 +17,7 @@ import { toast } from "sonner";
 const VIDEO_CATEGORIES = [
   "Nature", "Technology", "Food", "Cooking", "Abstract Concepts",
   "Sustainability", "Business", "Science", "Travel",
-  "Architecture", "Sports", "Fashion", "Music",
+  "Architecture", "Sports", "Fashion", "Audio Visuals (Silent)",
   "Medical", "Education", "Automotive",
   "Wellness & Mindfulness", "Micro Worlds", "Automotive Detail",
 ];
@@ -595,6 +595,12 @@ export default function PromptGenerator() {
           <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
             {VIDEO_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
+
+          <div className="bg-blue-500/10 border border-blue-500/20 p-2.5 rounded-lg mb-4">
+            <p className="text-[10px] text-blue-300 leading-relaxed font-medium">
+              ⚠️ ملاحظة: جميع الفيديوهات ستكون **بدون صوت (Silent)** لضمان قبولها في Adobe Stock وتجنب مشاكل حقوق الموسيقى.
+            </p>
+          </div>
 
           <label className="text-primary text-xs font-semibold font-mono block mb-1.5">
             عناوين متعددة (اختياري):

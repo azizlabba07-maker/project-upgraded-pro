@@ -148,7 +148,7 @@ export async function generateStockPrompts(
 
   const typeMap: Record<string, string> = {
     image: "image prompts ONLY",
-    video: "video prompts ONLY (include camera movement, motion speed, duration 10-30s)",
+    video: "video prompts ONLY (SILENT VIDEO, no audio, no music tracks, include camera movement, motion speed, duration 10-30s)",
     both: "a mix of image AND video prompts, labeled clearly",
     greenscreen: "green screen video prompts where subject is isolated on pure green (#00B140) or black background",
   };
@@ -201,7 +201,7 @@ TECHNICAL SPECS:
 - Professional lighting (specify exact type)
 - Smooth and slow camera motion for video ONLY (e.g., slow smooth pan, static tripod, slow tracking); duration 10–30s with specific movement. No jitter or shake.
 - Specify copy space location (top-left, right side, bottom, etc.)
-- Every prompt MUST end with: no humans, no faces, no hands, no fingers, no text, no logos, no watermarks, no trademarks, fictional AI-generated content only, commercial royalty-free stock
+- Every prompt MUST end with: no humans, no faces, no hands, no fingers, no text, no logos, no watermarks, no trademarks, fictional AI-generated content only, commercial royalty-free stock, silent video, no audio, no music
 
 PROHIBITED IN PROMPT/KEYWORDS: artist names, real people, fictional characters, copyrighted works, brands, government names, third-party IP.
 

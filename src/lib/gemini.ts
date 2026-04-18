@@ -469,8 +469,9 @@ Veo 2 generates 8-second clips. Every prompt MUST be designed for this constrain
 - SLOW MOTION subjects (water, particles, smoke, plants) fill 8s perfectly
 - SEAMLESS LOOP potential: the clip should look natural as a loop
 - NO complex narratives: 8 seconds = one moment, not a story
+- SILENT VIDEO: Absolutely NO audio, NO music, NO sound effects. This is a mandatory safety requirement.
 - IDEAL subjects: fluid dynamics, macro textures, subtle environmental motion, slow chemical reactions
-FORMULA: [Single Subject from ${category}] + [Exact Material/Texture Detail] + [One Fluid Motion] + [Lighting Setup] + [Camera: static OR very slow pan] + [Speed: slow/ultra-slow/real-time] + [Style]
+FORMULA: [Single Subject from ${category}] + [Exact Material/Texture Detail] + [One Fluid Motion] + [Lighting Setup] + [Camera: static OR very slow pan] + [Speed: slow/ultra-slow/real-time] + [Style] + [Constraint: Silent Video, No Audio]
 UNIQUENESS PER PROMPT:
 1. Each prompt: completely different subject within "${category}"
 2. Cycle through: macro close-up → medium shot → overhead → eye-level → low angle
@@ -478,11 +479,11 @@ UNIQUENESS PER PROMPT:
 4. Cycle through motion: water flow → smoke drift → particle fall → plant sway → liquid pour → crystal growth
 5. Mix durations/speeds: ultra-slow-motion → normal → slow → time-lapse-style
 NEGATIVE CONSTRAINTS (mandatory end of every prompt):
-${ADOBE_VIDEO_NEGATIVE_SUFFIX}
+${ADOBE_VIDEO_NEGATIVE_SUFFIX}, sound, music, audio, noise, soundtrack
 CRITICAL COUNT RULE: Return EXACTLY ${requestCount} distinct prompts. No fewer, no more.
 The JSON array MUST have exactly ${requestCount} objects.
 Return ONLY valid JSON array, no markdown:
-[{"number":1,"category":"${category}","prompt":"FULL DETAILED PROMPT, minimum 60 words, optimized for 8-second Veo 2 clip"}]`;
+[{"number":1,"category":"${category}","prompt":"FULL DETAILED PROMPT, minimum 60 words, optimized for 8-second Veo 2 clip. Ensure prompt mentions the video is silent."}]`;
   const result = await generateWithGemini(prompt, 0.85);
   const parsed = extractAndParseJSON<VideoPromptResult[]>(result, []);
   if (!parsed || parsed.length === 0) throw new Error("Failed to parse AI response");
@@ -547,9 +548,10 @@ ${ADOBE_AI_PROMPT_RULES}
 🎬 FOR VIDEO PROMPTS — VEO 2 (8-SECOND) OPTIMIZATION:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - 8 seconds = ONE fluid action, not a story
+- SILENT VIDEO: All video prompts MUST specify "silent video, no audio, no music".
 - Best for Veo 2: slow-motion water, particle systems, smoke/mist, macro textures, subtle plant/crystal growth
 - Camera: static OR ultra-slow pan/dolly. NO fast movements, NO cuts.
-- End with: ${ADOBE_VIDEO_NEGATIVE_SUFFIX}
+- End with: ${ADOBE_VIDEO_NEGATIVE_SUFFIX}, audio, music, sound
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RADICAL DIVERSITY — MANDATORY PER PROMPT:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -559,17 +561,13 @@ RADICAL DIVERSITY — MANDATORY PER PROMPT:
 4. Different COLOR STORY: warm earth → cool Nordic → vibrant tropical → monochromatic → jewel tones
 5. Different COMPOSITION: symmetrical → rule of thirds → negative space → abstract splatter → minimalist
 TITLE RULES (CRITICAL):
-- NEVER write: "Video Clip", "Footage", "4K", "HD", "AI Generated" in the title
+- NEVER write: "Video Clip", "Footage", "4K", "HD", "AI Generated", "With Music" in the title
 - Title = pure descriptive subject: "Chef Hands Stretching Fresh Pasta Dough on Marble" ✓
 - NOT: "Pizza Dough Stretching Video Clip 4K" ✗
 KEYWORD RULES:
 - Generate 47-49 keywords per prompt
 - ORDER BY BUYER INTENT (strongest/most-searched first)
-  Layer 1 (positions 1-10): Exact visual details a buyer would search for
-  Layer 2 (positions 11-25): Subject, context, environment terms
-  Layer 3 (positions 26-40): Commercial use terms, mood, style
-  Layer 4 (positions 41-49): Emotional/conceptual tags
-- NO brand names, NO AI platform names, NO promotional terms
+- NO brand names, NO AI platform names, NO promotional terms, NO music-related keywords unless abstract visuals
 CRITICAL COUNT RULE:
 Generate EXACTLY ${requestCount} prompts. The JSON array MUST contain EXACTLY ${requestCount} objects. Count carefully.
 Return ONLY valid JSON array:
@@ -578,7 +576,7 @@ Return ONLY valid JSON array:
   "category": "${category}",
   "type": "${outputType === 'video' ? 'video' : 'image'}",
   "demand": "low",
-  "prompt": "FULL DETAILED PROMPT (min 60 words) for ${outputType === 'video' ? '8-second Veo 2 video' : 'Imagen 3 image'}",
+  "prompt": "FULL DETAILED PROMPT (min 60 words) for ${outputType === 'video' ? '8-second silent Veo 2 video' : 'Imagen 3 image'}. Must include: Silent video, no audio.",
   "title": "SEO title max 70 chars — NO technical words",
   "keywords": ["47 to 49 keywords ordered by buyer intent strength"]
 }]`;
