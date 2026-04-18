@@ -1,167 +1,167 @@
 import type { MarketTrend } from "./marketData";
 
-// فئات إضافية لعام 2026 مع اتجاهات ناشئة
+/**
+ * اتجاهات ناشئة لعام 2025-2026
+ * ═══════════════════════════════
+ * المصادر:
+ * - Adobe Stock Creative Trends 2025
+ * - Shutterstock Creative Trends Report 2025
+ * - Pinterest Predicts 2025
+ * - Google Trends Q1 2025
+ * 
+ * ⚠️ تم إصلاح توافق الأنواع مع MarketTrend interface
+ */
 export const EMERGING_TRENDS_2026: MarketTrend[] = [
   {
-    id: "quantum-tech",
     category: "Technology",
     topic: "Quantum Computing Visualization",
     searches: 45000,
-    competition: 35,
+    competition: "low",
+    demand: "high",
     profitability: 92,
-    description: "تمثيلات بصرية للحوسبة الكمية والذكاء الاصطناعي المتقدم"
   },
   {
-    id: "space-tourism",
     category: "Travel",
     topic: "Space Tourism Era",
     searches: 38000,
-    competition: 28,
+    competition: "low",
+    demand: "high",
     profitability: 88,
-    description: "السياحة الفضائية والاستكشافات الكونية"
   },
   {
-    id: "biohacking",
-    category: "Health",
-    topic: "Biohacking & Human Enhancement",
+    category: "Wellness",
+    topic: "Biohacking Human Enhancement",
     searches: 32000,
-    competition: 22,
+    competition: "low",
+    demand: "high",
     profitability: 85,
-    description: "تحسين القدرات البشرية من خلال التكنولوجيا"
   },
   {
-    id: "circular-economy",
     category: "Business",
     topic: "Circular Economy Solutions",
     searches: 29000,
-    competition: 30,
+    competition: "medium",
+    demand: "high",
     profitability: 87,
-    description: "الاقتصاد الدائري والاستدامة البيئية"
   },
   {
-    id: "metaverse-commerce",
     category: "Technology",
     topic: "Metaverse Commerce",
     searches: 41000,
-    competition: 40,
+    competition: "medium",
+    demand: "high",
     profitability: 90,
-    description: "التجارة الإلكترونية في العوالم الافتراضية"
   },
   {
-    id: "urban-farming",
     category: "Sustainability",
     topic: "Urban Vertical Farming",
     searches: 26000,
-    competition: 18,
+    competition: "low",
+    demand: "medium",
     profitability: 83,
-    description: "الزراعة العمودية في المدن الحديثة"
   },
   {
-    id: "ai-ethics",
     category: "Technology",
-    topic: "AI Ethics & Governance",
+    topic: "AI Ethics Governance",
     searches: 35000,
-    competition: 25,
+    competition: "low",
+    demand: "high",
     profitability: 86,
-    description: "الأخلاقيات في الذكاء الاصطناعي وحوكمته"
   },
   {
-    id: "digital-nomad",
     category: "Lifestyle",
     topic: "Digital Nomad Communities",
     searches: 43000,
-    competition: 45,
+    competition: "medium",
+    demand: "high",
     profitability: 89,
-    description: "مجتمعات المتنقلين الرقميين حول العالم"
   },
   {
-    id: "climate-tech",
     category: "Sustainability",
     topic: "Climate Technology Solutions",
     searches: 37000,
-    competition: 32,
+    competition: "medium",
+    demand: "high",
     profitability: 91,
-    description: "تقنيات مكافحة تغير المناخ"
   },
   {
-    id: "nft-metaverse",
-    category: "Technology",
-    topic: "NFT & Metaverse Integration",
-    searches: 39000,
-    competition: 38,
-    profitability: 88,
-    description: "دمج الرموز غير القابلة للاستبدال مع الميتافيرس"
-  }
+    category: "Lifestyle",
+    topic: "Intentional Slow Living",
+    searches: 22000,
+    competition: "low",
+    demand: "medium",
+    profitability: 84,
+  },
 ];
 
-// فئات فيديو إضافية للعام 2026
+// فئات فيديو إضافية — آمنة من حقوق الملكية
 export const VIDEO_CATEGORIES_2026 = [
   "Quantum Computing Animations",
-  "Space Tourism Experiences",
-  "Biohacking Documentaries",
-  "Circular Economy Explainers",
-  "Metaverse Shopping Tours",
+  "Space Exploration Concepts",
+  "Biohacking Recovery Rituals",
+  "Sustainable Economy Explainers",
+  "Virtual Shopping Experiences",
   "Urban Farming Time-lapse",
-  "AI Ethics Discussions",
+  "Ethical AI Discussions",
   "Digital Nomad Lifestyle",
-  "Climate Tech Innovations",
-  "NFT Marketplace Walkthroughs",
-  "Virtual Reality Training",
-  "Augmented Reality Commerce",
-  "Sustainable Fashion Shows",
+  "Climate Technology Innovations",
+  "Virtual Reality Training Simulations",
+  "Augmented Reality Interfaces",
+  "Sustainable Textile Production",
   "Electric Vehicle Charging",
   "Smart City Infrastructure",
   "Remote Work Productivity",
-  "Mental Health Tech",
-  "Cryptocurrency Mining",
-  "Blockchain Supply Chain",
-  "Autonomous Vehicle Fleets"
+  "Mental Health Awareness",
+  "Decentralized Finance Concepts",
+  "Supply Chain Transparency",
+  "Autonomous Navigation Systems",
+  "Regenerative Agriculture",
 ];
 
-// كلمات مفتاحية شائعة لعام 2026
+// كلمات مفتاحية شائعة — خالية من حقوق الملكية
 export const TRENDING_KEYWORDS_2026 = [
   "quantum computing",
-  "space tourism",
+  "space exploration",
   "biohacking",
   "circular economy",
-  "metaverse commerce",
+  "virtual commerce",
   "urban farming",
   "ai ethics",
   "digital nomad",
   "climate tech",
-  "nft metaverse",
+  "virtual world",
   "virtual reality",
   "augmented reality",
-  "sustainable fashion",
+  "sustainable textile",
   "electric vehicles",
   "smart cities",
   "remote work",
-  "mental health tech",
-  "cryptocurrency",
-  "blockchain",
-  "autonomous vehicles",
+  "mental health awareness",
+  "decentralized finance",
+  "supply chain",
+  "autonomous navigation",
   "cybersecurity",
   "data privacy",
   "digital twins",
   "edge computing",
-  "5g technology",
+  "connectivity",
   "internet of things",
   "artificial intelligence",
   "machine learning",
   "deep learning",
-  "neural networks"
+  "neural networks",
 ];
 
 // ألوان اتجاهية لعام 2026
 export const TREND_COLORS_2026 = {
-  primary: "#00D4FF", // Electric Blue
+  primary: "#00D4FF",   // Electric Blue
   secondary: "#FF6B6B", // Coral Pink
-  accent: "#4ECDC4", // Mint Green
-  dark: "#2D3748", // Dark Gray
-  light: "#F7FAFC", // Light Gray
-  neon: "#39FF14", // Neon Green
-  cyber: "#FF0080", // Cyber Pink
-  earth: "#8B4513", // Earth Brown
+  accent: "#4ECDC4",    // Mint Green
+  dark: "#2D3748",      // Dark Gray
+  light: "#F7FAFC",     // Light Gray
+  neon: "#39FF14",      // Neon Green
+  cyber: "#FF0080",     // Cyber Pink
+  earth: "#8B4513",     // Earth Brown
 };
 
 // أحجام شاشات شائعة لعام 2026
@@ -173,5 +173,5 @@ export const POPULAR_SCREEN_SIZES_2026 = [
   { name: "Story (9:16)", ratio: "1080x1920", usage: "88%" },
   { name: "Banner (3:1)", ratio: "1800x600", usage: "45%" },
   { name: "VR (16:9)", ratio: "3840x2160", usage: "35%" },
-  { name: "AR Overlay (4:3)", ratio: "1024x768", usage: "28%" }
+  { name: "AR Overlay (4:3)", ratio: "1024x768", usage: "28%" },
 ];

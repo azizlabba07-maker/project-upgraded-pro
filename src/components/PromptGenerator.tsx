@@ -19,41 +19,130 @@ const VIDEO_CATEGORIES = [
   "Sustainability", "Business", "Science", "Travel",
   "Architecture", "Sports", "Fashion", "Music",
   "Medical", "Education", "Automotive",
+  "Wellness & Mindfulness", "Micro Worlds", "Automotive Detail",
 ];
 
 const TRENDS_2026 = [
   "AI Visuals", "Minimalism", "Clean Backgrounds", "Loop Animation",
   "UI Elements", "Particle Systems", "Holographic", "Biophilic Design",
   "Flat Lay", "Isometric 3D", "Dark Mode", "Social Media Assets",
+  "Solarpunk", "Quiet Luxury", "Analog Film", "Fermentation Art",
 ];
 
-const CAMERA_MOVEMENTS = ["slow pan", "dolly zoom", "static shot", "aerial drone", "timelapse", "tracking shot", "crane shot", "orbit shot", "handheld shake", "steadicam glide", "whip pan", "tilt up reveal", "push in", "pull out", "dutch angle", "jib shot"];
-const MOTION_SPEEDS = ["slow motion", "normal speed", "fast motion", "timelapse", "ultra slow motion", "speed ramp", "reverse motion"];
-const LIGHTING = ["golden hour", "soft diffused", "dramatic rim", "cinematic", "natural ambient", "studio", "backlit silhouette", "neon glow", "moonlight", "overcast soft", "harsh midday", "volumetric fog", "sunset warm", "blue hour", "candlelight", "underwater caustics"];
+// ═══════════════════════════════════════════════════════════════════
+// 🎨 نظام Signature Style — أسلوب توقيعي فريد يميز برومبتاتك
+// ═══════════════════════════════════════════════════════════════════
+const SIGNATURE_STYLES = [
+  "liquid metal reflections with organic flow patterns",
+  "luminous decay aesthetic with warm amber undertones",
+  "crystalline geometry emerging from natural textures",
+  "atmospheric depth layers with desaturated foreground",
+  "kinetic tension between stillness and implied motion",
+  "isolated subject with expansive negative space composition",
+  "chiaroscuro contrast with a single warm accent color",
+  "tactile surface detail with shallow focus transition",
+  "split-complementary color harmony with muted tones",
+  "ethereal backlit haze with sharp silhouette edges",
+  "deconstructed perspective with floating element arrangement",
+  "raw elemental texture juxtaposed with refined geometry",
+];
+
+// منظورات فريدة تجعل المحتوى مميزاً
+const PERSPECTIVE_MODIFIERS = [
+  "extreme macro through water droplet lens",
+  "split-level half underwater half above surface",
+  "overhead flat lay with geometric shadow play",
+  "worm's eye view looking upward through elements",
+  "cross-section cutaway revealing inner structure",
+  "reflection-only composition in polished surface",
+  "through frosted glass with selective clarity",
+  "long exposure light painting with static elements",
+  "tilt-shift miniature world effect",
+  "infrared color spectrum reimagining",
+];
+
+// قصص لونية فريدة
+const COLOR_STORIES = [
+  "desaturated sage green with warm copper accents",
+  "midnight indigo transitioning to electric amber",
+  "monochromatic charcoal with a single crimson element",
+  "muted terracotta and dusty olive earth palette",
+  "cool steel blue with oxidized bronze highlights",
+  "deep aubergine purple fading into rose gold",
+  "arctic white with subtle ice-blue undertones",
+  "burnt sienna layered with smoky charcoal",
+];
+
+// طبقات عاطفية
+const EMOTIONAL_LAYERS = [
+  "nostalgic solitude with quiet contemplation",
+  "fierce determination meeting calm resolve",
+  "fragile impermanence of fleeting moments",
+  "stoic resilience against overwhelming forces",
+  "playful curiosity discovering hidden patterns",
+  "serene acceptance in the face of change",
+  "raw vulnerability exposed through texture",
+  "triumphant emergence from constraint",
+];
+
+const CAMERA_MOVEMENTS = ["slow pan", "dolly zoom", "static shot", "aerial drone", "tracking shot", "crane shot", "orbit shot", "steadicam glide", "tilt up reveal", "push in", "pull out", "dutch angle", "jib shot", "parallax shift", "vertigo zoom", "arc rotation"];
+const MOTION_SPEEDS = ["slow motion", "normal speed", "fast motion", "ultra slow motion", "speed ramp", "reverse motion", "frozen moment with particle drift"];
+const LIGHTING = ["golden hour", "soft diffused", "dramatic rim", "natural ambient", "studio three-point", "backlit silhouette", "neon glow", "moonlight", "overcast soft", "volumetric fog", "sunset warm", "blue hour", "candlelight", "underwater caustics", "chiaroscuro contrast", "dappled forest light"];
 const DURATIONS = ["10 seconds", "15 seconds", "20 seconds", "25 seconds", "30 seconds"];
 const TECHNICAL_STYLES = [
-  "hyper-realistic 4K, cinematic depth of field, detailed textures, sharp focus",
-  "ultra-detailed 4K, clean composition, premium commercial look, razor-sharp",
-  "anamorphic lens flare, film-grain, cinematic color grading, wide dynamic range",
-  "macro close-up, shallow depth of field, studio-quality sharpness, vivid colors",
-  "aerial cinematography, sweeping landscapes, epic scale, HDR processing",
-  "documentary style, authentic feel, natural color palette, observational",
+  "detailed textures, shallow depth of field, razor-sharp subject",
+  "clean composition, wide dynamic range, natural color grading",
+  "anamorphic lens character, organic film grain, warm shadows",
+  "macro close-up, extreme shallow focus, vivid color saturation",
+  "aerial perspective, sweeping scale, atmospheric haze depth",
+  "documentary naturalism, authentic color palette, observational framing",
+  "high-contrast tonal range, sculpted light, architectural precision",
+  "diffused softness, pastel toning, ethereal floating quality",
 ];
 const COMMERCIAL_APPEAL = [
-  "commercial stock footage, modern clean aesthetic, clear space for overlays",
-  "authentic premium stock, minimal market-friendly composition, negative space",
-  "agency-ready commercial style, brand-safe framing, text overlay area",
-  "editorial-grade, storytelling composition, premium production value",
+  "commercial stock asset, modern clean aesthetic, clear space for text overlays",
+  "authentic composition, minimal market-friendly framing, negative space",
+  "agency-ready style, brand-safe framing, text overlay area reserved",
+  "storytelling composition, layered depth, versatile cropping options",
+  "presentation-ready layout, spacious composition for design integration",
 ];
-const NEGATIVE_CONSTRAINTS = "no humans, no hands, no fingers, no text, no logos, no watermarks, no copyrighted elements";
+const NEGATIVE_CONSTRAINTS = "no humans, no hands, no fingers, no text, no logos, no watermarks, no copyrighted elements, no brand packaging, no trademarked designs, no recognizable products, fictional content only";
 
 const CATEGORY_SUBJECTS: Record<string, string[]> = {
+  "Wellness & Mindfulness": [
+    "Herbal tea steam rising in morning light", "Meditation singing bowl vibrations on water",
+    "Essential oil drops falling in diffuser", "Yoga mat texture with incense smoke",
+    "Crystal cluster on raw linen fabric", "Bamboo water fountain zen garden",
+    "Dried flower arrangement mindful stillness", "Salt lamp warm glow ambient atmosphere",
+    "Sound healing tuning fork vibration", "Journaling handmade paper texture",
+    "Breathing exercise visualization abstract", "Forest bathing canopy therapy light",
+    "Aromatherapy botanical arrangement", "Mindful walking stone path garden",
+    "Cold plunge ice water surface detail", "Gratitude practice warm candlelit space",
+  ],
+  "Micro Worlds": [
+    "Water droplet refracting landscape", "Moss forest floor extreme macro",
+    "Ice crystal formation on glass surface", "Pollen grain surface electron style",
+    "Rust patterns on abandoned metal", "Soap film interference rainbow pattern",
+    "Butterfly wing scale structure detail", "Dew droplet on spider web strand",
+    "Salt crystal growth timelapse", "Lichen texture on stone surface",
+    "Coffee crema surface texture extreme close", "Frost fern patterns on window",
+    "Mineral cross-section geological layers", "Seed pod opening mechanism",
+    "Honey crystallization macro", "Bread crust texture mountainscape",
+  ],
+  "Automotive Detail": [
+    "Alloy wheel rim precision engineering detail", "Rain droplets on polished car body",
+    "Dashboard instrument cluster warm glow", "Exhaust pipe chrome reflection",
+    "Leather steering wheel stitching detail", "Tire tread water channel displacement",
+    "Headlight beam cone in fog", "Brake caliper through wheel spoke",
+    "Paint depth layered clear coat shine", "Carbon fiber weave texture close-up",
+    "Gear shift knob ergonomic design", "Side mirror city reflection at night",
+  ],
   Nature: [
     "Crystal-clear mountain stream over mossy rocks", "Dense tropical rainforest canopy with mist",
     "Rolling sand dunes in desert wind", "Ocean waves crashing on volcanic rocks",
     "Lavender field swaying in breeze", "Frozen waterfall with ice crystals",
     "Autumn leaves falling from oak tree", "Coral reef with colorful fish",
-    "Lightning storm over prairie", "Northern lights over snowy tundra",
+    "Lightning storm over open prairie", "Northern lights over snowy tundra",
     "Bamboo forest with filtered sunlight", "Volcanic lava flowing into ocean",
     "Bioluminescent plankton on dark beach", "Giant redwood trees in fog",
     "Cherry blossom petals floating on stream", "Glacial ice calving into fjord",
@@ -186,6 +275,9 @@ const CATEGORY_ENVIRONMENTS: Record<string, string[]> = {
   Medical: ["sterile operating theater", "modern hospital ward", "research laboratory", "pharmaceutical clean room", "diagnostic imaging suite", "rehabilitation center", "biotech startup lab", "telemedicine studio"],
   Education: ["modern university library", "science classroom lab", "digital learning center", "historical lecture hall", "outdoor campus garden", "virtual reality classroom", "maker space workshop", "study lounge"],
   Automotive: ["luxury car showroom", "race track pit lane", "automotive factory line", "wind tunnel facility", "design studio clay model", "electric charging station", "off-road terrain course", "classic car garage"],
+  "Wellness & Mindfulness": ["zen garden sunrise", "spa treatment room", "forest clearing morning mist", "minimalist meditation space", "botanical greenhouse", "natural hot spring", "candlelit sanctuary", "bamboo grove path"],
+  "Micro Worlds": ["laboratory macro stage", "black velvet background", "backlit translucent surface", "petri dish universe", "dew-covered morning garden", "frost-covered windowpane", "mineral specimen display", "underwater macro environment"],
+  "Automotive Detail": ["polished showroom floor", "rain-soaked parking garage", "sunset highway overpass", "automotive workshop bench", "detailing studio spotlights", "foggy mountain road", "urban night street scene", "classic car restoration shop"],
 };
 
 const CATEGORY_GUARD_KEYWORDS: Record<string, string[]> = {
@@ -205,6 +297,9 @@ const CATEGORY_GUARD_KEYWORDS: Record<string, string[]> = {
   Medical: ["medical", "healthcare", "hospital", "clinical", "diagnosis"],
   Education: ["education", "learning", "school", "university", "study"],
   Automotive: ["automotive", "car", "vehicle", "engine", "transport"],
+  "Wellness & Mindfulness": ["wellness", "meditation", "mindfulness", "zen", "healing", "spa", "calm", "tea"],
+  "Micro Worlds": ["macro", "micro", "close-up", "detail", "texture", "crystal", "droplet", "surface"],
+  "Automotive Detail": ["automotive", "car", "vehicle", "wheel", "engine", "dashboard", "paint", "chrome"],
 };
 
 function pickRandom<T>(arr: T[]): T {
@@ -243,6 +338,7 @@ function generateLocalVideoPrompts(category: string, count: number): VideoPrompt
   const environments = CATEGORY_ENVIRONMENTS[category] || CATEGORY_ENVIRONMENTS.Nature;
   const results: VideoPromptResult[] = [];
   const usedSubjects = new Set<string>();
+  const usedSignatures = new Set<string>();
 
   let safety = 0;
   while (results.length < count && safety < count * 100) {
@@ -259,7 +355,19 @@ function generateLocalVideoPrompts(category: string, count: number): VideoPrompt
     const style = pickRandom(TECHNICAL_STYLES);
     const appeal = pickRandom(COMMERCIAL_APPEAL);
 
-    const prompt = `${subject}, ${environment}, ${light} lighting, ${camera}, ${speed}, ${duration}, ${style}, ${appeal}, ${NEGATIVE_CONSTRAINTS}`;
+    // 🎨 Signature Style — عنصر فريد في كل برومبت
+    let signature = pickRandom(SIGNATURE_STYLES);
+    while (usedSignatures.has(signature) && usedSignatures.size < SIGNATURE_STYLES.length) {
+      signature = pickRandom(SIGNATURE_STYLES);
+    }
+    usedSignatures.add(signature);
+
+    // إضافة منظور فريد ولون عاطفي
+    const perspective = pickRandom(PERSPECTIVE_MODIFIERS);
+    const colorStory = pickRandom(COLOR_STORIES);
+    const emotion = pickRandom(EMOTIONAL_LAYERS);
+
+    const prompt = `${subject}, ${environment}, ${light} lighting, ${camera}, ${speed}, ${duration}, ${style}, signature style: ${signature}, perspective: ${perspective}, color palette: ${colorStory}, mood: ${emotion}, ${appeal}, ${NEGATIVE_CONSTRAINTS}`;
     results.push({ number: results.length + 1, category, prompt });
   }
 

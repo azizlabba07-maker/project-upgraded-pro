@@ -163,6 +163,27 @@ export const GLOBAL_IP_BLACKLIST = [
   "coca-cola", "pepsi", "sprite", "fanta", "7up", "red bull", "monster energy",
   "gatorade", "powerade", "lipton", "arizona tea", "snapple", "nespresso",
   "keurig", "volvic", "evian", "perrier", "san pellegrino",
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Gaming & Entertainment
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  "fortnite", "minecraft", "roblox", "call of duty", "grand theft auto",
+  "zelda", "mario", "pokemon", "sonic", "halo", "overwatch",
+  "disney", "marvel", "dc comics", "star wars", "pixar",
+  "netflix", "hbo", "spotify", "youtube", "tiktok", "instagram",
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Pharmaceuticals & Health Brands
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  "pfizer", "moderna", "johnson and johnson", "tylenol", "advil",
+  "aspirin brand", "bayer", "merck", "novartis",
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Sports Brands & Leagues
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  "nba", "nfl", "fifa", "uefa", "premier league", "champions league",
+  "olympics logo", "world cup", "la liga", "bundesliga",
+  "new balance", "fila", "converse", "vans", "skechers",
 ];
 
 /**
@@ -175,4 +196,74 @@ export const ADOBE_CATEGORIES = [
   "Culture and Religion", "Science", "Social Issues", "Sports", "Technology",
   "Transport and Infrastructure", "Travel",
 ];
+
+// ═══════════════════════════════════════════════════════════════════
+// فحص تنوع الدفعات — يمنع رفض "Similar Content"
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * حساب نسبة التشابه بين مجموعتي كلمات مفتاحية
+ * @returns نسبة 0-100 — أعلى من 60% = خطر رفض
+ */
+export function computeKeywordOverlap(keywordsA: string[], keywordsB: string[]): number {
+  if (keywordsA.length === 0 || keywordsB.length === 0) return 0;
+  const setA = new Set(keywordsA.map(k => k.toLowerCase().trim()));
+  const setB = new Set(keywordsB.map(k => k.toLowerCase().trim()));
+  let overlap = 0;
+  for (const word of setA) {
+    if (setB.has(word)) overlap++;
+  }
+  const minSize = Math.min(setA.size, setB.size);
+  return minSize > 0 ? Math.round((overlap / minSize) * 100) : 0;
+}
+
+export interface DiversityCheckResult {
+  isAcceptable: boolean;
+  totalAssets: number;
+  similarPairs: Array<{ assetA: string; assetB: string; overlapPercent: number }>;
+  averageOverlap: number;
+  recommendation: string;
+}
+
+/**
+ * فحص تنوع دفعة كاملة قبل التصدير
+ * يتحقق أن لا يوجد تشابه >60% بين أي أصلين
+ */
+export function validateBatchDiversity(
+  assets: Array<{ name: string; keywords: string[]; title: string }>
+): DiversityCheckResult {
+  const similarPairs: DiversityCheckResult["similarPairs"] = [];
+  let totalOverlap = 0;
+  let comparisons = 0;
+
+  for (let i = 0; i < assets.length; i++) {
+    for (let j = i + 1; j < assets.length; j++) {
+      const overlap = computeKeywordOverlap(assets[i].keywords, assets[j].keywords);
+      totalOverlap += overlap;
+      comparisons++;
+
+      if (overlap > 60) {
+        similarPairs.push({
+          assetA: assets[i].name,
+          assetB: assets[j].name,
+          overlapPercent: overlap,
+        });
+      }
+    }
+  }
+
+  const averageOverlap = comparisons > 0 ? Math.round(totalOverlap / comparisons) : 0;
+  const isAcceptable = similarPairs.length === 0;
+
+  let recommendation = "";
+  if (isAcceptable) {
+    recommendation = "✅ الدفعة متنوعة بشكل كافٍ — جاهزة للرفع";
+  } else if (similarPairs.length <= 2) {
+    recommendation = `⚠️ ${similarPairs.length} زوج متشابه — يُنصح بمراجعة الكلمات المفتاحية قبل الرفع`;
+  } else {
+    recommendation = `🚫 ${similarPairs.length} أزواج متشابهة — خطر رفض "Similar Content" مرتفع. أعد التوليد.`;
+  }
+
+  return { isAcceptable, totalAssets: assets.length, similarPairs, averageOverlap, recommendation };
+}
 

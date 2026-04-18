@@ -16,15 +16,13 @@ const BANNED_WORDS_SET = new Set(ADOBE_BANNED_KEYWORDS.map(w => w.toLowerCase())
 
 /**
  * فلترة الكلمات المحظورة مع دعم المصطلحات المركّبة (multi-word).
- * تعمل جنباً إلى جنب مع sanitizeStringArray من sanitizer.ts
- * لضمان فلترة مزدوجة: قائمة constants + قائمة IP الكاملة.
  */
 function filterBannedKeywords(keywords: string[]): { filtered: string[]; removed: string[] } {
   const removed: string[] = [];
   const filtered = keywords.filter((kw) => {
     const normalized = kw.toLowerCase().trim();
     
-    // 1. تحقق من المصطلح كاملاً (لمعالجة "ai-generated", "high-resolution", "coca-cola")
+    // 1. تحقق من المصطلح كاملاً
     const normalizedNoDash = normalized.replace(/[-\s]+/g, "");
     if (BANNED_WORDS_SET.has(normalized) || BANNED_WORDS_SET.has(normalizedNoDash)) {
       removed.push(kw);
@@ -132,7 +130,7 @@ function calculateReadinessScore(
     issues.push("تفرد منخفض جداً — من المرجح وجود أصول متطابقة تقريباً، خطر رفض عالٍ");
   }
 
-  // ── تحذيرات الحقوق (إعلامية فقط، لا تؤثر على النقاط)
+  // ── تحذيرات الحقوق
   if (releases.modelRelease)    issues.push("⚠️ Model Release Required");
   if (releases.propertyRelease) issues.push("⚠️ Property Release Required");
   if (releases.editorialOnly)   issues.push("⚠️ Editorial Use Only — Brand/Logo detected");
@@ -147,9 +145,9 @@ function calculateReadinessScore(
   const status = finalScore >= 80 ? "ready" : finalScore >= 55 ? "review" : "rejected";
 
   const estimatedAcceptance = Math.round(
-    finalScore >= 80 ? 70 + (finalScore - 80) * 0.75 :
-    finalScore >= 55 ? 40 + (finalScore - 55) * 1.2 :
-    finalScore * 0.72
+    finalScore >= 80 ? 65 + (finalScore - 80) * 0.65 :
+    finalScore >= 55 ? 35 + (finalScore - 55) * 1.0 :
+    finalScore * 0.60
   );
 
   return {
@@ -168,13 +166,30 @@ function calculateReadinessScore(
   };
 }
 
-const buildPrompt = (): string => `
+const buildPrompt = (batchContext?: string): string => `
 You are a Senior Adobe Stock Intelligence Specialist — 15+ years curating, approving and 
 rejecting submissions. Your mission: generate metadata that MAXIMIZES buyer discovery 
 while MINIMIZING similarity with the 400M+ assets already on Adobe Stock.
 Today: ${new Date().toISOString().slice(0, 10)}
-${ADOBE_AI_PROMPT_RULES}
+
+${batchContext ? `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BATCH CONTEXT (PREVIOUS ASSETS IN THIS FOLDER):
+${batchContext}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+` : ""}
+
+${ADOBE_AI_PROMPT_RULES}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 DIVERSITY ENFORCEMENT:
+Adobe REJECTS batches where content is too similar. 
+You MUST ensure this asset is RADICALLY DIFFERENT from the previous assets listed in Batch Context.
+- Change SUBJECT details (different spices, different tools, different angles).
+- Change LIGHTING (moody vs airy, warm vs cool).
+- Change COMPOSITION (macro vs wide, flat-lay vs eye-level).
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 STEP 1 — VISUAL DNA
 • uniqueVisualElement: the ONE detail in this frame that <0.5% of similar assets share.
 • colorPalette: 2-3 exact descriptors (e.g., "desaturated sage green", "warm ochre").
@@ -249,9 +264,10 @@ RESPOND WITH ONLY VALID JSON — NO MARKDOWN:
 
 export async function analyzeImageForStock(
   file: File,
-  base64Data: string
+  base64Data: string,
+  batchContext?: string
 ): Promise<AnalysisResult> {
-  const prompt = buildPrompt();
+  const prompt = buildPrompt(batchContext);
   const isVideo = file.type.startsWith("video/");
 
   const result = await generateWithGemini(prompt, 0.4, {
@@ -261,14 +277,10 @@ export async function analyzeImageForStock(
 
   const parsed = extractAndParseJSON<any>(result, {});
 
-  // ── طبقة فلترة مزدوجة:
-  // 1. sanitizeStringArray: يزيل العلامات التجارية الكاملة (IP Blacklist من sanitizer.ts)
-  // 2. filterBannedKeywords: يزيل المصطلحات التقنية/الترويجية (constants.ts)
   const sanitizedFirst = sanitizeStringArray(parsed.keywords || []);
   const deduped = deduplicateKeywords(sanitizedFirst);
   const { filtered: cleanKeywords, removed } = filterBannedKeywords(deduped);
 
-  // تنظيف العنوان أيضاً
   const cleanTitle = sanitizePromptOrKeywords(parsed.title || file.name);
 
   const trendCount = (parsed.visualDNA?.trendAlignment ?? []).length;

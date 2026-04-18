@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { marketData as initialMarketData, dailyTips, type MarketTrend } from "@/data/marketData";
+import { marketData as initialMarketData, dailyTips, DATA_SOURCES, type MarketTrend } from "@/data/marketData";
 import { createSourcePulse, pulseLocalTrends } from "@/lib/livePulse";
 import { generateAITrends, hasAnyApiKey, getUnifiedMarketOracle, type MarketOracleItem } from "@/lib/gemini";
 import { clearAllCache } from "@/lib/sanitizer";
@@ -676,11 +676,36 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="mt-8 border-t border-primary/10 pt-6 pb-2 text-center opacity-60">
-        <p className="text-[10px] font-mono text-secondary leading-relaxed">
-          جميع البيانات يتم استخلاصها ومطابقتها عبر Oracle AI لعام 2025-2026.<br />
-          تعتمد دقة التوقعات على Adobe Stock Analytics و Google Trends Live Pulse.<br />
-          <span className="text-primary/60">Adobe Stock Batch Pro © 2026 • Premium Market Intelligence</span>
+      <div className="mt-8 border-t border-primary/10 pt-6 pb-2">
+        <div className="bg-card border-2 border-primary/20 rounded-lg p-5 mb-4">
+          <h3 className="text-xs font-bold text-primary font-mono uppercase tracking-widest mb-3 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            مصادر البيانات الموثقة
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {Object.entries(DATA_SOURCES).filter(([k]) => k !== 'trends').map(([key, src]) => (
+              <div key={key} className="bg-primary/5 border border-primary/10 rounded-md p-3">
+                <div className="text-[10px] font-mono text-primary font-semibold mb-1">{src.name}</div>
+                <div className="text-[9px] font-mono text-secondary">
+                  آخر تحقق: {src.lastVerified}
+                </div>
+                {'stats' in src && typeof src.stats === 'object' && (
+                  <div className="mt-1.5 space-y-0.5">
+                    {Object.entries(src.stats as Record<string, string | string[]>).map(([k, v]) => (
+                      <div key={k} className="text-[9px] font-mono text-secondary">
+                        {k}: <span className="text-primary">{Array.isArray(v) ? v.join(', ') : v}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="text-[10px] font-mono text-secondary leading-relaxed text-center opacity-60">
+          جميع البيانات مستخلصة من تقارير رسمية موثقة.<br />
+          أرقام البحث تقديرية مبنية على Google Trends + Adobe Stock Analytics.<br />
+          <span className="text-primary/60">Adobe Stock Batch Pro © 2026 • Real Data Intelligence</span>
         </p>
       </div>
     </div>

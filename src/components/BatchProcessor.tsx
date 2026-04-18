@@ -6,6 +6,7 @@ import { exportToCsv } from "@/lib/csvExport";
 import { type AnalysisResult, type VideoFile } from "../types";
 import { copyTextSafely } from "@/lib/shared";
 import { hasAnyApiKey, getUserGeminiApiKeys } from "@/lib/gemini";
+import { validateBatchDiversity } from "@/lib/adobeStockCompliance";
 
 // Modular Components
 import DropZone from "./DropZone";
@@ -30,6 +31,11 @@ export default function BatchProcessor() {
   const [riskFilter, setRiskFilter] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const cancelRef = useRef(false);
+  const videosRef = useRef(videos);
+
+  useEffect(() => {
+    videosRef.current = videos;
+  }, [videos]);
 
   // Stats calculation
   const completedCount = videos.filter(v => v.status === "ready" || v.status === "review" || v.status === "rejected").length;
@@ -113,10 +119,16 @@ export default function BatchProcessor() {
         const vid = queue.shift();
         if (!vid) break;
 
+        // Build batch context from already completed results in THIS batch
+        const currentResults = videosRef.current.filter(v => v.result).map(v => v.result!);
+        const batchContext = currentResults.length > 0 
+          ? currentResults.slice(-10).map(r => `- Title: ${r.title}\n  Keywords: ${r.keywords.slice(0, 8).join(", ")}`).join("\n")
+          : undefined;
+
         setVideos(prev => prev.map(v => v.id === vid.id ? { ...v, status: "processing" } : v));
 
         try {
-          const result = await analyzeImageForStock(vid.file, vid.frameBase64!);
+          const result = await analyzeImageForStock(vid.file, vid.frameBase64!, batchContext);
           setVideos(prev => prev.map(v => 
             v.id === vid.id ? { ...v, status: result.adobeReadinessStatus, result } : v
           ));
@@ -152,8 +164,36 @@ export default function BatchProcessor() {
       toast.error("لا توجد نتائج للتصدير");
       return;
     }
-    exportToCsv(results);
-    toast.success("تم تصدير ملف CSV بنجاح 📥");
+
+    // فحص التنوع قبل التصدير
+    const diversityAssets = results.map(r => ({
+      name: r.name || r.title,
+      keywords: r.keywords || [],
+      title: r.title || "",
+    }));
+
+    import("@/lib/adobeStockCompliance").then(({ validateBatchDiversity }) => {
+      const diversity = validateBatchDiversity(diversityAssets);
+      
+      if (!diversity.isAcceptable) {
+        const proceed = confirm(
+          `⚠️ تحذير تنوع الدفعة:\n\n` +
+          `${diversity.recommendation}\n\n` +
+          `عدد الأزواج المتشابهة: ${diversity.similarPairs.length}\n` +
+          `متوسط التشابه: ${diversity.averageOverlap}%\n\n` +
+          `هل تريد المتابعة مع التصدير رغم التحذير؟`
+        );
+        if (!proceed) {
+          toast.info("تم إلغاء التصدير — أعد تحليل الملفات المتشابهة");
+          return;
+        }
+      } else {
+        toast.success(`✅ تنوع الدفعة ممتاز (${diversity.averageOverlap}% تشابه متوسط)`);
+      }
+
+      exportToCsv(results);
+      toast.success("تم تصدير ملف CSV بنجاح 📥");
+    });
   };
 
   return (
@@ -197,6 +237,60 @@ export default function BatchProcessor() {
             toast.success("تمت التصفية التلقائية بنجاح");
           }}
         />
+      )}
+
+      {/* Diversity Analytics */}
+      {videos.filter(v => v.result).length > 1 && !processing && (
+        <div className="bg-slate-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-white">تحليل تنوع الدفعة</span>
+              <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/10">Beta</span>
+            </div>
+            {(() => {
+              const results = videos.filter(v => v.result).map(v => v.result!);
+              const div = validateBatchDiversity(results);
+              return (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                  div.isAcceptable ? "bg-green-500/10 text-green-400 border border-green-500/20" : 
+                  div.similarPairs.length > 2 ? "bg-red-500/10 text-red-400 border border-red-500/20" :
+                  "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
+                }`}>
+                  {div.isAcceptable ? "آمنة" : "خطر تشابه"}
+                </span>
+              );
+            })()}
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            {(() => {
+              const results = videos.filter(v => v.result).map(v => v.result!);
+              const div = validateBatchDiversity(results);
+              return (
+                <>
+                  <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                    <div className="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">متوسط التشابه</div>
+                    <div className="text-lg font-mono font-bold text-white">{div.averageOverlap}%</div>
+                  </div>
+                  <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                    <div className="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">الأزواج المتشابهة</div>
+                    <div className="text-lg font-mono font-bold text-white">{div.similarPairs.length}</div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+
+          <div className="p-2.5 bg-blue-500/5 border border-blue-500/10 rounded-xl">
+            <p className="text-[10px] text-blue-300/80 leading-relaxed italic">
+              💡 {(() => {
+                const results = videos.filter(v => v.result).map(v => v.result!);
+                const div = validateBatchDiversity(results);
+                return div.recommendation;
+              })()}
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Processing Status */}
