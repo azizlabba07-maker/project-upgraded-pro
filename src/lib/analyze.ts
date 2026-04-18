@@ -71,7 +71,7 @@ function calculateReadinessScore(
 
   const uniqueness = criteria.uniqueness || 3;
   const commercial = criteria.commercialValue || 3;
-  const quality    = criteria.visualQuality || 3;
+  const quality    = criteria.visualQuality || (criteria as any).subjectClarity || 3;
   const saturation = criteria.marketSaturation || 3;
 
   const contentScore = Math.round(
@@ -164,7 +164,7 @@ function calculateReadinessScore(
     breakdown: {
       uniqueness:      uniqueness * 10,
       commercialValue: commercial * 10,
-      subjectClarity:  clarity   * 10,
+      visualQuality:   quality    * 10,
       marketSaturation: saturation * 10,
       metadataPenalty: -metadataPenalty,
       bonuses,

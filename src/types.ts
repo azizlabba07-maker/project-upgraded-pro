@@ -17,7 +17,7 @@ export interface VideoFile {
 export interface ScoreBreakdown {
   uniqueness: number;
   commercialValue: number;
-  subjectClarity: number;
+  visualQuality: number;
   marketSaturation: number;
   metadataPenalty: number;
   bonuses: number;
