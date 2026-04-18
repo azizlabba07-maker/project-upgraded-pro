@@ -119,8 +119,8 @@ export async function extractVideoFrame(file: File): Promise<{
     video.onerror = () => fail("تعذر تحميل ملف الفيديو");
     
     setTimeout(() => {
-      fail("انتهت مهلة تحميل الفيديو (25 ثانية)");
-    }, 25000);
+      fail("انتهت مهلة تحميل الفيديو (120 ثانية)");
+    }, 120000);
   });
 }
 

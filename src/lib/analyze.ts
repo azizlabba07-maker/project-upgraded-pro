@@ -71,41 +71,41 @@ function calculateReadinessScore(
 
   const uniqueness = criteria.uniqueness || 3;
   const commercial = criteria.commercialValue || 3;
-  const clarity = criteria.subjectClarity || 3;
+  const quality    = criteria.visualQuality || 3;
   const saturation = criteria.marketSaturation || 3;
 
   const contentScore = Math.round(
-    (uniqueness  * 0.30 +
-     commercial  * 0.30 +
-     clarity     * 0.20 +
-     saturation  * 0.20) * 10
+    (uniqueness  * 0.25 +
+     commercial  * 0.25 +
+     quality     * 0.35 +
+     saturation  * 0.15) * 10
   );
 
-  // ── عقوبات
+  // ── عقوبات (تمت معايرتها لتكون واقعية)
   if (removedKeywords.length > 0) {
-    metadataPenalty += removedKeywords.length * 12;
-    issues.push(`${removedKeywords.length} كلمة مفتاحية محظورة تم حذفها: ${removedKeywords.join(", ")}`);
+    metadataPenalty += removedKeywords.length * 4; // تقليل العقوبة من 12 إلى 4
+    issues.push(`${removedKeywords.length} كلمة مفتاحية غير مناسبة تم حذفها`);
   }
 
-  if (title.length < 40) {
-    metadataPenalty += 18;
-    issues.push(`العنوان قصير جداً (${title.length} حرف) — استهدف 55-70 حرفاً لزيادة ظهورك في البحث`);
-  } else if (title.length < OPTIMAL_TITLE_MIN) {
-    metadataPenalty += 8;
-    issues.push(`العنوان (${title.length} حرف) — أضف المزيد من التفاصيل (الهدف 55-70)`);
+  if (title.length < 30) {
+    metadataPenalty += 12;
+    issues.push(`العنوان قصير جداً (${title.length} حرف)`);
+  } else if (title.length < 50) {
+    metadataPenalty += 5;
+    issues.push(`العنوان (${title.length} حرف) يمكن تحسينه بإضافة تفاصيل`);
   }
 
-  if (keywords.length < 40) {
-    metadataPenalty += 20;
-    issues.push(`عدد الكلمات قليل (${keywords.length}) — استهدف 47-49 كلمة لأقصى قدر من الانتشار`);
+  if (keywords.length < 25) {
+    metadataPenalty += 15;
+    issues.push(`عدد الكلمات قليل جداً (${keywords.length})`);
   } else if (keywords.length < MIN_KEYWORDS) {
-    metadataPenalty += 8;
-    issues.push(`عدد الكلمات (${keywords.length}) — أضف المزيد للوصول للنطاق المثالي`);
+    metadataPenalty += 5;
+    issues.push(`عدد الكلمات (${keywords.length}) جيد ولكن يفضل الوصول لـ 49`);
   }
 
   if (keywords.length > MAX_KEYWORDS) {
-    metadataPenalty += 10;
-    issues.push(`عدد الكلمات (${keywords.length}) يتجاوز الحد المسموح به في Adobe (49)`);
+    metadataPenalty += 5;
+    issues.push(`عدد الكلمات يتجاوز الحد (49)`);
   }
 
   const titleWords = title.toLowerCase().split(/[\s,._-]+/);
@@ -122,12 +122,17 @@ function calculateReadinessScore(
 
   if (saturation <= 2) {
     metadataPenalty += 10;
-    issues.push("تشبع عالي جداً — هذا الموضوع يضم ملايين الملفات؛ تحتاج زاوية فريدة جداً");
+    issues.push("High Saturation — Very high competition, needs a unique angle");
+  }
+
+  if (quality <= 3) {
+    metadataPenalty += 40;
+    issues.push("🚨 Technical Quality Issue: AI artifacts or distortions detected");
   }
 
   if (uniqueness <= 2) {
-    metadataPenalty += 10;
-    issues.push("تفرد منخفض جداً — من المرجح وجود أصول متطابقة تقريباً، خطر رفض عالٍ");
+    metadataPenalty += 15;
+    issues.push("Similar Content — Too similar to existing Adobe Stock assets");
   }
 
   // ── تحذيرات الحقوق
@@ -145,9 +150,10 @@ function calculateReadinessScore(
   const status = finalScore >= 80 ? "ready" : finalScore >= 55 ? "review" : "rejected";
 
   const estimatedAcceptance = Math.round(
-    finalScore >= 80 ? 65 + (finalScore - 80) * 0.65 :
-    finalScore >= 55 ? 35 + (finalScore - 55) * 1.0 :
-    finalScore * 0.60
+    finalScore >= 85 ? 80 + (finalScore - 85) * 1.3 :
+    finalScore >= 70 ? 60 + (finalScore - 70) * 1.3 :
+    finalScore >= 40 ? 30 + (finalScore - 40) * 1.0 :
+    finalScore * 0.75
   );
 
   return {
@@ -182,12 +188,12 @@ ${batchContext}
 ${ADOBE_AI_PROMPT_RULES}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚨 DIVERSITY ENFORCEMENT:
-Adobe REJECTS batches where content is too similar. 
-You MUST ensure this asset is RADICALLY DIFFERENT from the previous assets listed in Batch Context.
-- Change SUBJECT details (different spices, different tools, different angles).
-- Change LIGHTING (moody vs airy, warm vs cool).
-- Change COMPOSITION (macro vs wide, flat-lay vs eye-level).
+🚨 VISUAL QUALITY & AI ARTIFACTS (CRITICAL):
+Adobe Stock has ZERO TOLERANCE for AI artifacts. Check for:
+- Hallucinations: Extra limbs, distorted faces, floating objects, warped textures.
+- Technical issues: Excessive noise, compression artifacts, blurred key subjects.
+- IP Violations: Visible logos, trademarked designs, recognizable brand products.
+If any of these are present, set uniqueness and quality scores to 1.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 STEP 1 — VISUAL DNA
@@ -197,8 +203,11 @@ STEP 1 — VISUAL DNA
 • emotionalRegister: primary mood in 3-5 words.
 • trendAlignment: pick from 2025-2026 trends: ${RISING_TRENDS_2026.join(", ")}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 2 — COMPETITIVE GAP
-1-2 sentences: what specific market hole does this fill? If saturated, set uniqueness ≤ 3.
+STEP 2 — COMPETITIVE GAP & QUALITY AUDIT
+Identify:
+1. Market Hole: What does this fill?
+2. AI Artifacts: Any hallucinations or distortions? (Mention specifically).
+3. IP Audit: Any visible logos or brands?
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 3 — TITLE (55-70 characters)
 Formula: [Hyper-specific Subject + State] + [Rare Visual Detail] + [Commercial Signal]
@@ -220,10 +229,10 @@ promotional terms (stunning, amazing, beautiful, exclusive, best, premium, top),
 technical metadata (4k, 8k, uhd, hd, high resolution, video, clip, footage, cinematic),
 AI disclosure (ai generated, ai-generated, created by ai)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 5 — SCORING (1-10 each)
-uniqueness: 10=Golden Gap | 7=Differentiated | 5=Average | 3=Saturated | 1=Spam risk
+STEP 5 — REAL-WORLD SCORING (1-10 each)
+uniqueness: 10=Golden Gap | 7=Differentiated | 5=Average | 1=SPAM/SIMILAR
 commercialValue: How likely buyers pay for this?
-subjectClarity: Is the main subject instantly clear?
+visualQuality: 10=Perfect | 5=Minor AI artifacts | 1=Major Hallucinations (REJECT)
 marketSaturation: 10=Very niche | 5=Moderate competition | 1=Millions of similar assets
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 6 — RELEASES & IP
@@ -240,7 +249,11 @@ RESPOND WITH ONLY VALID JSON — NO MARKDOWN:
     "emotionalRegister": "string",
     "trendAlignment": ["matching 2025-2026 trends only"]
   },
-  "competitiveGap": "string",
+  "qualityAudit": {
+    "artifactsDetected": "string",
+    "ipConcerns": "string",
+    "commercialViability": "string"
+  },
   "title": "55-70 chars, no banned words",
   "description": "2-3 sensory commercial sentences",
   "keywords": ["EXACTLY 47-49 keywords, ORDERED BY BUYER INTENT — strongest first"],
@@ -248,7 +261,7 @@ RESPOND WITH ONLY VALID JSON — NO MARKDOWN:
   "scoring": {
     "uniqueness": 0,
     "commercialValue": 0,
-    "subjectClarity": 0,
+    "visualQuality": 0,
     "marketSaturation": 0,
     "reasoning": "1-2 sentences"
   },
@@ -260,7 +273,7 @@ RESPOND WITH ONLY VALID JSON — NO MARKDOWN:
     "releaseNote": "string",
     "avoidanceHint": "string"
   }
-}`.trim();
+} `.trim();
 
 export async function analyzeImageForStock(
   file: File,
@@ -302,9 +315,17 @@ export async function analyzeImageForStock(
     parsed.category || "Unknown",
     parsed.scoring || {},
     releases,
-    hasGap,
+    !!parsed.qualityAudit,
     trendCount
   );
+
+  // Add quality audit issues to readiness
+  if (parsed.qualityAudit?.artifactsDetected && parsed.qualityAudit.artifactsDetected !== "none") {
+    readiness.issues.push(`Visual Issue: ${parsed.qualityAudit.artifactsDetected}`);
+  }
+  if (parsed.qualityAudit?.ipConcerns && parsed.qualityAudit.ipConcerns !== "none") {
+    readiness.issues.push(`IP Risk: ${parsed.qualityAudit.ipConcerns}`);
+  }
 
   return {
     id: Date.now().toString(36),
