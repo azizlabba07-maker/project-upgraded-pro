@@ -57,7 +57,7 @@ export default function ApiKeySettings() {
         const added = addUserGeminiApiKey(keysToProcess[0]);
         if (!added.added) {
           if (added.reason === "exists") toast.error("هذا المفتاح مضاف بالفعل.");
-          else if (added.reason === "limit") toast.error("الحد الأقصى 10 مفاتيح Gemini.");
+          else if (added.reason === "limit") toast.error("الحد الأقصى 50 مفتاح Gemini.");
           else toast.error("تعذر إضافة المفتاح.");
           return;
         }
@@ -86,7 +86,7 @@ export default function ApiKeySettings() {
         
         if (addedCount > 0) {
           toast.success(`✅ تم إضافة ${addedCount} مفاتيح صالحة بنجاح!`);
-          if (limitReached) toast.warning("⚠️ تم الوصول للحد الأقصى (10 مفاتيح).");
+          if (limitReached) toast.warning("⚠️ تم الوصول للحد الأقصى (50 مفتاح).");
           if (addedCount < keysToProcess.length) toast.error(`❌ تم تجاهل ${keysToProcess.length - addedCount} مفاتيح غير صالحة.`);
         } else {
           toast.error("❌ لم يتم إضافة أي مفتاح. جميع المفاتيح غير صالحة أو مضافة مسبقاً.");

@@ -104,7 +104,7 @@ export function addUserGeminiApiKey(key: string): { added: boolean; reason?: "ex
   if (!trimmed) return { added: false, reason: "empty" };
   const current = readStoredGeminiApiKeys();
   if (current.some((k) => k === trimmed)) return { added: false, reason: "exists" };
-  if (current.length >= 10) return { added: false, reason: "limit" };
+  if (current.length >= 50) return { added: false, reason: "limit" };
   const next = [...current, trimmed];
   try {
     localStorage.setItem(GEMINI_STORAGE_KEYS, JSON.stringify(next));
