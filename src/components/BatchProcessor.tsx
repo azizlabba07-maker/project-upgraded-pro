@@ -381,7 +381,7 @@ export default function BatchProcessor() {
         </summary>
         
         <div className="pt-4 space-y-3">
-          {videos.map((vid) => (
+          {videos.filter(vid => !riskFilter || (vid.result && vid.result.adobeReadinessScore < 55)).map((vid) => (
             <div key={vid.id} className="bg-slate-900/40 border border-white/5 p-4 rounded-2xl flex items-start gap-4 hover:border-white/10 transition-all">
               <div className="w-24 h-16 bg-slate-800 rounded-xl overflow-hidden shrink-0 border border-white/5">
                 {vid.thumbnailUrl ? (
