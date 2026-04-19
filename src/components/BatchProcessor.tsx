@@ -247,17 +247,36 @@ export default function BatchProcessor() {
               <span className="text-sm font-bold text-red-400">تنظيف الملفات المرفوضة</span>
               <span className="text-[10px] bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full border border-red-500/10">Action Required</span>
             </div>
-            <button 
-              onClick={() => {
-                const rejectedFiles = videos.filter(v => v.status === "rejected").map(v => `"${v.name}"`);
-                const command = `rm ${rejectedFiles.join(", ")}`;
-                copyTextSafely(command);
-                toast.success("تم نسخ أمر الحذف! الصقه في PowerShell في مجلد الفيديوهات.");
-              }}
-              className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-[11px] font-bold border border-red-500/20 transition-all"
-            >
-              📋 نسخ أمر حذف الملفات ({videos.filter(v => v.status === "rejected").length})
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => {
+                  const rejectedFiles = videos.filter(v => v.status === "rejected").map(v => `"${v.name}"`);
+                  const command = `rm ${rejectedFiles.join(", ")}`;
+                  copyTextSafely(command);
+                  toast.success("تم نسخ أمر الحذف! الصقه في PowerShell.");
+                }}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-bold border border-white/5 transition-all"
+              >
+                📋 نسخ أمر PowerShell
+              </button>
+              
+              <button 
+                onClick={() => {
+                  const rejectedFiles = videos.filter(v => v.status === "rejected").map(v => `del "${v.name}"`);
+                  const content = `@echo off\necho Cleaning up rejected Adobe Stock assets...\n${rejectedFiles.join("\n")}\necho Done!\npause`;
+                  const blob = new Blob([content], { type: "text/plain" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "cleanup_rejected.bat";
+                  a.click();
+                  toast.success("تم تحميل ملف الحذف! ضعه في مجلد الفيديوهات وشغله.");
+                }}
+                className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-[10px] font-bold border border-red-500/20 transition-all flex items-center gap-1.5"
+              >
+                📥 تحميل ملف حذف فوري (.bat)
+              </button>
+            </div>
           </div>
           <p className="text-[10px] text-red-300/60 leading-relaxed mb-2">
             اكتشف النظام ملفات غير متوافقة مع معايير Adobe Stock. يمكنك نسخ الأمر أعلاه وتشغيله في مجلد الفيديوهات لحذفها فوراً.
