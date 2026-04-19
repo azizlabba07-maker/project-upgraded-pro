@@ -203,9 +203,9 @@ ${ADOBE_AI_PROMPT_RULES}
 🚨 VISUAL QUALITY & IP TRAP-HUNTING (CRITICAL):
 Adobe Stock has ZERO TOLERANCE for text, logos, or AI artifacts.
 - IP TRAP: Look for ANY letters, numbers, or symbols on products (e.g., "GO" on a glass, "NI" on a shoe).
-- If ANY text/logo is visible: set `copyrightConcern: true`, `editorialOnly: true`, and `visualQuality: 1`.
+- If ANY text/logo is visible: set 'copyrightConcern: true', 'editorialOnly: true', and 'visualQuality: 1'.
 - Hallucinations: Check for distorted anatomy, warped textures, or gravity-defying objects.
-- If artifacts found: set `visualQuality: 1`.
+- If artifacts found: set 'visualQuality: 1'.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 STEP 1 — VISUAL DNA
