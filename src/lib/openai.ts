@@ -6,26 +6,61 @@ const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
 const OPENAI_MODEL = "gpt-4o-mini"; // Fast, cheap, and very smart option
 
 const OPENAI_KEY_STORAGE = "openai_api_key";
+const OPENAI_KEYS_STORAGE = "openai_api_keys";
+const OPENAI_LAST_KEY_INDEX = "openai_last_key_index";
 
-export function setOpenAIApiKey(key: string) {
+export function setOpenAIApiKeys(keys: string[]) {
   try {
-    if (key.trim()) localStorage.setItem(OPENAI_KEY_STORAGE, key.trim());
-    else localStorage.removeItem(OPENAI_KEY_STORAGE);
+    const cleaned = keys.map(k => k.trim()).filter(Boolean);
+    if (cleaned.length > 0) {
+      localStorage.setItem(OPENAI_KEYS_STORAGE, JSON.stringify(cleaned));
+      localStorage.setItem(OPENAI_KEY_STORAGE, cleaned[0]);
+    } else {
+      localStorage.removeItem(OPENAI_KEYS_STORAGE);
+      localStorage.removeItem(OPENAI_KEY_STORAGE);
+    }
   } catch {}
 }
 
-export function getOpenAIApiKey(): string {
+export function getOpenAIApiKeys(): string[] {
   try {
-    const stored = localStorage.getItem(OPENAI_KEY_STORAGE);
-    if (stored) return stored;
-    return (import.meta as any).env?.VITE_OPENAI_API_KEY || "";
+    const raw = localStorage.getItem(OPENAI_KEYS_STORAGE);
+    if (raw) return JSON.parse(raw);
+    const single = localStorage.getItem(OPENAI_KEY_STORAGE);
+    return single ? [single] : [];
   } catch {
-    return "";
+    return [];
   }
 }
 
+export function addUserOpenAIApiKey(key: string): { added: boolean; reason?: "exists" | "limit" | "empty" } {
+  const trimmed = key.trim();
+  if (!trimmed) return { added: false, reason: "empty" };
+  const current = getOpenAIApiKeys();
+  if (current.includes(trimmed)) return { added: false, reason: "exists" };
+  if (current.length >= 20) return { added: false, reason: "limit" };
+  setOpenAIApiKeys([...current, trimmed]);
+  return { added: true };
+}
+
+export function removeUserOpenAIApiKey(key: string): void {
+  const next = getOpenAIApiKeys().filter((k) => k !== key);
+  setOpenAIApiKeys(next);
+}
+
+function getNextOpenAIApiKey(): string {
+  const keys = getOpenAIApiKeys();
+  if (keys.length === 0) return (import.meta as any).env?.VITE_OPENAI_API_KEY || "";
+  if (keys.length === 1) return keys[0];
+
+  const lastIndex = Number(localStorage.getItem(OPENAI_LAST_KEY_INDEX) || "0");
+  const nextIndex = (lastIndex + 1) % keys.length;
+  localStorage.setItem(OPENAI_LAST_KEY_INDEX, String(nextIndex));
+  return keys[nextIndex];
+}
+
 export function hasOpenAIKey(): boolean {
-  return Boolean(getOpenAIApiKey().trim());
+  return getOpenAIApiKeys().length > 0 || Boolean(((import.meta as any).env?.VITE_OPENAI_API_KEY || "").trim());
 }
 
 async function callOpenAI(userPrompt: string, systemPrompt?: string, maxTokens = 4096): Promise<string> {
@@ -45,7 +80,7 @@ async function callOpenAI(userPrompt: string, systemPrompt?: string, maxTokens =
   }
 
   // 2. Direct browser connection for guests
-  const key = getOpenAIApiKey();
+  const key = getNextOpenAIApiKey();
   if (!key) throw new Error("NO_OPENAI_KEY: Add your OpenAI API key in Settings");
 
   const messages: any[] = [];
@@ -228,4 +263,57 @@ export async function getOpenAIMarketAnalysis(topic: string): Promise<string> {
     "You are a helpful AI market analyst for Adobe Stock.",
     1500
   ));
+}
+export async function generateWithOpenAI(
+  prompt: string, 
+  temperature = 0.8, 
+  image?: { base64: string; mimeType: string }
+): Promise<string> {
+  const key = getNextOpenAIApiKey();
+  if (!key) throw new Error("NO_OPENAI_KEY: No OpenAI API key configured");
+
+  const messages: any[] = [
+    { role: "system", content: "You are a professional Adobe Stock metadata specialist. Respond ONLY with valid JSON when requested." }
+  ];
+
+  if (image) {
+    messages.push({
+      role: "user",
+      content: [
+        { type: "text", text: prompt },
+        {
+          type: "image_url",
+          image_url: {
+            url: `data:${image.mimeType};base64,${image.base64.split(",").pop()}`
+          }
+        }
+      ]
+    });
+  } else {
+    messages.push({ role: "user", content: prompt });
+  }
+
+  const res = await fetch(OPENAI_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${key}`
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      messages,
+      temperature,
+      max_tokens: 4096
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = err?.error?.message || `Error ${res.status}`;
+    if (res.status === 429) throw new Error("RATE_LIMIT: OpenAI quota exhausted for this key.");
+    throw new Error(`OPENAI_ERROR: ${msg}`);
+  }
+
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || "";
 }

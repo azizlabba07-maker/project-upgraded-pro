@@ -6,6 +6,7 @@ import { extractAndParseJSON, withCache, sanitizePromptOrKeywords, sanitizeStrin
 export { extractAndParseJSON };
 import { AI_MOTION_ENGINE_PROMPT } from "./systemPrompts/aiMotionPrompt";
 import { type DesignTokens } from "@/remotion/MyComposition";
+import { dispatchVisualAnalysis } from "./aiDispatcher";
 
 const GEMINI_STORAGE_KEY = "gemini_api_key";
 const GEMINI_STORAGE_KEYS = "gemini_api_keys";
@@ -937,7 +938,7 @@ export async function generateMotionTokens(promptIdea: string): Promise<MotionGe
 USER REQUEST: "${promptIdea}"
 Return ONLY a valid JSON object matching the designTokens structure. No markdown, no explanations.`;
 
-  const result = await generateWithGemini(prompt, 0.7);
+  const result = await dispatchVisualAnalysis(prompt, 0.7);
   const parsed = extractAndParseJSON<MotionGenerationResult>(result, null as any);
   if (!parsed || !parsed.designTokens || !parsed.metadata) throw new Error("Failed to parse Motion Engine AI response");
   

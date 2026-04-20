@@ -1,4 +1,5 @@
-import { generateWithGemini, extractAndParseJSON } from "./gemini";
+import { extractAndParseJSON } from "./gemini";
+import { dispatchVisualAnalysis } from "./aiDispatcher";
 import { type AnalysisResult, type ScoreBreakdown, type ReleaseInfo } from "../types";
 import { 
   ADOBE_CATEGORIES, 
@@ -299,7 +300,7 @@ Assume the video perfectly matches its filename and is of high visual quality.
 Do NOT penalize the visualQuality score for the blank image. Set visualQuality to 8.`;
   }
 
-  const result = await generateWithGemini(prompt, 0.4, {
+  const result = await dispatchVisualAnalysis(prompt, 0.4, {
     base64: base64Data,
     mimeType: isVideo ? "image/jpeg" : (file.type || "image/jpeg")
   });

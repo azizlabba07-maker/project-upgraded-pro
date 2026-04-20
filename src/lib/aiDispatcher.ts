@@ -1,6 +1,5 @@
-import { generateStockPrompts as generateClaudePrompts, getClaudeMarketAnalysis, hasClaudeKey } from "./claude";
-import { generateOpenAIStockPrompts, getOpenAIMarketAnalysis, hasOpenAIKey } from "./openai";
-import { generateGeminiStockPrompts, getAIMarketAnalysis as getGeminiMarketAnalysis, hasAnyApiKey as hasGeminiKey } from "./gemini";
+import { generateGeminiStockPrompts, getAIMarketAnalysis as getGeminiMarketAnalysis, hasAnyApiKey as hasGeminiKey, generateWithGemini } from "./gemini";
+import { generateOpenAIStockPrompts, getOpenAIMarketAnalysis, hasOpenAIKey, generateWithOpenAI } from "./openai";
 import { trackAiMetric } from "./aiMetrics";
 import { addToPromptHistory } from "./shared";
 import { saveToPromptMemory } from "./promptMemory";
@@ -160,6 +159,37 @@ export async function dispatchMarketAnalysis(topic: string): Promise<{ analysis:
   }
 
   throw new Error("فشل الوصول لمحركات AI للتحليل.");
+}
+
+export async function dispatchVisualAnalysis(
+  prompt: string,
+  temperature = 0.5,
+  image?: { base64: string; mimeType: string }
+): Promise<string> {
+  const errors: string[] = [];
+
+  // 1. Try Gemini first (Cost effective)
+  if (hasGeminiKey()) {
+    try {
+      return await generateWithGemini(prompt, temperature, image);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[AI Dispatcher] Gemini visual analysis failed, trying fallback: ${msg}`);
+      errors.push(`Gemini: ${msg}`);
+    }
+  }
+
+  // 2. Try OpenAI (Vision) as fallback
+  if (hasOpenAIKey()) {
+    try {
+      return await generateWithOpenAI(prompt, temperature, image);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      errors.push(`OpenAI: ${msg}`);
+    }
+  }
+
+  throw new Error(`Visual AI failed: ${errors.join(" | ")}`);
 }
 
 function _saveGeneratedToHistory(prompts: UnifiedStockPrompt[], engine: FallbackEngine, category: string) {
