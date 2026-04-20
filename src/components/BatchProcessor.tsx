@@ -78,8 +78,19 @@ export default function BatchProcessor() {
 
           let data: { base64: string; mimeType: string; thumbnailUrl: string };
           
+          let isFallback = false;
           if (vid.file.type.startsWith("video/")) {
-            data = await extractVideoFrame(vid.file);
+            try {
+              data = await extractVideoFrame(vid.file);
+            } catch (err) {
+              // Fallback to a 1x1 transparent pixel if the browser cannot decode the video (e.g. H.265/HEVC)
+              data = {
+                base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+                mimeType: "image/png",
+                thumbnailUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+              };
+              isFallback = true;
+            }
           } else {
             data = await new Promise((resolve, reject) => {
               const reader = new FileReader();
@@ -94,7 +105,7 @@ export default function BatchProcessor() {
           }
 
           setVideos(prev => prev.map(v => 
-            v.id === vid.id ? { ...v, frameBase64: data.base64, frameMimeType: data.mimeType, thumbnailUrl: data.thumbnailUrl } : v
+            v.id === vid.id ? { ...v, frameBase64: data.base64, frameMimeType: data.mimeType, thumbnailUrl: data.thumbnailUrl, isFallbackImage: isFallback } : v
           ));
         } catch (err) {
           setVideos(prev => prev.map(v => 
@@ -135,7 +146,7 @@ export default function BatchProcessor() {
         setVideos(prev => prev.map(v => v.id === vid.id ? { ...v, status: "processing" } : v));
 
         try {
-          const result = await analyzeImageForStock(vid.file, vid.frameBase64!, batchContext);
+          const result = await analyzeImageForStock(vid.file, vid.frameBase64!, batchContext, vid.isFallbackImage);
           setVideos(prev => prev.map(v => 
             v.id === vid.id ? { ...v, status: result.adobeReadinessStatus, result } : v
           ));
@@ -406,6 +417,11 @@ export default function BatchProcessor() {
                   <img src={vid.thumbnailUrl} alt="Preview" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-xs text-slate-500">جاري المعالجة</div>
+                )}
+                {vid.isFallbackImage && (
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                    <span className="text-[10px] text-white/80 font-bold px-2 text-center leading-tight">No Preview<br/>(H.265/HEVC)</span>
+                  </div>
                 )}
               </div>
               

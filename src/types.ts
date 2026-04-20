@@ -9,6 +9,7 @@ export interface VideoFile {
   thumbnailUrl?: string;
   frameBase64?: string;
   frameMimeType?: string;
+  isFallbackImage?: boolean;
   status: AdobeReadinessStatus;
   result?: AnalysisResult;
   error?: string;

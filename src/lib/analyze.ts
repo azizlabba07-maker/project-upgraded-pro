@@ -283,10 +283,21 @@ RESPOND WITH ONLY VALID JSON — NO MARKDOWN:
 export async function analyzeImageForStock(
   file: File,
   base64Data: string,
-  batchContext?: string
+  batchContext?: string,
+  isFallbackImage?: boolean
 ): Promise<AnalysisResult> {
-  const prompt = buildPrompt(batchContext);
   const isVideo = file.type.startsWith("video/");
+  let prompt = buildPrompt(batchContext);
+  
+  if (isFallbackImage) {
+    prompt = prompt + `\n\n🚨 CRITICAL INSTRUCTION:
+The user provided a video file, but the browser could not extract a preview frame (likely because it is an H.265/HEVC or ProRes format). 
+You are currently looking at a placeholder 1x1 transparent image. 
+DO NOT write "blank image" or "white background".
+INSTEAD, you must generate the metadata PURELY based on the Original Filename: "${file.name}".
+Assume the video perfectly matches its filename and is of high visual quality.
+Do NOT penalize the visualQuality score for the blank image. Set visualQuality to 8.`;
+  }
 
   const result = await generateWithGemini(prompt, 0.4, {
     base64: base64Data,
