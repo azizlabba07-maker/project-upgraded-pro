@@ -9,7 +9,8 @@ export default function MotionEngine() {
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [tokens, setTokens] = useState<DesignTokens>(defaultDesignTokens);
-  const [history, setHistory] = useState<{prompt: string, tokens: DesignTokens}[]>([]);
+  const [metadata, setMetadata] = useState<{title: string, keywords: string[]} | null>(null);
+  const [history, setHistory] = useState<{prompt: string, tokens: DesignTokens, meta: {title: string, keywords: string[]} | null}[]>([]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -20,10 +21,11 @@ export default function MotionEngine() {
     setIsGenerating(true);
     try {
       toast.info('جاري تصميم الحركة عبر الذكاء الاصطناعي... 🎨');
-      const newTokens = await generateMotionTokens(prompt);
-      setTokens(newTokens);
-      setHistory(prev => [{ prompt, tokens: newTokens }, ...prev].slice(0, 5));
-      toast.success('تم بناء الفيديو بنجاح! شاهد المعاينة.');
+      const result = await generateMotionTokens(prompt);
+      setTokens(result.designTokens);
+      setMetadata(result.metadata);
+      setHistory(prev => [{ prompt, tokens: result.designTokens, meta: result.metadata }, ...prev].slice(0, 5));
+      toast.success('تم بناء الفيديو وتوليد البيانات بنجاح!');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'حدث خطأ أثناء التوليد');
     } finally {
@@ -42,6 +44,28 @@ npx remotion render src/remotion/index.ts MyComp out.mp4 --props=./tokens.json`;
     
     copyTextSafely(command);
     toast.success('تم نسخ أمر التصدير! الصقه في نافذة Terminal (PowerShell) الخاصة بالمشروع.');
+  };
+
+  const handleExportCSV = () => {
+    if (!metadata) return;
+    
+    // Adobe Stock CSV Format: Filename, Title, Keywords, Category, Releases, AI Generated
+    const filename = `motion_${Date.now()}.mp4`; // Example filename
+    const title = `"${metadata.title.replace(/"/g, '""')}"`;
+    const keywords = `"${metadata.keywords.join(', ').replace(/"/g, '""')}"`;
+    const category = "7"; // 7 = Graphic Resources (Abstract Backgrounds)
+    
+    const csvContent = `Filename,Title,Keywords,Category,Releases,AI Generated\n${filename},${title},${keywords},${category},,Yes`;
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'adobe_stock_metadata.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('تم تحميل ملف CSV بنجاح!');
   };
 
   return (
@@ -99,6 +123,7 @@ npx remotion render src/remotion/index.ts MyComp out.mp4 --props=./tokens.json`;
                     onClick={() => {
                       setPrompt(item.prompt);
                       setTokens(item.tokens);
+                      setMetadata(item.meta);
                     }}
                     className="w-full text-right p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-xs text-slate-400 hover:text-white truncate"
                   >
@@ -146,14 +171,63 @@ npx remotion render src/remotion/index.ts MyComp out.mp4 --props=./tokens.json`;
               </div>
             </div>
 
-            <button
-              onClick={handleExport}
-              className="mt-6 w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold shadow-lg border border-white/10 transition-all flex items-center justify-center gap-2 group"
-            >
-              <span className="text-xl group-hover:-translate-y-1 transition-transform">💾</span>
-              تصدير كملف MP4 (نسخ الأمر)
-            </button>
+            <div className="mt-6 flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleExport}
+                className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold shadow-lg border border-white/10 transition-all flex items-center justify-center gap-2 group"
+              >
+                <span className="text-xl group-hover:-translate-y-1 transition-transform">💾</span>
+                تصدير كملف MP4 (نسخ الأمر)
+              </button>
+              
+              <button
+                onClick={handleExportCSV}
+                disabled={!metadata}
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-xl font-bold shadow-lg border border-white/10 transition-all flex items-center justify-center gap-2 group"
+              >
+                <span className="text-xl group-hover:-translate-y-1 transition-transform">📄</span>
+                تحميل بيانات CSV لـ Adobe
+              </button>
+            </div>
           </div>
+
+          {/* Metadata Section */}
+          {metadata && (
+            <div className="mt-6 bg-slate-900/40 p-6 rounded-2xl border border-white/5 backdrop-blur-sm">
+              <h3 className="text-sm font-bold text-white mb-4">البيانات الوصفية (Metadata)</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">العنوان (Title)</label>
+                  <div className="p-3 bg-slate-800/50 rounded-xl border border-white/5 text-sm text-slate-300">
+                    {metadata.title}
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] text-slate-500 font-bold uppercase block">الكلمات المفتاحية ({metadata.keywords.length})</label>
+                    <button 
+                      onClick={() => {
+                        copyTextSafely(metadata.keywords.join(', '));
+                        toast.success('تم نسخ الكلمات المفتاحية');
+                      }}
+                      className="text-[10px] text-blue-400 hover:text-blue-300"
+                    >
+                      نسخ الكل
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 p-3 bg-slate-800/50 rounded-xl border border-white/5 max-h-40 overflow-y-auto custom-scrollbar">
+                    {metadata.keywords.map((kw, i) => (
+                      <span key={i} className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs text-slate-300">
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

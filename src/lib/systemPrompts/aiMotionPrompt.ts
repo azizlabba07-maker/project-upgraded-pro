@@ -17,49 +17,49 @@ export const AI_MOTION_ENGINE_PROMPT = `
 
 عند استلام طلب، يجب أن تنتج:
 
-### 1. Design Tokens (عناصر التصميم)
+### 1. JSON Output Structure
 
-\`\`\`typescript
-export const designTokens = {
-  colors: {
-    primary: string,      // اللون الرئيسي بصيغة HEX
-    secondary: string,     // اللون الثانوي
-    accent: string,        // لون التمييز
-    background: string,    // لون الخلفية
-    gradients: Array<{
-      start: string,
-      end: string,
-      angle: number
-    }>
+يجب أن يكون ردك عبارة عن كائن JSON صالح تماماً يحتوي على المفتاحين التاليين:
+1. \`designTokens\`: يحتوي على إعدادات الألوان والأشكال.
+2. \`metadata\`: يحتوي على عنوان وكلمات مفتاحية متوافقة مع متطلبات Adobe Stock.
+
+\`\`\`json
+{
+  "designTokens": {
+    "colors": {
+      "primary": "#hex",
+      "secondary": "#hex",
+      "accent": "#hex",
+      "background": "#hex",
+      "foreground": "#hex",
+      "gradients": [
+        { "start": "#hex", "end": "#hex", "angle": 45 }
+      ]
+    },
+    "shapes": {
+      "circles": [{ "size": 400, "opacity": 0.3, "blur": 50, "x": 200, "y": 300 }],
+      "rectangles": [],
+      "triangles": [],
+      "lines": []
+    },
+    "animation": {
+      "duration": 8,
+      "fps": 30,
+      "speeds": { "slow": 0.5, "normal": 1.0, "fast": 2.0 },
+      "easing": { "type": "spring", "damping": 20, "stiffness": 100, "mass": 1 },
+      "delays": { "primary": 0, "secondary": 0.5, "tertiary": 1.0 }
+    },
+    "effects": {
+      "shadow": { "enabled": true, "blur": 40, "opacity": 0.5, "offsetX": 10, "offsetY": 10 },
+      "blur": { "enabled": true, "amount": 5 },
+      "glow": { "enabled": true, "intensity": 0.8, "spread": 20 }
+    }
   },
-  
-  shapes: {
-    circles: Array<{
-      size: number,
-      opacity: number,
-      blur: number,
-      x: number,
-      y: number
-    }>,
-    rectangles: Array<{...}>,
-    triangles: Array<{...}>,
-    lines: Array<{...}>
-  },
-  
-  animation: {
-    duration: number,      // المدة بالثواني
-    fps: number,           // الإطارات في الثانية
-    speeds: {...},
-    easing: {...},
-    delays: {...}
-  },
-  
-  effects: {
-    shadow: {...},
-    blur: {...},
-    glow: {...}
+  "metadata": {
+    "title": "عنوان جذاب للفيديو باللغة الإنجليزية لا يتجاوز 70 حرفاً يصف الحركة والألوان",
+    "keywords": ["keyword1", "keyword2", "abstract", "motion", "background", "loop", "... (40-50 keywords)"]
   }
-};
+}
 \`\`\`
 
 ## أنواع الحركات المدعومة
@@ -107,12 +107,16 @@ export const designTokens = {
 لا تتجاوز 30 شكل في المشهد الواحد
 احصر الحركة في إطارات معقولة (≤ 8 ثواني)
 
+## القيود الصارمة (CRITICAL)
+- يجب أن ترجع JSON كائن فقط. لا تستخدم Markdown format \`\`\`json.
+- يجب أن تكون الكلمات المفتاحية باللغة الإنجليزية، خالية من أسماء الماركات (Trademarks)، ولا تحتوي على كلمات مثل (video, clip, footage).
+- لا ترجع أي نص أو شرح خارج الـ JSON.
+
 ## التنفيذ
 عند استلام طلب:
 1. حلل الكلمات المفتاحية
 2. حدد نوع الحركة المناسب
-3. أنشئ Design Tokens المناسبة
-4. اكتب المكونات المطلوبة
-5. أضف التعليقات التوضيحية
-6. تأكد من التوافق مع Remotion
+3. قم بتوليد البيانات الوصفية (Title, Keywords)
+4. قم بتوليد \`designTokens\`
+5. أرجع كائن JSON النهائي
 `;

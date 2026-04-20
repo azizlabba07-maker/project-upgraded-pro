@@ -923,14 +923,26 @@ Return ONLY a valid JSON object EXACTLY matching this interface:
 
 // Analysis functions moved to @/lib/analyze.ts
 
-export async function generateMotionTokens(promptIdea: string): Promise<DesignTokens> {
+export interface MotionGenerationResult {
+  designTokens: DesignTokens;
+  metadata: {
+    title: string;
+    keywords: string[];
+  };
+}
+
+export async function generateMotionTokens(promptIdea: string): Promise<MotionGenerationResult> {
   const prompt = `${AI_MOTION_ENGINE_PROMPT}
 
 USER REQUEST: "${promptIdea}"
 Return ONLY a valid JSON object matching the designTokens structure. No markdown, no explanations.`;
 
   const result = await generateWithGemini(prompt, 0.7);
-  const parsed = extractAndParseJSON<DesignTokens>(result, null as any);
-  if (!parsed) throw new Error("Failed to parse Motion Engine AI response");
+  const parsed = extractAndParseJSON<MotionGenerationResult>(result, null as any);
+  if (!parsed || !parsed.designTokens || !parsed.metadata) throw new Error("Failed to parse Motion Engine AI response");
+  
+  // Clean up keywords using the existing sanitizer
+  parsed.metadata.keywords = sanitizeStringArray(parsed.metadata.keywords);
+  
   return parsed;
 }
