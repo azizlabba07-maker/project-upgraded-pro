@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Player } from '@remotion/player';
 import { toast } from 'sonner';
 import { generateMotionTokens } from '@/lib/gemini';
+import { copyTextSafely } from '@/lib/shared';
 import { MyComposition, defaultDesignTokens, videoConfig, type DesignTokens } from '@/remotion/MyComposition';
 
 export default function MotionEngine() {
@@ -28,6 +29,19 @@ export default function MotionEngine() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleExport = () => {
+    const props = { designTokens: tokens };
+    const jsonStr = JSON.stringify(props).replace(/'/g, "''"); // escape for PowerShell
+    
+    // Create a PowerShell command that writes the JSON and runs Remotion
+    const command = `$json = '${jsonStr}'
+Set-Content -Path "tokens.json" -Value $json -Encoding UTF8
+npx remotion render src/remotion/index.ts MyComp out.mp4 --props=./tokens.json`;
+    
+    copyTextSafely(command);
+    toast.success('تم نسخ أمر التصدير! الصقه في نافذة Terminal (PowerShell) الخاصة بالمشروع.');
   };
 
   return (
@@ -131,6 +145,14 @@ export default function MotionEngine() {
                 <p className="text-sm text-white font-mono">{videoConfig.durationInSeconds}s</p>
               </div>
             </div>
+
+            <button
+              onClick={handleExport}
+              className="mt-6 w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold shadow-lg border border-white/10 transition-all flex items-center justify-center gap-2 group"
+            >
+              <span className="text-xl group-hover:-translate-y-1 transition-transform">💾</span>
+              تصدير كملف MP4 (نسخ الأمر)
+            </button>
           </div>
         </div>
       </div>
