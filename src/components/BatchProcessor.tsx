@@ -13,6 +13,7 @@ import DropZone from "./DropZone";
 import StatsBar from "./StatsBar";
 import ApiKeyModal from "./ApiKeyModal";
 import ShinyText from "./animations/ShinyText";
+import { KeywordOverlapChecker } from "./KeywordOverlapChecker";
 
 /**
  * 🚀 Adobe Stock Batch Processor Pro
@@ -63,19 +64,23 @@ export default function BatchProcessor() {
 
     setVideos(prev => [...prev, ...newEntries]);
 
-    // Extract frames in parallel for performance
-    await Promise.allSettled(
-      newEntries.map(async (vid) => {
+    // Extract frames with limited concurrency to prevent CPU/GPU spikes (Fan noise)
+    const extractionConcurrency = 2;
+    const extractionQueue = [...newEntries];
+
+    const extractionWorker = async () => {
+      while (extractionQueue.length > 0) {
+        const vid = extractionQueue.shift();
+        if (!vid) break;
+
         try {
-          // If already has frame, skip
-          if (vid.frameBase64) return;
+          if (vid.frameBase64) continue;
 
           let data: { base64: string; mimeType: string; thumbnailUrl: string };
           
           if (vid.file.type.startsWith("video/")) {
             data = await extractVideoFrame(vid.file);
           } else {
-            // For images, simple read
             data = await new Promise((resolve, reject) => {
               const reader = new FileReader();
               reader.onload = () => resolve({
@@ -96,8 +101,10 @@ export default function BatchProcessor() {
             v.id === vid.id ? { ...v, status: "error", error: err instanceof Error ? err.message : "فشل استخراج الصورة" } : v
           ));
         }
-      })
-    );
+      }
+    };
+
+    await Promise.all(Array(extractionConcurrency).fill(null).map(extractionWorker));
   }, []);
 
   const handleProcess = async () => {
@@ -343,6 +350,17 @@ export default function BatchProcessor() {
             </p>
           </div>
         </div>
+      )}
+
+      {/* Keyword Overlap Checker */}
+      {videos.filter(v => v.result).length > 1 && !processing && (
+        <KeywordOverlapChecker 
+          items={videos.filter(v => v.result).map(v => ({
+            id: v.id,
+            keywords: v.result!.keywords || [],
+            title: v.result!.title || v.name
+          }))} 
+        />
       )}
 
       {/* Processing Status */}

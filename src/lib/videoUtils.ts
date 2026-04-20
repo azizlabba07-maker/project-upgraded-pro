@@ -26,7 +26,12 @@ export async function extractVideoFrame(file: File): Promise<{
     
     let settled = false;
     const cleanup = () => { 
-      try { URL.revokeObjectURL(url); } catch (e) {} 
+      try { 
+        video.pause();
+        video.src = "";
+        video.load();
+        URL.revokeObjectURL(url); 
+      } catch (e) {} 
     };
 
     const done = (result: { base64: string; mimeType: string; thumbnailUrl: string }) => {
