@@ -11,6 +11,9 @@ export default function MotionEngine() {
   const [tokens, setTokens] = useState<DesignTokens>(defaultDesignTokens);
   const [metadata, setMetadata] = useState<{title: string, keywords: string[]} | null>(null);
   const [history, setHistory] = useState<{prompt: string, tokens: DesignTokens, meta: {title: string, keywords: string[]} | null}[]>([]);
+  const [batchCount, setBatchCount] = useState(5);
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const [batchItems, setBatchItems] = useState<{prompt: string, tokens: DesignTokens, meta: {title: string, keywords: string[]}}[]>([]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -19,13 +22,38 @@ export default function MotionEngine() {
     }
 
     setIsGenerating(true);
+    setBatchItems([]);
     try {
-      toast.info('جاري تصميم الحركة عبر الذكاء الاصطناعي... 🎨');
-      const result = await generateMotionTokens(prompt);
-      setTokens(result.designTokens);
-      setMetadata(result.metadata);
-      setHistory(prev => [{ prompt, tokens: result.designTokens, meta: result.metadata }, ...prev].slice(0, 5));
-      toast.success('تم بناء الفيديو وتوليد البيانات بنجاح!');
+      if (isBatchMode) {
+        toast.info(`جاري توليد دفعة من ${batchCount} تصميمات فريدة... 🎨`);
+        const newBatch = [];
+        for (let i = 0; i < batchCount; i++) {
+          const randomDuration = Math.floor(Math.random() * (12 - 8 + 1) + 8);
+          const uniquePrompt = `${prompt} - Variation ${i + 1}. Visual diversity is key. Random duration: ${randomDuration}s.`;
+          const result = await generateMotionTokens(uniquePrompt);
+          if (result.designTokens) {
+             result.designTokens.animation.duration = randomDuration;
+          }
+          newBatch.push({ prompt: uniquePrompt, tokens: result.designTokens, meta: result.metadata });
+        }
+        setBatchItems(newBatch);
+        if (newBatch.length > 0) {
+          setTokens(newBatch[0].tokens);
+          setMetadata(newBatch[0].meta);
+        }
+        toast.success(`تم توليد ${batchCount} تصميمات بنجاح!`);
+      } else {
+        const randomDuration = Math.floor(Math.random() * (12 - 8 + 1) + 8);
+        toast.info('جاري تصميم الحركة عبر الذكاء الاصطناعي... 🎨');
+        const result = await generateMotionTokens(`${prompt}. Duration: ${randomDuration}s.`);
+        if (result.designTokens) {
+           result.designTokens.animation.duration = randomDuration;
+        }
+        setTokens(result.designTokens);
+        setMetadata(result.metadata);
+        setHistory(prev => [{ prompt, tokens: result.designTokens, meta: result.metadata }, ...prev].slice(0, 5));
+        toast.success('تم بناء الفيديو وتوليد البيانات بنجاح!');
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'حدث خطأ أثناء التوليد');
     } finally {
@@ -34,16 +62,26 @@ export default function MotionEngine() {
   };
 
   const handleExport = () => {
-    const props = { designTokens: tokens };
-    const jsonStr = JSON.stringify(props).replace(/'/g, "''"); // escape for PowerShell
-    
-    // Create a PowerShell command that writes the JSON and runs Remotion
-    const command = `$json = '${jsonStr}'
-Set-Content -Path "tokens.json" -Value $json -Encoding UTF8
-npx remotion render src/remotion/index.ts MyComp out.mp4 --props=./tokens.json`;
-    
-    copyTextSafely(command);
-    toast.success('تم نسخ أمر التصدير! الصقه في نافذة Terminal (PowerShell) الخاصة بالمشروع.');
+    if (isBatchMode && batchItems.length > 0) {
+      let script = '@echo off\nset "PROJECT_DIR=D:\\ADOBE\\New folder (5)\\project-upgraded"\nset "OUTPUT_DIR=D:\\ADOBE\\New folder (4)"\ncd /d "%PROJECT_DIR%"\n';
+      
+      batchItems.forEach((item, idx) => {
+        const jsonStr = JSON.stringify({ designTokens: item.tokens }).replace(/'/g, "''");
+        script += `echo [${idx+1}/${batchItems.length}] Rendering: ${item.meta?.title || 'Video'}\n`;
+        script += `echo '${jsonStr}' > tokens.json\n`;
+        script += `call npx remotion render src/remotion/index.ts MyComp "%OUTPUT_DIR%\\Batch_${idx+1}_${Date.now()}.mp4" --props=tokens.json --gl=angle --concurrency=1\n`;
+      });
+      
+      script += 'echo All renders completed!\npause';
+      copyTextSafely(script);
+      toast.success('تم نسخ "أمر الرندرة الجماعي"! الصقه في ملف .bat أو في PowerShell.');
+    } else {
+      const props = { designTokens: tokens };
+      const jsonStr = JSON.stringify(props).replace(/'/g, "''");
+      const command = `$json = '${jsonStr}'\nSet-Content -Path "tokens.json" -Value $json -Encoding UTF8\nnpx remotion render src/remotion/index.ts MyComp out.mp4 --props=./tokens.json --gl=angle`;
+      copyTextSafely(command);
+      toast.success('تم نسخ أمر التصدير!');
+    }
   };
 
   const handleExportCSV = () => {
@@ -93,6 +131,30 @@ npx remotion render src/remotion/index.ts MyComp out.mp4 --props=./tokens.json`;
               placeholder="مثال: حركة سائل برونزي مع تدرجات ذهبية..."
               className="w-full h-32 bg-slate-900 border border-slate-700 rounded-xl p-4 text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none mb-4"
             />
+            <div className="mb-4 space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer bg-white/5 p-2 rounded-lg border border-white/10">
+                <input 
+                  type="checkbox" 
+                  checked={isBatchMode} 
+                  onChange={(e) => setIsBatchMode(e.target.checked)}
+                  className="w-4 h-4 accent-indigo-500"
+                />
+                <span className="text-[10px] font-bold text-slate-300">وضع الإنتاج الكمي (Batch Mode)</span>
+              </label>
+              
+              {isBatchMode && (
+                <div className="flex items-center justify-between gap-2 bg-indigo-500/10 p-2 rounded-lg border border-indigo-500/20">
+                  <span className="text-[10px] text-indigo-300 font-bold">عدد الفيديوهات:</span>
+                  <input 
+                    type="number" 
+                    value={batchCount} 
+                    onChange={(e) => setBatchCount(Math.min(50, Math.max(1, Number(e.target.value))))}
+                    className="w-16 bg-slate-900 border border-indigo-500/30 rounded px-2 py-1 text-xs text-white font-mono"
+                  />
+                </div>
+              )}
+            </div>
+
             <button
               onClick={handleGenerate}
               disabled={isGenerating || !prompt.trim()}
@@ -101,12 +163,12 @@ npx remotion render src/remotion/index.ts MyComp out.mp4 --props=./tokens.json`;
               {isGenerating ? (
                 <>
                   <span className="animate-spin text-lg">⏳</span>
-                  جاري التصميم...
+                  {isBatchMode ? `جاري إنتاج ${batchCount} فيديوهات...` : "جاري التصميم..."}
                 </>
               ) : (
                 <>
                   <span className="text-lg">✨</span>
-                  توليد الفيديو
+                  {isBatchMode ? `توليد دفعة (${batchCount})` : "توليد الفيديو"}
                 </>
               )}
             </button>
