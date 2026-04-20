@@ -24,6 +24,7 @@ const pageTitles: Record<string, string> = {
   niche: "مستكشف النيتش",
   autopilot: "الطيار الآلي",
   settings: "الإعدادات",
+  "motion-engine": "AI Motion Engine",
 };
 
 export default function AppShell({ children }: { children: ReactNode }) {

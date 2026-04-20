@@ -4,6 +4,8 @@ import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX, ADOBE_IMAGE_NEGATIV
 export { ADOBE_CATEGORIES };
 import { extractAndParseJSON, withCache, sanitizePromptOrKeywords, sanitizeStringArray, scanForIPRisks, type IPRiskFlag } from "@/lib/sanitizer";
 export { extractAndParseJSON };
+import { AI_MOTION_ENGINE_PROMPT } from "./systemPrompts/aiMotionPrompt";
+import { type DesignTokens } from "@/remotion/MyComposition";
 
 const GEMINI_STORAGE_KEY = "gemini_api_key";
 const GEMINI_STORAGE_KEYS = "gemini_api_keys";
@@ -920,3 +922,15 @@ Return ONLY a valid JSON object EXACTLY matching this interface:
 // ImageAnalysisResult and associated logic moved to @/lib/analyze and @/types
 
 // Analysis functions moved to @/lib/analyze.ts
+
+export async function generateMotionTokens(promptIdea: string): Promise<DesignTokens> {
+  const prompt = `${AI_MOTION_ENGINE_PROMPT}
+
+USER REQUEST: "${promptIdea}"
+Return ONLY a valid JSON object matching the designTokens structure. No markdown, no explanations.`;
+
+  const result = await generateWithGemini(prompt, 0.7);
+  const parsed = extractAndParseJSON<DesignTokens>(result, null as any);
+  if (!parsed) throw new Error("Failed to parse Motion Engine AI response");
+  return parsed;
+}

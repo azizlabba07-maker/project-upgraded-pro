@@ -20,7 +20,8 @@ export type ActivePage =
   | "validator"
   | "validator-batch"
   | "settings"
-  | "autopilot";
+  | "autopilot"
+  | "motion-engine";
 
 export interface ApiKeyState {
   gemini: string;

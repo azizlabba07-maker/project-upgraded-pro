@@ -22,6 +22,7 @@ const AIBattle = lazy(() => import("@/components/AIBattle"));
 const BatchProcessor = lazy(() => import("@/components/BatchProcessor"));
 const NicheExplorer = lazy(() => import("@/components/NicheExplorer"));
 const AutoPilot = lazy(() => import("@/components/AutoPilot"));
+const MotionEngine = lazy(() => import("@/components/MotionEngine"));
 
 const PageLoader = () => (
   <Suspense fallback={<SkeletonPage />}>
@@ -49,6 +50,7 @@ function PageContent() {
     case "batch":       return <BatchProcessor />;
     case "niche":       return <NicheExplorer />;
     case "autopilot":   return <AutoPilot />;
+    case "motion-engine": return <MotionEngine />;
     case "settings":    return <ApiKeySettings />;
     default:            return <WelcomeDashboard />;
   }
