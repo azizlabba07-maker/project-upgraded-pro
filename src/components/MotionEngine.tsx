@@ -157,25 +157,44 @@ Generate completely unique hex color codes - never reuse #6366f1 or #8b5cf6 or a
 
   const handleExport = () => {
     if (isBatchMode && batchItems.length > 0) {
-      let script = '@echo off\r\nchcp 65001 >nul\r\nset "PROJECT_DIR=D:\\ADOBE\\New folder (5)\\project-upgraded"\r\nset "OUTPUT_DIR=D:\\ADOBE\\New folder (4)"\r\ncd /d "%PROJECT_DIR%"\r\n\r\n';
-      
-      batchItems.forEach((item, idx) => {
-        const jsonStr = JSON.stringify({ designTokens: item.tokens });
-        const safeTitle = (item.meta?.title || 'Video').replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 30);
-        script += `echo [${idx+1}/${batchItems.length}] Rendering: ${safeTitle}\r\n`;
-        script += `echo ${jsonStr} > tokens.json\r\n`;
-        script += `call npx remotion render src/remotion/index.ts MyComp "%OUTPUT_DIR%\\Batch_${idx+1}_${safeTitle.replace(/ /g, '_')}.mp4" --props=tokens.json --gl=angle --concurrency=1\r\n\r\n`;
-      });
-      
-      script += 'echo ========================================\r\necho All renders completed!\r\necho ========================================\r\npause';
-      copyTextSafely(script);
-      toast.success(`تم نسخ سكريبت رندرة ${batchItems.length} فيديو! الصقه في ملف .bat وشغله.`);
-    } else {
-      const props = { designTokens: tokens };
-      const jsonStr = JSON.stringify(props);
-      const command = `cd /d "D:\\ADOBE\\New folder (5)\\project-upgraded"\r\necho ${jsonStr} > tokens.json\r\nnpx remotion render src/remotion/index.ts MyComp "D:\\ADOBE\\New folder (4)\\Motion_%date:~10,4%%date:~4,2%%date:~7,2%.mp4" --props=tokens.json --gl=angle --concurrency=1`;
+      // Download batch_tokens.json file directly (no CMD echo issues)
+      const batchData = {
+        items: batchItems.map(item => ({
+          tokens: item.tokens,
+          meta: item.meta,
+          duration: item.duration,
+        })),
+      };
+      const blob = new Blob([JSON.stringify(batchData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'batch_tokens.json');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      // Copy the simple render command
+      const command = `cd /d "D:\\ADOBE\\New folder (5)\\project-upgraded"\nnode scripts/batch-render.js`;
       copyTextSafely(command);
-      toast.success('تم نسخ أمر التصدير! الصقه في CMD.');
+      toast.success(`تم تحميل batch_tokens.json (${batchItems.length} فيديو)! انقل الملف إلى مجلد المشروع ثم الصق الأمر في CMD.`);
+    } else {
+      // Single video: download tokens.json directly
+      const props = { designTokens: tokens };
+      const blob = new Blob([JSON.stringify(props, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'tokens.json');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      const command = `cd /d "D:\\ADOBE\\New folder (5)\\project-upgraded"\nnpx remotion render src/remotion/index.ts MyComp "D:\\ADOBE\\New folder (4)\\Motion_output.mp4" --props=tokens.json --gl=angle --concurrency=1`;
+      copyTextSafely(command);
+      toast.success('تم تحميل tokens.json! انقله إلى مجلد المشروع ثم الصق الأمر في CMD.');
     }
   };
 
