@@ -58,6 +58,13 @@ export const defaultDesignTokens: DesignTokens = {
   seed: 'default-seed'
 };
 
+export const videoConfig = {
+  width: 3840,
+  height: 2160,
+  fps: 30,
+  durationInSeconds: defaultDesignTokens.animation.duration,
+};
+
 /* -------------------------------------------------------------------------
    مُولّد أرقام pseudo‑random ثابت على أساس seed
    (Mulberry32 – بسيط وسريع)
