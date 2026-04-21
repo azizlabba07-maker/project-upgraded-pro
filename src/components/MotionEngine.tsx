@@ -156,59 +156,82 @@ Generate completely unique hex color codes - never reuse #6366f1 or #8b5cf6 or a
   };
 
   const handleExport = async () => {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
     if (isBatchMode && batchItems.length > 0) {
-      try {
-        const batchData = {
-          items: batchItems.map(item => ({
-            tokens: item.tokens,
-            meta: item.meta,
-            duration: item.duration,
-          })),
-        };
-        
-        // Send directly to local server instead of downloading
-        const response = await fetch('/api/render', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(batchData, null, 2)
-        });
-        
-        if (response.ok) {
-          toast.success(`بدأ التوليد! تم إرسال ${batchItems.length} فيديو. ستظهر لك نافذة CMD الآن لتوضيح التقدم.`);
-        } else {
-          throw new Error('فشل في الاتصال بالخادم المحلي');
+      const batchData = {
+        items: batchItems.map(item => ({
+          tokens: item.tokens,
+          meta: item.meta,
+          duration: item.duration,
+        })),
+      };
+
+      if (isLocalhost) {
+        try {
+          const response = await fetch('/api/render', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(batchData, null, 2)
+          });
+          
+          if (response.ok) {
+            toast.success(`بدأ التوليد! تم إرسال ${batchItems.length} فيديو. ستظهر لك نافذة CMD الآن لتوضيح التقدم.`);
+          } else {
+            throw new Error('فشل في الاتصال بالخادم المحلي');
+          }
+        } catch (error) {
+          toast.error('حدث خطأ أثناء محاولة بدء التوليد التلقائي. تأكد من أن الخادم يعمل.');
         }
-      } catch (error) {
-        toast.error('حدث خطأ أثناء محاولة بدء التوليد التلقائي. تأكد من أن الخادم يعمل.');
+      } else {
+        // Fallback to downloading file when on Vercel
+        const blob = new Blob([JSON.stringify(batchData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'batch_tokens.json');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        const command = `cd /d "D:\\ADOBE\\New folder (5)\\project-upgraded"\nnode scripts/batch-render.js`;
+        copyTextSafely(command);
+        toast.success(`أنت تستخدم النسخة السحابية. تم تحميل batch_tokens.json! انسخ الأمر والصقه في CMD.`);
       }
     } else {
       // Single video
       const props = { designTokens: tokens };
-      try {
-        const response = await fetch('/api/render', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: [props] }, null, 2)
-        });
-        
-        if (response.ok) {
-          toast.success(`بدأ التوليد! ستظهر لك نافذة CMD الآن.`);
+      if (isLocalhost) {
+        try {
+          const response = await fetch('/api/render', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: [props] }, null, 2)
+          });
+          
+          if (response.ok) {
+            toast.success(`بدأ التوليد! ستظهر لك نافذة CMD الآن.`);
+          }
+        } catch (error) {
+          // Fallback handled below
+          toast.error('فشل التوليد التلقائي.');
         }
-      } catch (error) {
-        // Fallback to old behavior if API fails for single video
+      } else {
+        // Fallback to old behavior if not on localhost
         const blob = new Blob([JSON.stringify(props, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'tokens.json');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'tokens.json');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
 
-      const command = `cd /d "D:\\ADOBE\\New folder (5)\\project-upgraded"\nnpx remotion render src/remotion/index.ts MyComp "D:\\ADOBE\\New folder (4)\\Motion_output.mp4" --props=tokens.json --gl=angle --concurrency=1`;
-      copyTextSafely(command);
-      toast.success('تم تحميل tokens.json! انقله إلى مجلد المشروع ثم الصق الأمر في CMD.');
+        const command = `cd /d "D:\\ADOBE\\New folder (5)\\project-upgraded"\nnpx remotion render src/remotion/index.ts MyComp "D:\\ADOBE\\New folder (4)\\Motion_output.mp4" --props=tokens.json --gl=angle --concurrency=1`;
+        copyTextSafely(command);
+        toast.success('تم تحميل tokens.json! انقله إلى مجلد المشروع ثم الصق الأمر في CMD.');
       }
     }
   };
