@@ -3,7 +3,7 @@ import { Player } from '@remotion/player';
 import { toast } from 'sonner';
 import { generateMotionTokens } from '@/lib/gemini';
 import { copyTextSafely } from '@/lib/shared';
-import { MyComposition, defaultDesignTokens, videoConfig, type DesignTokens } from '@/remotion/MyComposition';
+import { MyComposition, defaultDesignTokens, type DesignTokens } from '@/remotion/MyComposition';
 import { v4 as uuidv4 } from 'uuid';
 
 // ============================================================================
