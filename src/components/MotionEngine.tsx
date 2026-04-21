@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { generateMotionTokens } from '@/lib/gemini';
 import { copyTextSafely } from '@/lib/shared';
 import { MyComposition, defaultDesignTokens, videoConfig, type DesignTokens } from '@/remotion/MyComposition';
+import { v4 as uuidv4 } from 'uuid';
 
 // ============================================================================
 // 🔥 TRENDING IDEAS DATABASE (built-in, no external API needed)
@@ -109,17 +110,22 @@ export default function MotionEngine() {
           const colorSeed = colorSeeds[i % colorSeeds.length];
           const shapeSeed = shapeSeeds[i % shapeSeeds.length];
           
+          const seed = uuidv4();
           const uniquePrompt = `${prompt}. 
 IMPORTANT: This is variation ${i + 1} of ${batchCount}. It MUST look completely different from all other variations.
 Color palette: Use ${colorSeed} colors. 
 Shape style: Focus on ${shapeSeed}.
 Duration: ${randomDuration} seconds.
-Generate completely unique hex color codes - never reuse #6366f1 or #8b5cf6 or any default colors.`;
+Constraints: Use ONLY the latest 2024 design trends (abstract gradients, low-poly isometric, liquid-metal shaders, neon cyber-punk, geometric motion, organic fluid shapes). 
+Absolutely no copyrighted brand names, logos or trademarked assets. All assets must be royalty-free and safe for Adobe Stock.
+Generate completely unique hex color codes - never reuse #6366f1 or #8b5cf6 or any default colors.
+Seed: ${seed}`;
 
           try {
             const result = await generateMotionTokens(uniquePrompt);
             if (result.designTokens) {
               result.designTokens.animation.duration = randomDuration;
+              result.designTokens.seed = seed;
             }
             newBatch.push({ prompt: uniquePrompt, tokens: result.designTokens, meta: result.metadata, duration: randomDuration });
             setBatchProgress(i + 1);
@@ -138,10 +144,18 @@ Generate completely unique hex color codes - never reuse #6366f1 or #8b5cf6 or a
         toast.success(`تم توليد ${newBatch.length} تصميمات بنجاح!`);
       } else {
         const randomDuration = Math.floor(Math.random() * (12 - 8 + 1) + 8);
+        const seed = uuidv4();
         toast.info('جاري تصميم الحركة عبر الذكاء الاصطناعي... 🎨');
-        const result = await generateMotionTokens(`${prompt}. Duration: ${randomDuration}s. Generate unique hex color codes, never use default colors like #6366f1.`);
+        const uniquePrompt = `${prompt}. Duration: ${randomDuration}s.
+Constraints: Use ONLY the latest 2024 design trends (abstract gradients, low-poly isometric, liquid-metal shaders, neon cyber-punk, geometric motion, organic fluid shapes). 
+Absolutely no copyrighted brand names, logos or trademarked assets. All assets must be royalty-free and safe for Adobe Stock.
+Generate unique hex color codes, never use default colors like #6366f1.
+Seed: ${seed}`;
+        
+        const result = await generateMotionTokens(uniquePrompt);
         if (result.designTokens) {
            result.designTokens.animation.duration = randomDuration;
+           result.designTokens.seed = seed;
         }
         setTokens(result.designTokens);
         setMetadata(result.metadata);

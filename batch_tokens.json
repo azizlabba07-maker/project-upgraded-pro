@@ -1,0 +1,1053 @@
+{
+  "items": [
+    {
+      "tokens": {
+        "colors": {
+          "primary": "#E84A5F",
+          "secondary": "#FFC300",
+          "accent": "#B03A8A",
+          "background": "#1A0A2E",
+          "foreground": "#FFA07A",
+          "gradients": [
+            {
+              "start": "#E84A5F",
+              "end": "#FFC300",
+              "angle": 45
+            },
+            {
+              "start": "#B03A8A",
+              "end": "#FFA07A",
+              "angle": 135
+            },
+            {
+              "start": "#2E1A47",
+              "end": "#FFA07A",
+              "angle": 90
+            },
+            {
+              "start": "#FF8C00",
+              "end": "#E0BBE4",
+              "angle": 225
+            }
+          ]
+        },
+        "shapes": {
+          "circles": [
+            {
+              "size": 900,
+              "opacity": 0.2,
+              "blur": 150,
+              "x": 1000,
+              "y": 800
+            },
+            {
+              "size": 700,
+              "opacity": 0.25,
+              "blur": 100,
+              "x": 2800,
+              "y": 300
+            },
+            {
+              "size": 600,
+              "opacity": 0.3,
+              "blur": 120,
+              "x": 500,
+              "y": 1800
+            },
+            {
+              "size": 800,
+              "opacity": 0.18,
+              "blur": 180,
+              "x": 1900,
+              "y": 1500
+            },
+            {
+              "size": 550,
+              "opacity": 0.22,
+              "blur": 90,
+              "x": 3200,
+              "y": 1000
+            },
+            {
+              "size": 400,
+              "opacity": 0.35,
+              "blur": 70,
+              "x": 1500,
+              "y": 400
+            },
+            {
+              "size": 450,
+              "opacity": 0.28,
+              "blur": 80,
+              "x": 2500,
+              "y": 1900
+            }
+          ],
+          "rectangles": [],
+          "triangles": [],
+          "lines": []
+        },
+        "animation": {
+          "duration": 10,
+          "fps": 30,
+          "speeds": {
+            "slow": 0.5,
+            "normal": 1,
+            "fast": 2
+          },
+          "easing": {
+            "type": "spring",
+            "damping": 25,
+            "stiffness": 120,
+            "mass": 1.2
+          },
+          "delays": {
+            "primary": 0,
+            "secondary": 0.4,
+            "tertiary": 0.8
+          }
+        },
+        "effects": {
+          "shadow": {
+            "enabled": true,
+            "blur": 60,
+            "opacity": 0.4,
+            "offsetX": 15,
+            "offsetY": 15
+          },
+          "blur": {
+            "enabled": true,
+            "amount": 8
+          },
+          "glow": {
+            "enabled": true,
+            "intensity": 0.9,
+            "spread": 25
+          }
+        }
+      },
+      "meta": {
+        "title": "Iridescent Oil Slick Rainbow on Dark Water Surface Motion",
+        "keywords": [
+          "oil slick",
+          "iridescent",
+          "rainbow",
+          "fluid",
+          "organic",
+          "abstract",
+          "loop",
+          "background",
+          "sunset",
+          "warm",
+          "gradient",
+          "liquid",
+          "flow",
+          "colorful",
+          "dynamic",
+          "surface",
+          "reflection",
+          "spectrum",
+          "holographic",
+          "shimmer",
+          "vibrant",
+          "elegant",
+          "smooth",
+          "soft",
+          "dreamy",
+          "meditative",
+          "relaxing",
+          "calm",
+          "modern",
+          "digital",
+          "art",
+          "graphic",
+          "texture",
+          "pattern",
+          "backdrop",
+          "overlay",
+          "visual",
+          "effect",
+          "animation",
+          "graphic",
+          "abstract art",
+          "fluid art",
+          "color burst",
+          "vivid",
+          "deep",
+          "dark",
+          "water",
+          "ocean",
+          "liquid texture",
+          "swirl",
+          "ripple",
+          "psychedelic",
+          "chromatic"
+        ]
+      },
+      "duration": 10
+    },
+    {
+      "tokens": {
+        "colors": {
+          "primary": "#33D6FF",
+          "secondary": "#C88BFF",
+          "accent": "#70FF8A",
+          "background": "#0A1A2A",
+          "foreground": "#1E324A",
+          "gradients": [
+            {
+              "start": "#1E324A",
+              "end": "#33D6FF",
+              "angle": 135
+            },
+            {
+              "start": "#33D6FF",
+              "end": "#C88BFF",
+              "angle": 45
+            },
+            {
+              "start": "#C88BFF",
+              "end": "#70FF8A",
+              "angle": 90
+            },
+            {
+              "start": "#0A1A2A",
+              "end": "#2A4B6E",
+              "angle": 225
+            }
+          ]
+        },
+        "shapes": {
+          "circles": [],
+          "rectangles": [
+            {
+              "width": 1800,
+              "height": 1000,
+              "opacity": 0.25,
+              "rotation": 25,
+              "x": 1000,
+              "y": 500,
+              "fill": "url(#gradient1)"
+            },
+            {
+              "width": 700,
+              "height": 400,
+              "opacity": 0.5,
+              "rotation": -40,
+              "x": 2900,
+              "y": 900,
+              "fill": "#33D6FF"
+            },
+            {
+              "width": 1300,
+              "height": 500,
+              "opacity": 0.3,
+              "rotation": 10,
+              "x": 1900,
+              "y": 1600,
+              "fill": "url(#gradient2)"
+            },
+            {
+              "width": 500,
+              "height": 200,
+              "opacity": 0.6,
+              "rotation": 70,
+              "x": 600,
+              "y": 1200,
+              "fill": "#70FF8A"
+            }
+          ],
+          "triangles": [
+            {
+              "size": 800,
+              "opacity": 0.4,
+              "rotation": 60,
+              "x": 500,
+              "y": 1800,
+              "fill": "#C88BFF"
+            },
+            {
+              "size": 550,
+              "opacity": 0.6,
+              "rotation": -20,
+              "x": 3200,
+              "y": 300,
+              "fill": "#70FF8A"
+            },
+            {
+              "size": 400,
+              "opacity": 0.3,
+              "rotation": 110,
+              "x": 1500,
+              "y": 200,
+              "fill": "url(#gradient3)"
+            }
+          ],
+          "lines": [
+            {
+              "startX": 0,
+              "startY": 1000,
+              "endX": 3840,
+              "endY": 1200,
+              "stroke": "#2A4B6E",
+              "strokeWidth": 6,
+              "opacity": 0.3
+            },
+            {
+              "startX": 1920,
+              "startY": 0,
+              "endX": 1920,
+              "endY": 2160,
+              "stroke": "#1E324A",
+              "strokeWidth": 4,
+              "opacity": 0.2
+            },
+            {
+              "startX": 3840,
+              "startY": 500,
+              "endX": 0,
+              "endY": 1800,
+              "stroke": "#1E324A",
+              "strokeWidth": 5,
+              "opacity": 0.25
+            }
+          ]
+        },
+        "animation": {
+          "duration": 10,
+          "fps": 30,
+          "speeds": {
+            "slow": 0.5,
+            "normal": 1,
+            "fast": 2
+          },
+          "easing": {
+            "type": "spring",
+            "damping": 30,
+            "stiffness": 150,
+            "mass": 1.2
+          },
+          "delays": {
+            "primary": 0,
+            "secondary": 0.5,
+            "tertiary": 1
+          }
+        },
+        "effects": {
+          "shadow": {
+            "enabled": true,
+            "blur": 30,
+            "opacity": 0.4,
+            "offsetX": 15,
+            "offsetY": 15
+          },
+          "blur": {
+            "enabled": true,
+            "amount": 8
+          },
+          "glow": {
+            "enabled": true,
+            "intensity": 0.7,
+            "spread": 25
+          }
+        }
+      },
+      "meta": {
+        "title": "Iridescent Geometric Ocean Surface with Prismatic Reflections",
+        "keywords": [
+          "iridescent",
+          "geometric",
+          "abstract",
+          "background",
+          "seamless loop",
+          "oil slick",
+          "rainbow effect",
+          "water surface",
+          "reflections",
+          "prismatic light",
+          "cool colors",
+          "ocean tones",
+          "dark liquid",
+          "dynamic angles",
+          "shifting shapes",
+          "abstract patterns",
+          "modern",
+          "futuristic aesthetic",
+          "flowing movement",
+          "vibrant hues",
+          "gradient transition",
+          "glowing elements",
+          "soft blur",
+          "depth illusion",
+          "textured",
+          "animated graphic",
+          "digital art",
+          "elegant",
+          "sleek",
+          "subtle energy",
+          "tranquil",
+          "serene",
+          "mysterious",
+          "crystalline",
+          "refraction",
+          "spectrum",
+          "angular",
+          "polygon",
+          "tessellation",
+          "aqua",
+          "teal",
+          "indigo",
+          "sapphire",
+          "amethyst",
+          "emerald"
+        ]
+      },
+      "duration": 10
+    },
+    {
+      "tokens": {
+        "colors": {
+          "primary": "#00FFFF",
+          "secondary": "#FF00FF",
+          "accent": "#00FF00",
+          "background": "#1A0A2E",
+          "foreground": "#FFFF00",
+          "gradients": [
+            {
+              "start": "#00FFFF",
+              "end": "#FF00FF",
+              "angle": 60
+            },
+            {
+              "start": "#FF00FF",
+              "end": "#00FF00",
+              "angle": 120
+            },
+            {
+              "start": "#00FF00",
+              "end": "#FFFF00",
+              "angle": 180
+            },
+            {
+              "start": "#FFFF00",
+              "end": "#00FFFF",
+              "angle": 240
+            }
+          ]
+        },
+        "shapes": {
+          "circles": [
+            {
+              "size": 700,
+              "opacity": 0.2,
+              "blur": 80,
+              "x": 1920,
+              "y": 1080
+            },
+            {
+              "size": 550,
+              "opacity": 0.4,
+              "blur": 50,
+              "x": 1000,
+              "y": 700
+            },
+            {
+              "size": 400,
+              "opacity": 0.5,
+              "blur": 30,
+              "x": 2800,
+              "y": 1400
+            },
+            {
+              "size": 300,
+              "opacity": 0.6,
+              "blur": 20,
+              "x": 500,
+              "y": 1800
+            },
+            {
+              "size": 600,
+              "opacity": 0.3,
+              "blur": 60,
+              "x": 3000,
+              "y": 500
+            },
+            {
+              "size": 250,
+              "opacity": 0.7,
+              "blur": 15,
+              "x": 1500,
+              "y": 300
+            },
+            {
+              "size": 450,
+              "opacity": 0.35,
+              "blur": 45,
+              "x": 2200,
+              "y": 1900
+            }
+          ],
+          "rectangles": [],
+          "triangles": [],
+          "lines": []
+        },
+        "animation": {
+          "duration": 10,
+          "fps": 30,
+          "speeds": {
+            "slow": 0.5,
+            "normal": 1,
+            "fast": 2
+          },
+          "easing": {
+            "type": "spring",
+            "damping": 15,
+            "stiffness": 80,
+            "mass": 1.2
+          },
+          "delays": {
+            "primary": 0,
+            "secondary": 0.5,
+            "tertiary": 1
+          }
+        },
+        "effects": {
+          "shadow": {
+            "enabled": true,
+            "blur": 60,
+            "opacity": 0.6,
+            "offsetX": 15,
+            "offsetY": 15
+          },
+          "blur": {
+            "enabled": true,
+            "amount": 8
+          },
+          "glow": {
+            "enabled": true,
+            "intensity": 1,
+            "spread": 30
+          }
+        }
+      },
+      "meta": {
+        "title": "Cybernetic Oil Slick Iridescence on Dark Water Surface",
+        "keywords": [
+          "iridescent",
+          "rainbow",
+          "spectrum",
+          "holographic",
+          "liquid",
+          "fluid",
+          "sheen",
+          "shimmer",
+          "reflection",
+          "glossy",
+          "vibrant",
+          "metallic",
+          "psychedelic",
+          "abstract",
+          "dynamic",
+          "moving",
+          "surface",
+          "wet",
+          "neon",
+          "cyber",
+          "futuristic",
+          "digital",
+          "glowing",
+          "electric",
+          "synthwave",
+          "retro-futuristic",
+          "tech",
+          "data",
+          "light",
+          "luminous",
+          "spheres",
+          "circles",
+          "bubbles",
+          "orbs",
+          "floating",
+          "organic",
+          "amorphous",
+          "smooth",
+          "soft",
+          "round",
+          "background",
+          "loop",
+          "animation",
+          "graphic",
+          "modern",
+          "energy",
+          "flow",
+          "dark",
+          "deep"
+        ]
+      },
+      "duration": 10
+    },
+    {
+      "tokens": {
+        "colors": {
+          "primary": "#4A6E5A",
+          "secondary": "#6B4A6E",
+          "accent": "#A37B4A",
+          "background": "#1C1C1E",
+          "foreground": "#7A9E8A",
+          "gradients": [
+            {
+              "start": "#4A6E5A",
+              "end": "#7A9E8A",
+              "angle": 135
+            },
+            {
+              "start": "#6B4A6E",
+              "end": "#A37B4A",
+              "angle": 45
+            },
+            {
+              "start": "#7A9E8A",
+              "end": "#4A6E5A",
+              "angle": 225
+            }
+          ]
+        },
+        "shapes": {
+          "circles": [
+            {
+              "size": 900,
+              "opacity": 0.15,
+              "blur": 80,
+              "x": 960,
+              "y": 540,
+              "color": "#4A6E5A"
+            },
+            {
+              "size": 700,
+              "opacity": 0.25,
+              "blur": 60,
+              "x": 980,
+              "y": 560,
+              "color": "#6B4A6E"
+            },
+            {
+              "size": 550,
+              "opacity": 0.35,
+              "blur": 40,
+              "x": 940,
+              "y": 520,
+              "color": "#A37B4A"
+            },
+            {
+              "size": 400,
+              "opacity": 0.45,
+              "blur": 30,
+              "x": 960,
+              "y": 540,
+              "color": "#7A9E8A"
+            },
+            {
+              "size": 250,
+              "opacity": 0.55,
+              "blur": 20,
+              "x": 970,
+              "y": 550,
+              "color": "#4A6E5A"
+            },
+            {
+              "size": 150,
+              "opacity": 0.65,
+              "blur": 10,
+              "x": 950,
+              "y": 530,
+              "color": "#6B4A6E"
+            }
+          ],
+          "rectangles": [],
+          "triangles": [],
+          "lines": []
+        },
+        "animation": {
+          "duration": 9,
+          "fps": 30,
+          "speeds": {
+            "slow": 0.7,
+            "normal": 1,
+            "fast": 1.5
+          },
+          "easing": {
+            "type": "spring",
+            "damping": 25,
+            "stiffness": 120,
+            "mass": 1.2
+          },
+          "delays": {
+            "primary": 0,
+            "secondary": 0.3,
+            "tertiary": 0.6
+          }
+        },
+        "effects": {
+          "shadow": {
+            "enabled": false,
+            "blur": 0,
+            "opacity": 0,
+            "offsetX": 0,
+            "offsetY": 0
+          },
+          "blur": {
+            "enabled": true,
+            "amount": 15
+          },
+          "glow": {
+            "enabled": true,
+            "intensity": 0.6,
+            "spread": 30
+          }
+        }
+      },
+      "meta": {
+        "title": "Iridescent Oil Slick Vortex Loop with Earth Tones",
+        "keywords": [
+          "abstract",
+          "background",
+          "loop",
+          "organic",
+          "fluid",
+          "liquid",
+          "water",
+          "surface",
+          "iridescent",
+          "rainbow",
+          "oil slick",
+          "vortex",
+          "spiral",
+          "swirl",
+          "dark",
+          "earthy",
+          "natural",
+          "ecology",
+          "environmental",
+          "texture",
+          "pattern",
+          "dynamic",
+          "energy",
+          "flow",
+          "smooth",
+          "seamless",
+          "animation",
+          "digital",
+          "graphic",
+          "art",
+          "colorful",
+          "spectrum",
+          "reflections",
+          "glimmer",
+          "shine",
+          "subtle",
+          "elegant",
+          "modern",
+          "tranquil",
+          "meditative",
+          "hypnotic",
+          "mesmerizing",
+          "calm"
+        ]
+      },
+      "duration": 9
+    },
+    {
+      "tokens": {
+        "colors": {
+          "primary": "#8ECDDD",
+          "secondary": "#F0B0E5",
+          "accent": "#FFECB3",
+          "background": "#1E1E3F",
+          "foreground": "#F0F8FF",
+          "gradients": [
+            {
+              "start": "#8ECDDD",
+              "end": "#F0B0E5",
+              "angle": 60
+            },
+            {
+              "start": "#FFECB3",
+              "end": "#8ECDDD",
+              "angle": 120
+            },
+            {
+              "start": "#F0B0E5",
+              "end": "#FFECB3",
+              "angle": 30
+            }
+          ]
+        },
+        "shapes": {
+          "circles": [
+            {
+              "size": 600,
+              "opacity": 0.15,
+              "blur": 80,
+              "x": 500,
+              "y": 700
+            },
+            {
+              "size": 500,
+              "opacity": 0.2,
+              "blur": 60,
+              "x": 1400,
+              "y": 300
+            },
+            {
+              "size": 700,
+              "opacity": 0.1,
+              "blur": 90,
+              "x": 1000,
+              "y": 1500
+            }
+          ],
+          "rectangles": [
+            {
+              "width": 800,
+              "height": 400,
+              "opacity": 0.25,
+              "blur": 40,
+              "rotation": 15,
+              "x": 300,
+              "y": 200
+            },
+            {
+              "width": 600,
+              "height": 300,
+              "opacity": 0.3,
+              "blur": 30,
+              "rotation": -25,
+              "x": 1200,
+              "y": 800
+            },
+            {
+              "width": 300,
+              "height": 300,
+              "opacity": 0.15,
+              "blur": 20,
+              "rotation": 45,
+              "x": 800,
+              "y": 1400
+            },
+            {
+              "width": 100,
+              "height": 100,
+              "opacity": 0.5,
+              "blur": 5,
+              "rotation": 0,
+              "x": 200,
+              "y": 1000
+            },
+            {
+              "width": 100,
+              "height": 100,
+              "opacity": 0.5,
+              "blur": 5,
+              "rotation": 0,
+              "x": 1800,
+              "y": 400
+            },
+            {
+              "width": 100,
+              "height": 100,
+              "opacity": 0.5,
+              "blur": 5,
+              "rotation": 0,
+              "x": 900,
+              "y": 200
+            }
+          ],
+          "triangles": [],
+          "lines": [
+            {
+              "x1": 0,
+              "y1": 500,
+              "x2": 3840,
+              "y2": 500,
+              "strokeWidth": 2,
+              "opacity": 0.4,
+              "blur": 2
+            },
+            {
+              "x1": 0,
+              "y1": 1000,
+              "x2": 3840,
+              "y2": 1000,
+              "strokeWidth": 2,
+              "opacity": 0.4,
+              "blur": 2
+            },
+            {
+              "x1": 0,
+              "y1": 1500,
+              "x2": 3840,
+              "y2": 1500,
+              "strokeWidth": 2,
+              "opacity": 0.4,
+              "blur": 2
+            },
+            {
+              "x1": 500,
+              "y1": 0,
+              "x2": 500,
+              "y2": 2160,
+              "strokeWidth": 2,
+              "opacity": 0.4,
+              "blur": 2
+            },
+            {
+              "x1": 1500,
+              "y1": 0,
+              "x2": 1500,
+              "y2": 2160,
+              "strokeWidth": 2,
+              "opacity": 0.4,
+              "blur": 2
+            },
+            {
+              "x1": 2500,
+              "y1": 0,
+              "x2": 2500,
+              "y2": 2160,
+              "strokeWidth": 2,
+              "opacity": 0.4,
+              "blur": 2
+            },
+            {
+              "x1": 3500,
+              "y1": 0,
+              "x2": 3500,
+              "y2": 2160,
+              "strokeWidth": 2,
+              "opacity": 0.4,
+              "blur": 2
+            },
+            {
+              "x1": 0,
+              "y1": 0,
+              "x2": 3840,
+              "y2": 2160,
+              "strokeWidth": 3,
+              "opacity": 0.3,
+              "blur": 3
+            },
+            {
+              "x1": 3840,
+              "y1": 0,
+              "x2": 0,
+              "y2": 2160,
+              "strokeWidth": 3,
+              "opacity": 0.3,
+              "blur": 3
+            }
+          ]
+        },
+        "animation": {
+          "duration": 10,
+          "fps": 30,
+          "speeds": {
+            "slow": 0.5,
+            "normal": 1,
+            "fast": 2
+          },
+          "easing": {
+            "type": "spring",
+            "damping": 15,
+            "stiffness": 80,
+            "mass": 1.2
+          },
+          "delays": {
+            "primary": 0,
+            "secondary": 0.5,
+            "tertiary": 1
+          }
+        },
+        "effects": {
+          "shadow": {
+            "enabled": true,
+            "blur": 30,
+            "opacity": 0.4,
+            "offsetX": 8,
+            "offsetY": 8
+          },
+          "blur": {
+            "enabled": true,
+            "amount": 7
+          },
+          "glow": {
+            "enabled": true,
+            "intensity": 0.7,
+            "spread": 15
+          }
+        }
+      },
+      "meta": {
+        "title": "Iridescent Pastel Grid Motion on Dark Water Surface",
+        "keywords": [
+          "abstract",
+          "animation",
+          "background",
+          "calm",
+          "colorful",
+          "contemporary",
+          "cool",
+          "creative",
+          "dark",
+          "digital",
+          "dreamy",
+          "dynamic",
+          "elegant",
+          "ethereal",
+          "flowing",
+          "futuristic",
+          "geometric",
+          "glass",
+          "glimmer",
+          "glossy",
+          "glow",
+          "graphic",
+          "grid",
+          "holographic",
+          "iridescent",
+          "light",
+          "liquid",
+          "loop",
+          "luminous",
+          "magenta",
+          "marine",
+          "modern",
+          "mystic",
+          "oil slick",
+          "organic",
+          "pastel",
+          "pattern",
+          "peaceful",
+          "pearl",
+          "pink",
+          "reflection",
+          "ripple",
+          "serene",
+          "shimmer",
+          "slick",
+          "smooth",
+          "soft",
+          "spectrum",
+          "splash",
+          "surface",
+          "texture",
+          "tranquil",
+          "vibrant",
+          "water",
+          "wave",
+          "yellow"
+        ]
+      },
+      "duration": 10
+    }
+  ]
+}

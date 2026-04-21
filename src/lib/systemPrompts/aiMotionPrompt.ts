@@ -37,10 +37,10 @@ export const AI_MOTION_ENGINE_PROMPT = `
       ]
     },
     "shapes": {
-      "circles": [{ "size": 400, "opacity": 0.3, "blur": 50, "x": 200, "y": 300 }],
-      "rectangles": [],
-      "triangles": [],
-      "lines": []
+      "circles": 6,
+      "rectangles": 3,
+      "triangles": 4,
+      "lines": 5
     },
     "animation": {
       "duration": 8,
@@ -49,11 +49,7 @@ export const AI_MOTION_ENGINE_PROMPT = `
       "easing": { "type": "spring", "damping": 20, "stiffness": 100, "mass": 1 },
       "delays": { "primary": 0, "secondary": 0.5, "tertiary": 1.0 }
     },
-    "effects": {
-      "shadow": { "enabled": true, "blur": 40, "opacity": 0.5, "offsetX": 10, "offsetY": 10 },
-      "blur": { "enabled": true, "amount": 5 },
-      "glow": { "enabled": true, "intensity": 0.8, "spread": 20 }
-    }
+    "seed": "uuid-string-here"
   },
   "metadata": {
     "title": "عنوان جذاب للفيديو باللغة الإنجليزية لا يتجاوز 70 حرفاً يصف الحركة والألوان",
