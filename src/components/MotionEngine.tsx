@@ -5,6 +5,72 @@ import { generateMotionTokens } from '@/lib/gemini';
 import { copyTextSafely } from '@/lib/shared';
 import { MyComposition, defaultDesignTokens, videoConfig, type DesignTokens } from '@/remotion/MyComposition';
 
+// ============================================================================
+// 🔥 TRENDING IDEAS DATABASE (built-in, no external API needed)
+// ============================================================================
+const TRENDING_CATEGORIES = [
+  {
+    category: '🌊 Fluid & Liquid',
+    ideas: [
+      'Smooth liquid mercury flowing over dark marble surface with golden reflections',
+      'Iridescent soap bubble surfaces with rainbow color shifts on black background',
+      'Molten lava flowing in slow motion with deep orange and crimson glow',
+      'Abstract ink drops dissolving in crystal clear water with neon colors',
+      'Chrome liquid metal morphing into organic shapes with blue tint',
+    ],
+  },
+  {
+    category: '✨ Particles & Light',
+    ideas: [
+      'Golden dust particles floating in volumetric light beams on dark background',
+      'Neon aurora borealis ribbons dancing across a midnight sky',
+      'Fiber optic strands pulsing with electric blue and purple light',
+      'Sparkling diamond dust swirling in a vortex with prismatic colors',
+      'Bioluminescent plankton glowing in deep ocean darkness with teal and cyan',
+    ],
+  },
+  {
+    category: '🔮 Geometric & Abstract',
+    ideas: [
+      'Sacred geometry mandala rotating with gold wireframe on navy background',
+      'Floating 3D glass cubes refracting light in a minimal dark space',
+      'Hexagonal grid morphing with gradient waves of coral and violet',
+      'Infinite tunnel of rotating concentric circles with depth blur',
+      'Crystalline fractal structures growing organically with ice blue palette',
+    ],
+  },
+  {
+    category: '🌈 Gradient & Color',
+    ideas: [
+      'Smooth gradient mesh flowing between warm sunset colors orange pink purple',
+      'Holographic foil texture shifting colors with metallic sheen',
+      'Pastel cotton candy clouds morphing in soft pink blue lavender',
+      'Deep space nebula with magenta cyan and gold cosmic dust',
+      'Oil slick rainbow on dark water surface with iridescent reflections',
+    ],
+  },
+  {
+    category: '🏗️ Tech & Digital',
+    ideas: [
+      'Digital circuit board traces glowing with electric green data pulses',
+      'Abstract data visualization with floating nodes and connecting lines',
+      'Cyberpunk cityscape silhouette with neon rain and reflections',
+      'Blockchain network nodes connecting with golden energy beams',
+      'AI neural network synapses firing with blue electric impulses',
+    ],
+  },
+  {
+    category: '🌿 Nature & Organic',
+    ideas: [
+      'Abstract coral reef growth patterns with warm ocean color palette',
+      'Microscopic cell division animation with soft biological colors',
+      'Tree ring growth patterns expanding with earth tone gradients',
+      'Abstract butterfly wing patterns with vibrant jewel tone colors',
+      'Topographic map contour lines flowing with desert sand palette',
+    ],
+  },
+];
+
 export default function MotionEngine() {
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -13,7 +79,14 @@ export default function MotionEngine() {
   const [history, setHistory] = useState<{prompt: string, tokens: DesignTokens, meta: {title: string, keywords: string[]} | null}[]>([]);
   const [batchCount, setBatchCount] = useState(5);
   const [isBatchMode, setIsBatchMode] = useState(false);
-  const [batchItems, setBatchItems] = useState<{prompt: string, tokens: DesignTokens, meta: {title: string, keywords: string[]}}[]>([]);
+  const [batchItems, setBatchItems] = useState<{prompt: string, tokens: DesignTokens, meta: {title: string, keywords: string[]}, duration: number}[]>([]);
+  const [batchProgress, setBatchProgress] = useState(0);
+  const [selectedBatchIndex, setSelectedBatchIndex] = useState(0);
+  const [showTrending, setShowTrending] = useState(false);
+
+  // Compute dynamic duration from current tokens
+  const currentDuration = tokens.animation?.duration || 8;
+  const currentDurationFrames = currentDuration * (tokens.animation?.fps || 30);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -23,29 +96,50 @@ export default function MotionEngine() {
 
     setIsGenerating(true);
     setBatchItems([]);
+    setBatchProgress(0);
     try {
       if (isBatchMode) {
         toast.info(`جاري توليد دفعة من ${batchCount} تصميمات فريدة... 🎨`);
-        const newBatch = [];
+        const newBatch: typeof batchItems = [];
         for (let i = 0; i < batchCount; i++) {
           const randomDuration = Math.floor(Math.random() * (12 - 8 + 1) + 8);
-          const uniquePrompt = `${prompt} - Variation ${i + 1}. Visual diversity is key. Random duration: ${randomDuration}s.`;
-          const result = await generateMotionTokens(uniquePrompt);
-          if (result.designTokens) {
-             result.designTokens.animation.duration = randomDuration;
+          // Create a VERY unique prompt for each variation to ensure visual diversity
+          const colorSeeds = ['warm sunset', 'cool ocean', 'neon cyber', 'earth natural', 'pastel soft', 'dark moody', 'vibrant tropical', 'monochrome elegant', 'golden luxury', 'icy crystal'];
+          const shapeSeeds = ['organic flowing curves', 'sharp geometric angles', 'floating spheres', 'spiral vortex', 'grid patterns', 'scattered particles', 'wave ripples', 'fractal branching', 'layered depth', 'radial burst'];
+          const colorSeed = colorSeeds[i % colorSeeds.length];
+          const shapeSeed = shapeSeeds[i % shapeSeeds.length];
+          
+          const uniquePrompt = `${prompt}. 
+IMPORTANT: This is variation ${i + 1} of ${batchCount}. It MUST look completely different from all other variations.
+Color palette: Use ${colorSeed} colors. 
+Shape style: Focus on ${shapeSeed}.
+Duration: ${randomDuration} seconds.
+Generate completely unique hex color codes - never reuse #6366f1 or #8b5cf6 or any default colors.`;
+
+          try {
+            const result = await generateMotionTokens(uniquePrompt);
+            if (result.designTokens) {
+              result.designTokens.animation.duration = randomDuration;
+            }
+            newBatch.push({ prompt: uniquePrompt, tokens: result.designTokens, meta: result.metadata, duration: randomDuration });
+            setBatchProgress(i + 1);
+            toast.info(`✅ تم توليد ${i + 1}/${batchCount}`);
+          } catch (err) {
+            console.error(`Batch item ${i + 1} failed:`, err);
+            toast.error(`فشل التصميم رقم ${i + 1}, متابعة...`);
           }
-          newBatch.push({ prompt: uniquePrompt, tokens: result.designTokens, meta: result.metadata });
         }
         setBatchItems(newBatch);
         if (newBatch.length > 0) {
           setTokens(newBatch[0].tokens);
           setMetadata(newBatch[0].meta);
+          setSelectedBatchIndex(0);
         }
-        toast.success(`تم توليد ${batchCount} تصميمات بنجاح!`);
+        toast.success(`تم توليد ${newBatch.length} تصميمات بنجاح!`);
       } else {
         const randomDuration = Math.floor(Math.random() * (12 - 8 + 1) + 8);
         toast.info('جاري تصميم الحركة عبر الذكاء الاصطناعي... 🎨');
-        const result = await generateMotionTokens(`${prompt}. Duration: ${randomDuration}s.`);
+        const result = await generateMotionTokens(`${prompt}. Duration: ${randomDuration}s. Generate unique hex color codes, never use default colors like #6366f1.`);
         if (result.designTokens) {
            result.designTokens.animation.duration = randomDuration;
         }
@@ -63,47 +157,57 @@ export default function MotionEngine() {
 
   const handleExport = () => {
     if (isBatchMode && batchItems.length > 0) {
-      let script = '@echo off\nset "PROJECT_DIR=D:\\ADOBE\\New folder (5)\\project-upgraded"\nset "OUTPUT_DIR=D:\\ADOBE\\New folder (4)"\ncd /d "%PROJECT_DIR%"\n';
+      let script = '@echo off\r\nchcp 65001 >nul\r\nset "PROJECT_DIR=D:\\ADOBE\\New folder (5)\\project-upgraded"\r\nset "OUTPUT_DIR=D:\\ADOBE\\New folder (4)"\r\ncd /d "%PROJECT_DIR%"\r\n\r\n';
       
       batchItems.forEach((item, idx) => {
-        const jsonStr = JSON.stringify({ designTokens: item.tokens }).replace(/'/g, "''");
-        script += `echo [${idx+1}/${batchItems.length}] Rendering: ${item.meta?.title || 'Video'}\n`;
-        script += `echo '${jsonStr}' > tokens.json\n`;
-        script += `call npx remotion render src/remotion/index.ts MyComp "%OUTPUT_DIR%\\Batch_${idx+1}_${Date.now()}.mp4" --props=tokens.json --gl=angle --concurrency=1\n`;
+        const jsonStr = JSON.stringify({ designTokens: item.tokens });
+        const safeTitle = (item.meta?.title || 'Video').replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 30);
+        script += `echo [${idx+1}/${batchItems.length}] Rendering: ${safeTitle}\r\n`;
+        script += `echo ${jsonStr} > tokens.json\r\n`;
+        script += `call npx remotion render src/remotion/index.ts MyComp "%OUTPUT_DIR%\\Batch_${idx+1}_${safeTitle.replace(/ /g, '_')}.mp4" --props=tokens.json --gl=angle --concurrency=1\r\n\r\n`;
       });
       
-      script += 'echo All renders completed!\npause';
+      script += 'echo ========================================\r\necho All renders completed!\r\necho ========================================\r\npause';
       copyTextSafely(script);
-      toast.success('تم نسخ "أمر الرندرة الجماعي"! الصقه في ملف .bat أو في PowerShell.');
+      toast.success(`تم نسخ سكريبت رندرة ${batchItems.length} فيديو! الصقه في ملف .bat وشغله.`);
     } else {
       const props = { designTokens: tokens };
-      const jsonStr = JSON.stringify(props).replace(/'/g, "''");
-      const command = `$json = '${jsonStr}'\nSet-Content -Path "tokens.json" -Value $json -Encoding UTF8\nnpx remotion render src/remotion/index.ts MyComp out.mp4 --props=./tokens.json --gl=angle`;
+      const jsonStr = JSON.stringify(props);
+      const command = `cd /d "D:\\ADOBE\\New folder (5)\\project-upgraded"\r\necho ${jsonStr} > tokens.json\r\nnpx remotion render src/remotion/index.ts MyComp "D:\\ADOBE\\New folder (4)\\Motion_%date:~10,4%%date:~4,2%%date:~7,2%.mp4" --props=tokens.json --gl=angle --concurrency=1`;
       copyTextSafely(command);
-      toast.success('تم نسخ أمر التصدير!');
+      toast.success('تم نسخ أمر التصدير! الصقه في CMD.');
     }
   };
 
   const handleExportCSV = () => {
-    if (!metadata) return;
+    const items = isBatchMode && batchItems.length > 0 ? batchItems : (metadata ? [{ meta: metadata }] : []);
+    if (items.length === 0) return;
     
-    // Adobe Stock CSV Format: Filename, Title, Keywords, Category, Releases, AI Generated
-    const filename = `motion_${Date.now()}.mp4`; // Example filename
-    const title = `"${metadata.title.replace(/"/g, '""')}"`;
-    const keywords = `"${metadata.keywords.join(', ').replace(/"/g, '""')}"`;
-    const category = "7"; // 7 = Graphic Resources (Abstract Backgrounds)
-    
-    const csvContent = `Filename,Title,Keywords,Category,Releases,AI Generated\n${filename},${title},${keywords},${category},,Yes`;
+    let csvContent = 'Filename,Title,Keywords,Category,Releases,AI Generated\n';
+    items.forEach((item, idx) => {
+      const m = 'tokens' in item ? item.meta : (item as any).meta;
+      if (!m) return;
+      const filename = `Batch_${idx + 1}.mp4`;
+      const title = `"${m.title.replace(/"/g, '""')}"`;
+      const keywords = `"${m.keywords.join(', ').replace(/"/g, '""')}"`;
+      csvContent += `${filename},${title},${keywords},7,,Yes\n`;
+    });
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'adobe_stock_metadata.csv');
+    link.setAttribute('download', `adobe_stock_metadata_${items.length}_videos.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success('تم تحميل ملف CSV بنجاح!');
+    toast.success(`تم تحميل ملف CSV لـ ${items.length} فيديو!`);
+  };
+
+  const handleTrendingSelect = (idea: string) => {
+    setPrompt(idea);
+    setShowTrending(false);
+    toast.success('تم تحميل الفكرة! اضغط توليد.');
   };
 
   return (
@@ -131,6 +235,39 @@ export default function MotionEngine() {
               placeholder="مثال: حركة سائل برونزي مع تدرجات ذهبية..."
               className="w-full h-32 bg-slate-900 border border-slate-700 rounded-xl p-4 text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none mb-4"
             />
+
+            {/* 🔥 Trending Ideas Button */}
+            <button
+              onClick={() => setShowTrending(!showTrending)}
+              className="w-full mb-4 py-2.5 px-4 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 rounded-xl font-bold border border-amber-500/30 transition-all flex items-center justify-center gap-2 text-sm"
+            >
+              <span className="text-lg">🔥</span>
+              {showTrending ? 'إخفاء الأفكار' : 'استلهم أفكار تراند'}
+            </button>
+
+            {/* Trending Ideas Panel */}
+            {showTrending && (
+              <div className="mb-4 max-h-64 overflow-y-auto custom-scrollbar space-y-3 bg-slate-950/50 p-3 rounded-xl border border-amber-500/20">
+                {TRENDING_CATEGORIES.map((cat, catIdx) => (
+                  <div key={catIdx}>
+                    <p className="text-[10px] font-bold text-amber-400 mb-1.5">{cat.category}</p>
+                    <div className="space-y-1">
+                      {cat.ideas.map((idea, ideaIdx) => (
+                        <button
+                          key={ideaIdx}
+                          onClick={() => handleTrendingSelect(idea)}
+                          className="w-full text-left p-2 rounded-lg bg-white/5 hover:bg-amber-500/10 border border-white/5 hover:border-amber-500/30 transition-all text-[11px] text-slate-400 hover:text-amber-200 leading-relaxed"
+                        >
+                          {idea}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Batch Mode Controls */}
             <div className="mb-4 space-y-3">
               <label className="flex items-center gap-2 cursor-pointer bg-white/5 p-2 rounded-lg border border-white/10">
                 <input 
@@ -163,7 +300,7 @@ export default function MotionEngine() {
               {isGenerating ? (
                 <>
                   <span className="animate-spin text-lg">⏳</span>
-                  {isBatchMode ? `جاري إنتاج ${batchCount} فيديوهات...` : "جاري التصميم..."}
+                  {isBatchMode ? `جاري إنتاج ${batchProgress}/${batchCount}...` : "جاري التصميم..."}
                 </>
               ) : (
                 <>
@@ -173,6 +310,35 @@ export default function MotionEngine() {
               )}
             </button>
           </div>
+
+          {/* Batch Items List */}
+          {batchItems.length > 0 && (
+            <div className="bg-slate-900/40 p-6 rounded-2xl border border-white/5 backdrop-blur-sm">
+              <h3 className="text-sm font-bold text-emerald-400 mb-4">✅ الدفعة المنتجة ({batchItems.length})</h3>
+              <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                {batchItems.map((item, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setTokens(item.tokens);
+                      setMetadata(item.meta);
+                      setSelectedBatchIndex(idx);
+                    }}
+                    className={`w-full text-right p-3 rounded-xl border transition-all text-xs truncate ${
+                      selectedBatchIndex === idx 
+                        ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-200' 
+                        : 'bg-white/5 border-white/5 text-slate-400 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-slate-500">{item.duration}s</span>
+                      <span>#{idx + 1} - {item.meta?.title?.substring(0, 30) || 'فيديو'}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* History */}
           {history.length > 0 && (
@@ -204,8 +370,8 @@ export default function MotionEngine() {
               <Player
                 component={MyComposition}
                 inputProps={{ designTokens: tokens }}
-                durationInFrames={videoConfig.durationInSeconds * videoConfig.fps}
-                fps={videoConfig.fps}
+                durationInFrames={currentDurationFrames}
+                fps={tokens.animation?.fps || 30}
                 compositionWidth={videoConfig.width}
                 compositionHeight={videoConfig.height}
                 style={{
@@ -225,11 +391,11 @@ export default function MotionEngine() {
               </div>
               <div className="bg-slate-800/50 p-4 rounded-xl border border-white/5 text-center">
                 <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">معدل الإطارات</p>
-                <p className="text-sm text-white font-mono">{videoConfig.fps} FPS</p>
+                <p className="text-sm text-white font-mono">{tokens.animation?.fps || 30} FPS</p>
               </div>
               <div className="bg-slate-800/50 p-4 rounded-xl border border-white/5 text-center">
                 <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">المدة</p>
-                <p className="text-sm text-white font-mono">{videoConfig.durationInSeconds}s</p>
+                <p className="text-sm text-white font-mono">{currentDuration}s</p>
               </div>
             </div>
 
@@ -239,12 +405,12 @@ export default function MotionEngine() {
                 className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold shadow-lg border border-white/10 transition-all flex items-center justify-center gap-2 group"
               >
                 <span className="text-xl group-hover:-translate-y-1 transition-transform">💾</span>
-                تصدير كملف MP4 (نسخ الأمر)
+                {isBatchMode && batchItems.length > 0 ? `تصدير ${batchItems.length} فيديو (نسخ الأمر)` : 'تصدير كملف MP4 (نسخ الأمر)'}
               </button>
               
               <button
                 onClick={handleExportCSV}
-                disabled={!metadata}
+                disabled={!metadata && batchItems.length === 0}
                 className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-xl font-bold shadow-lg border border-white/10 transition-all flex items-center justify-center gap-2 group"
               >
                 <span className="text-xl group-hover:-translate-y-1 transition-transform">📄</span>
