@@ -72,6 +72,19 @@
     "vaul": "^0.9.9",
     "zod": "^3.25.76"
   },
+  "overrides": {
+    "remotion": "4.0.450",
+    "@remotion/media-utils": "4.0.450",
+    "@remotion/player": "4.0.450",
+    "@remotion/renderer": "4.0.450",
+    "@remotion/bundler": "4.0.450",
+    "@remotion/cli": "4.0.450",
+    "@remotion/studio": "4.0.450",
+    "@remotion/studio-shared": "4.0.450",
+    "@remotion/studio-server": "4.0.450",
+    "@remotion/zod-types": "4.0.450",
+    "@remotion/web-renderer": "4.0.450"
+  },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@playwright/test": "^1.57.0",
