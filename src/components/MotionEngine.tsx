@@ -155,35 +155,49 @@ Generate completely unique hex color codes - never reuse #6366f1 or #8b5cf6 or a
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (isBatchMode && batchItems.length > 0) {
-      // Download batch_tokens.json file directly (no CMD echo issues)
-      const batchData = {
-        items: batchItems.map(item => ({
-          tokens: item.tokens,
-          meta: item.meta,
-          duration: item.duration,
-        })),
-      };
-      const blob = new Blob([JSON.stringify(batchData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'batch_tokens.json');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      // Copy the simple render command
-      const command = `cd /d "D:\\ADOBE\\New folder (5)\\project-upgraded"\nnode scripts/batch-render.js`;
-      copyTextSafely(command);
-      toast.success(`تم تحميل batch_tokens.json (${batchItems.length} فيديو)! انقل الملف إلى مجلد المشروع ثم الصق الأمر في CMD.`);
+      try {
+        const batchData = {
+          items: batchItems.map(item => ({
+            tokens: item.tokens,
+            meta: item.meta,
+            duration: item.duration,
+          })),
+        };
+        
+        // Send directly to local server instead of downloading
+        const response = await fetch('/api/render', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(batchData, null, 2)
+        });
+        
+        if (response.ok) {
+          toast.success(`بدأ التوليد! تم إرسال ${batchItems.length} فيديو. ستظهر لك نافذة CMD الآن لتوضيح التقدم.`);
+        } else {
+          throw new Error('فشل في الاتصال بالخادم المحلي');
+        }
+      } catch (error) {
+        toast.error('حدث خطأ أثناء محاولة بدء التوليد التلقائي. تأكد من أن الخادم يعمل.');
+      }
     } else {
-      // Single video: download tokens.json directly
+      // Single video
       const props = { designTokens: tokens };
-      const blob = new Blob([JSON.stringify(props, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      try {
+        const response = await fetch('/api/render', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: [props] }, null, 2)
+        });
+        
+        if (response.ok) {
+          toast.success(`بدأ التوليد! ستظهر لك نافذة CMD الآن.`);
+        }
+      } catch (error) {
+        // Fallback to old behavior if API fails for single video
+        const blob = new Blob([JSON.stringify(props, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', 'tokens.json');
@@ -195,6 +209,7 @@ Generate completely unique hex color codes - never reuse #6366f1 or #8b5cf6 or a
       const command = `cd /d "D:\\ADOBE\\New folder (5)\\project-upgraded"\nnpx remotion render src/remotion/index.ts MyComp "D:\\ADOBE\\New folder (4)\\Motion_output.mp4" --props=tokens.json --gl=angle --concurrency=1`;
       copyTextSafely(command);
       toast.success('تم تحميل tokens.json! انقله إلى مجلد المشروع ثم الصق الأمر في CMD.');
+      }
     }
   };
 
