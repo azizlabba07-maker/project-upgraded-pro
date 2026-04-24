@@ -197,6 +197,56 @@ export const ADOBE_CATEGORIES = [
   "Transport and Infrastructure", "Travel",
 ];
 
+/**
+ * 🚫 SATURATED CONTENT — فئات ثبت بالبيانات الحقيقية أنها مرفوضة بنسبة >99%
+ * مستخرجة من تحليل 2,757 ملف مرفوض في المتجر الفعلي.
+ * يجب حظر توليد هذه الفئات نهائياً حتى يتحسن وضع الحساب.
+ */
+export const SATURATED_TOPIC_KEYWORDS = [
+  // ━━ الطعام المشبع ━━
+  "food", "cooking", "recipe", "kitchen", "salad", "steak", "meat", "burger",
+  "pizza", "pasta", "bread", "cake", "dessert", "chocolate", "pancake",
+  "donut", "avocado", "bowl", "plate", "dish", "meal", "cuisine", "wok",
+  "stir fry", "seared", "grilled", "baked", "fried", "roasted",
+  // ━━ الشموع والسبا ━━ (4 صفوف كاملة في المتجر = كارثة)
+  "candle", "candles", "spa", "meditation", "zen", "stones", "pebbles",
+  "aromatherapy", "relaxation", "wellness candle", "candlelight",
+  // ━━ الطبيعة العامة المشبعة ━━
+  "sunset", "sunrise", "landscape", "forest", "ocean waves", "beach",
+  "waterfall", "flowers", "autumn leaves", "fall leaves", "maple leaves",
+  // ━━ الأشياء المتكررة في المتجر ━━
+  "airplane", "aircraft", "globe", "earth sphere", "planet earth",
+  "laptop white background", "laptop mockup",
+];
+
+/**
+ * فحص ما إذا كان المحتوى المطلوب ينتمي لفئة مشبعة
+ * @returns كائن يحتوي على النتيجة والسبب
+ */
+export function isSaturatedContent(category: string, topicHint?: string): { saturated: boolean; reason: string } {
+  const combined = `${category} ${topicHint || ""}`.toLowerCase();
+  
+  // فئات محظورة كلياً لهذا الحساب حتى يتحسن الوضع
+  const BANNED_CATEGORIES_NOW = ["food", "drinks"];
+  if (BANNED_CATEGORIES_NOW.some(c => combined.includes(c))) {
+    return {
+      saturated: true,
+      reason: `⛔ فئة "${category}" محظورة حالياً — 2,757 رفض سابق. استخدم: Business, Technology, Science, Healthcare`
+    };
+  }
+
+  // فحص الكيووردات المشبعة
+  const matchedKeyword = SATURATED_TOPIC_KEYWORDS.find(kw => combined.includes(kw));
+  if (matchedKeyword) {
+    return {
+      saturated: true,
+      reason: `⛔ موضوع "${matchedKeyword}" مشبع جداً في Adobe Stock — جرب زاوية مختلفة كلياً أو فئة أخرى`
+    };
+  }
+
+  return { saturated: false, reason: "" };
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // فحص تنوع الدفعات — يمنع رفض "Similar Content"
 // ═══════════════════════════════════════════════════════════════════
@@ -242,7 +292,8 @@ export function validateBatchDiversity(
       totalOverlap += overlap;
       comparisons++;
 
-      if (overlap > 60) {
+      // ✅ تخفيض الحد من 60% إلى 40% — Adobe ترفض حتى عند 50% تشابه فعلياً
+      if (overlap > 40) {
         similarPairs.push({
           assetA: assets[i].name,
           assetB: assets[j].name,
@@ -257,11 +308,11 @@ export function validateBatchDiversity(
 
   let recommendation = "";
   if (isAcceptable) {
-    recommendation = "✅ الدفعة متنوعة بشكل كافٍ — جاهزة للرفع";
+    recommendation = "✅ الدفعة متنوعة بشكل كافٍ (تشابه < 40%) — جاهزة للرفع";
   } else if (similarPairs.length <= 2) {
-    recommendation = `⚠️ ${similarPairs.length} زوج متشابه — يُنصح بمراجعة الكلمات المفتاحية قبل الرفع`;
+    recommendation = `⚠️ ${similarPairs.length} زوج تشابهه فوق 40% — يجب تعديل الكلمات المفتاحية قبل الرفع`;
   } else {
-    recommendation = `🚫 ${similarPairs.length} أزواج متشابهة — خطر رفض "Similar Content" مرتفع. أعد التوليد.`;
+    recommendation = `🚫 ${similarPairs.length} أزواج تشابهها فوق 40% — خطر رفض "Similar Content" مرتفع جداً. أعد التوليد بمواضيع مختلفة كلياً.`;
   }
 
   return { isAcceptable, totalAssets: assets.length, similarPairs, averageOverlap, recommendation };

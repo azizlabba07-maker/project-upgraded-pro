@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { supabase, checkAuthStatus } from "./supabase";
-import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX, ADOBE_IMAGE_NEGATIVE_SUFFIX, ADOBE_BANNED_METADATA_TERMS, ADOBE_CATEGORIES } from "./adobeStockCompliance";
+import { ADOBE_AI_PROMPT_RULES, ADOBE_VIDEO_NEGATIVE_SUFFIX, ADOBE_IMAGE_NEGATIVE_SUFFIX, ADOBE_BANNED_METADATA_TERMS, ADOBE_CATEGORIES, isSaturatedContent } from "./adobeStockCompliance";
 export { ADOBE_CATEGORIES };
 import { extractAndParseJSON, withCache, sanitizePromptOrKeywords, sanitizeStringArray, scanForIPRisks, type IPRiskFlag } from "@/lib/sanitizer";
 export { extractAndParseJSON };
@@ -451,16 +451,44 @@ CRITICAL - CATEGORY ADHERENCE (DO NOT VIOLATE):
 - Double-check: each prompt must make the category obvious to a reader.
 `;
 
+/**
+ * أعلى الفئات مبيعاً وأقلها تشبعاً في Adobe Stock حالياً
+ * مستخرج من بيانات السوق ومن تحليل حساب المستخدم الفعلي.
+ */
+const HIGH_DEMAND_CATEGORIES_GUIDE = `
+🌟 HIGH-DEMAND CATEGORIES (Proven to sell on Adobe Stock in 2025-2026):
+- Business & Finance: data visualization, team collaboration, digital transformation, remote work setups
+- Technology: AI/machine learning abstract visuals, cybersecurity, quantum computing, neural networks
+- Healthcare & Medical: medical research lab, DNA/genetics abstract, pharmaceutical, mental health
+- Environment & Sustainability: clean energy, solar panels, green technology, carbon capture
+- Science & Research: microscopic particles, laboratory equipment, chemical reactions, space data
+- Architecture (Abstract): futuristic buildings, sustainable design, smart cities, glass structures
+
+🚫 BANNED FOR THIS ACCOUNT (Proven 99%+ rejection rate based on 2,757 rejected files):
+- Food, Cooking, Kitchen content → STOP. Saturated beyond recovery.
+- Candles, Spa, Meditation stones → STOP. 4 full rows in store = disaster.
+- Generic sunsets/sunrises → STOP. Oversaturated globally.
+- Identical airplane shots, globe/earth spheres → STOP. Already have duplicates.
+`;
+
+
 export async function generateAIVideoPrompts(
   category: string,
   count: number
 ): Promise<VideoPromptResult[]> {
+  // 🚫 فحص مسبق للفئات المشبعة — يمنع إهدار tokens على محتوى مضمون الرفض
+  const satCheck = isSaturatedContent(category);
+  if (satCheck.saturated) {
+    throw new Error(satCheck.reason);
+  }
+
   // نطلب count+3 لتعويض أي فلترة لاحقة
   const requestCount = count + 3;
   const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.floor(Math.random() * 1000000)}`;
   const strictRules = CATEGORY_STRICT_RULES.replace(/\{CATEGORY\}/g, category);
   const prompt = `You are an expert Adobe Stock video prompt engineer specialized in Gemini Business AI video generation (8-second clips, Veo 2 model).
 ${strictRules}
+${HIGH_DEMAND_CATEGORIES_GUIDE}
 REQUIRED OUTPUT CATEGORY: "${category}" — ALL ${requestCount} prompts MUST be about this topic ONLY.
 UNIQUENESS SEED: ${seed}
 ${ADOBE_AI_PROMPT_RULES}
@@ -519,6 +547,12 @@ export async function generateGeminiStockPrompts(
   topicHint?: string,
   generationHistory?: string
 ): Promise<GeminiStockPrompt[]> {
+  // 🚫 فحص مسبق للفئات المشبعة — يمنع إهدار tokens على محتوى مضمون الرفض
+  const satCheck = isSaturatedContent(category, topicHint);
+  if (satCheck.saturated) {
+    throw new Error(satCheck.reason);
+  }
+
   // نطلب عدداً إضافياً لضمان وصول العدد المطلوب بعد الفلترة
   const requestCount = count + 3;
   const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -535,6 +569,7 @@ export async function generateGeminiStockPrompts(
     : "";
   const prompt = `You are an expert Adobe Stock prompt engineer specialized in Gemini Business AI (Veo 2 for video, Imagen 3 for images).
 ${strictRules}
+${HIGH_DEMAND_CATEGORIES_GUIDE}
 REQUIRED CATEGORY: "${category}" — EVERY prompt MUST be about this topic ONLY.
 UNIQUENESS SEED: ${seed}
 OUTPUT TYPE: ${typeReq}
@@ -561,8 +596,8 @@ RADICAL DIVERSITY — MANDATORY PER PROMPT:
 5. Different COMPOSITION: symmetrical → rule of thirds → negative space → abstract splatter → minimalist
 TITLE RULES (CRITICAL):
 - NEVER write: "Video Clip", "Footage", "4K", "HD", "AI Generated", "With Music", "Design", "Brochure", "Quality", "Template" in the title
-- Title = pure descriptive subject: "Chef Hands Stretching Fresh Pasta Dough on Marble" ✓
-- NOT: "Pizza Dough Stretching Video Clip 4K" ✗
+- Title = pure descriptive subject: "Digital Neural Network Data Stream in Blue Neon" ✓
+- NOT: "Technology Video Clip 4K Abstract" ✗
 KEYWORD RULES:
 - Generate EXACTLY 49 keywords per prompt (MANDATORY)
 - ORDER BY BUYER INTENT (strongest/most-searched first)

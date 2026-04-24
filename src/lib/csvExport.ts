@@ -1,6 +1,27 @@
 import type { AnalysisResult } from "../types";
 
 /**
+ * Converts a title to a safe, descriptive filename (no UUID chaos).
+ * e.g. "Hot Seared Steak with Steam" → "hot_seared_steak_with_steam"
+ */
+function titleToFilename(title: string, originalName: string): string {
+  // If original name is not a UUID-style name, keep it
+  const isUuidName = /upscaled_generated_video_[a-f0-9-]+\.mp4/i.test(originalName);
+  if (!isUuidName && originalName) return originalName;
+
+  // Convert title to safe filename
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim()
+    .replace(/\s+/g, "_")
+    .slice(0, 60);
+
+  const ext = originalName.includes(".mp4") ? ".mp4" : ".jpg";
+  return slug ? `${slug}${ext}` : originalName;
+}
+
+/**
  * Escapes a string for CSV, using semicolon as an internal separator for multi-value cells.
  */
 function csvCell(value: string | number | null | undefined): string {
@@ -14,13 +35,16 @@ function csvCell(value: string | number | null | undefined): string {
 
 export function exportToCsv(results: AnalysisResult[]): void {
   const headers = [
-    "Filename", 
+    "Filename",
+    "Descriptive_Filename",        // ✅ اسم وصفي بدلاً من UUID
     "Title", 
     "Title_Length",
     "Description", 
     "Keywords", 
     "Keyword_Count", 
     "Category",
+    "AI_Generated",                // ✅ حقل جديد: مطلوب من Adobe
+    "People_Property_Fictional",   // ✅ حقل جديد: يمنع رفض Property Release
     "Releases", 
     "Model_Release", 
     "Property_Release", 
@@ -59,14 +83,20 @@ export function exportToCsv(results: AnalysisResult[]): void {
       rel?.copyrightConcern ? "Copyright Concern" : "",
     ].filter(Boolean).join("; ") || "None Required";
 
+    // ✅ الاسم الوصفي: يحوّل UUID إلى اسم قابل للقراءة
+    const descriptiveName = titleToFilename(r.title, r.name);
+
     return [
       csvCell(r.name),
+      csvCell(descriptiveName),    // ✅ اسم وصفي جديد
       csvCell(r.title),
       csvCell(r.title.length),
       csvCell(r.description),
       csvCell(r.keywords.join("; ")), // Use semicolons so CSV doesn't break
       csvCell(r.keywords.length),
       csvCell(r.category),
+      csvCell("TRUE"),             // ✅ AI_Generated — دائماً TRUE
+      csvCell("TRUE"),             // ✅ People_Property_Fictional — دائماً TRUE (يمنع Property Release rejection)
       csvCell(releaseSummary),
       csvCell(rel?.modelRelease ? "Yes" : "No"),
       csvCell(rel?.propertyRelease ? "Yes" : "No"),

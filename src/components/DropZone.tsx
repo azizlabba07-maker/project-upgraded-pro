@@ -62,7 +62,7 @@ export default function DropZone({ onFilesSelected, processing }: DropZoneProps)
       <input
         type="file"
         multiple
-        className="absolute inset-0 opacity-0 cursor-pointer"
+        className="absolute inset-0 opacity-0 cursor-pointer z-20"
         onChange={(e) => handleFiles(e.target.files)}
         disabled={processing}
       />

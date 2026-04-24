@@ -8,7 +8,7 @@ setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
 echo =======================================================
-echo   Adobe Motion Engine - Start Tool ^& Generate Videos
+echo   Adobe Motion Engine - Start and Generate Videos
 echo =======================================================
 echo.
 

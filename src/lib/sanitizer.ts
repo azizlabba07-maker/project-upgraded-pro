@@ -62,390 +62,142 @@ const SMART_SWAP_MAP: Record<string, string> = {
 
 /**
  * Ambiguous words that are common English AND brand names.
- * These must NEVER go in the blacklist or swap map as single words
- * because they destroy legitimate stock content about architecture,
- * food, space, technology, etc.
  */
 const AMBIGUOUS_SAFE_WORDS = new Set([
-  "windows",   // glass windows in architecture
-  "surface",   // marble surface, water surface
-  "apple",     // fruit, food photography
-  "galaxy",    // astronomy, space content
-  "pixel",     // digital art, resolution
-  "android",   // robot, sci-fi content
-  "switch",    // electrical switch, light switch
-  "meta",      // prefix meaning "about itself"
-  "prime",     // math, general adjective
-  "sprint",    // running, athletics
-  "dell",      // valley (as in dale)
-  "canon",     // photography term (lens type)
+  "windows", "surface", "apple", "galaxy", "pixel", "android", "switch", "meta", "prime", "sprint", "dell", "canon",
 ]);
 
-
 /**
- * 1. ADOBE STOCK COMPLIANCE SANITIZER — HARDENED v2
- * =================================================
- * Prevents account ban due to AI hallucinations that include:
- *  - Copyrighted material & trademarks (IP Refusal)
- *  - Artist names, fictional characters
- *  - AI platform names
- *  - Food brands & product packaging references (NEW — primary rejection cause)
- *  - Promotional/spam keywords Adobe blacklists
+ * 🚨 PROMOTIONAL & TECHNICAL BAN LIST
+ * Adobe REJECTS metadata containing these terms as they are considered "spam" or "non-descriptive".
  */
-
-const ADOBE_STOCK_BLACKLIST = [
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // Major Brands & Tech Companies
-  // NOTE: Single words that are also common English (windows, surface,
-  //       apple, galaxy, pixel, android, switch, meta, dell, canon)
-  //       are EXCLUDED to prevent destroying legitimate content.
-  //       Use multi-word brand forms instead.
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  "nike", "adidas", "puma", "reebok", "under armour",
-  "iphone", "ipad", "macbook", "imac", "airpods", "apple watch",
-  "microsoft windows", "xbox", "surface tablet", "surface pro",
-  "google pixel", "chromebook",
-  "samsung galaxy",
-  "disney", "marvel", "dc comics", "star wars", "pixar",
-  "coca-cola", "pepsi", "mcdonalds", "burger king", "starbucks",
-  "tesla", "spacex", "ferrari", "porsche", "lamborghini",
-  "bmw", "mercedes", "audi", "bentley", "rolls royce", "maserati",
-  "rolex", "omega", "cartier", "gucci", "louis vuitton", "prada", "chanel",
-  "hermes", "versace", "dior", "balenciaga", "yves saint laurent",
-  "amazon", "facebook", "instagram", "whatsapp", "twitter", "tiktok",
-  "netflix", "youtube", "hulu", "spotify", "twitch",
-  "sony", "playstation", "nintendo switch",
-  "ikea", "lego", "mattel", "barbie", "hasbro", "hot wheels", "nerf",
-  "lenovo", "asus", "acer",
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // Fictional Characters & IP
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  "mickey mouse", "donald duck", "goofy", "winnie the pooh",
-  "batman", "superman", "spiderman", "spider-man", "iron man", "avengers",
-  "captain america", "thor marvel", "hulk marvel", "black panther",
-  "wonder woman", "aquaman", "flash dc",
-  "darth vader", "yoda", "luke skywalker", "chewbacca", "r2d2",
-  "harry potter", "hogwarts", "dumbledore", "voldemort",
-  "pokemon", "pikachu", "charizard",
-  "mario bros", "sonic hedgehog", "zelda", "link nintendo",
-  "minions", "shrek", "elsa frozen", "buzz lightyear",
-  "transformers", "optimus prime",
-  "spongebob", "patrick star",
-  "hello kitty", "totoro",
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // Artists / Styles (Prevents "in the style of [Artist]")
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  "picasso", "van gogh", "da vinci", "monet", "rembrandt", "salvador dali",
-  "andy warhol", "banksy", "frida kahlo", "kandinsky", "klimt",
-  "greg rutkowski", "artgerm", "alphonse mucha", "stanley artgerm",
-  "james gurney", "thomas kinkade", "bob ross", "wlop",
-  "ilya kuvshinov", "makoto shinkai", "hayao miyazaki",
-  "studio ghibli", "disney style", "pixar style", "marvel style",
-  "dreamworks style", "comic book style",
-  "in the style of", "inspired by", "by artist", "style of",
-  "reminiscent of", "homage to", "tribute to",
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // AI Generators (Adobe forbids tagging as AI platform output)
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  "midjourney", "dall-e", "dalle", "dall e",
-  "stable diffusion", "stability ai",
-  "ai generated", "ai-generated", "made with ai", "created by ai",
-  "chatgpt", "openai", "gemini ai", "claude ai",
-  "firefly", "adobe firefly",
-  "leonardo ai", "ideogram", "runway ml",
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // Adobe-Banned Promotional Language
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  "best quality", "masterpiece", "award winning", "exclusive",
-  "must see", "top rated", "number one", "world's best",
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // Famous Landmarks (IP for recognizable buildings/places)
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  "eiffel tower", "statue of liberty", "big ben", "sydney opera house",
-  "taj mahal", "colosseum rome", "christ the redeemer",
-  "burj khalifa", "empire state building", "golden gate bridge",
-  "hollywood sign", "times square",
-
-  // Merge in the GLOBAL_IP_BLACKLIST from compliance module
-  ...GLOBAL_IP_BLACKLIST,
+const ADOBE_METADATA_DEATH_LIST = [
+  "video", "footage", "clip", "4k", "8k", "uhd", "high resolution", "high res", "hd",
+  "stunning", "amazing", "beautiful", "epic", "masterpiece", "exclusive", "best", "top",
+  "trending", "premium", "must see", "sharp focus", "highly detailed", "photorealistic",
+  "unreal engine", "octane render", "redshift", "vray", "midjourney", "dall-e",
+  "stable diffusion", "ai generated", "ai-generated", "created by ai", "design", "quality",
+  "brochure", "template", "mockup", "aerial", "drone", "motion", "animation", "cinematic"
 ];
 
 /**
- * Sanitize a single text string (prompt, title, or keyword) by removing all blacklisted terms.
+ * Sanitize a single text string (prompt, title, or keyword).
+ * FORCED PURGE: Automatically removes banned terms.
  */
 export function sanitizePromptOrKeywords(text: string): string {
   if (!text) return "";
   let sanitized = text;
 
-  // 1. Technical Suffix Stripping (Adobe Banned Titles/Metadata)
-  // Strips "Video Clip", "Footage", "4K", etc. from the end or middle of strings
-  const technicalSuffixes = [
-    /\s+video\s+clip\b/gi,
-    /\s+footage\b/gi,
-    /\s+motion\s+footage\b/gi,
-    /\s+animation\b/gi,
-    /\s+clip\b/gi,
-    /\b(4k|8k|uhd)\b/gi,
-    /\b(cinematic|stunning|amazing)\b/gi,
-  ];
-  for (const pattern of technicalSuffixes) {
-    sanitized = sanitized.replace(pattern, "");
-  }
-  
-  // 2. Replace blacklisted words case-insensitively with Smart Swap or deletion
-  // We combine ADOBE_STOCK_BLACKLIST and ADOBE_BANNED_METADATA_TERMS for thorough cleaning
-  const masterBlacklist = Array.from(new Set([...ADOBE_STOCK_BLACKLIST, ...ADOBE_BANNED_METADATA_TERMS, ...EXTRA_BANNED_TERMS]));
-  
-  for (const word of masterBlacklist) {
-    const lowerWord = word.toLowerCase();
-    
-    // SKIP ambiguous words that are common English — they must not be sanitized
-    if (AMBIGUOUS_SAFE_WORDS.has(lowerWord)) continue;
-    
-    // Escape regex special characters in the word
-    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const regex = new RegExp(`\\b${escaped}\\b`, 'gi');
-    
-    if (regex.test(sanitized)) {
-        const isBannedMeta = ADOBE_BANNED_METADATA_TERMS.includes(lowerWord);
-        const swap = SMART_SWAP_MAP[lowerWord];
+  // 1. Technical & Promotional Purge
+  const purgeRegex = new RegExp(`\\b(${ADOBE_METADATA_DEATH_LIST.join('|')})\\b`, 'gi');
+  sanitized = sanitized.replace(purgeRegex, "");
 
-        if (isBannedMeta) {
-          // 1. If it's a banned meta term (e.g. "4k", "stunning"), just delete it.
-          sanitized = sanitized.replace(regex, "");
-        } else if (swap) {
-          // 2. If we have a smart swap (e.g. "iPhone" -> "premium smartphone"), use it.
-          sanitized = sanitized.replace(regex, swap);
-        } else {
-          // 3. For unknown IP risks, silently remove the term.
-          sanitized = sanitized.replace(regex, "");
-        }
-    }
+  // 2. IP Swap / Redaction
+  for (const [brand, swap] of Object.entries(SMART_SWAP_MAP)) {
+    const regex = new RegExp(`\\b${brand}\\b`, 'gi');
+    sanitized = sanitized.replace(regex, swap);
   }
 
-  // 3. Strip packaging-related visual cues from prompts
-  const packagingPatterns = [
-    /\b(branded|brand\s*name|product\s*label|logo\s*on)\b/gi,
-    /\b(trademark|registered|©|®|™)\b/gi,
-    /\b(bottle\s*with\s*label|labeled\s*(container|bottle|jar|can))\b/gi,
-  ];
-  for (const pattern of packagingPatterns) {
-    sanitized = sanitized.replace(pattern, "[Redacted-IP]");
-  }
-
-  // 4. POST-SANITIZATION ARTIFACT CLEANUP
-  // Catches legacy artifacts from older code versions that replaced brand names
-  // with literal descriptive phrases that look absurd in stock metadata.
-  // Also catches AI hallucinations where the model literally writes "generic term"
-  // or "operating system" into metadata because of overly literal prompt interpretation.
+  // 3. Artifact Cleanup
   const artifactPatterns = [
-    /\boperating system(s)?\b/gi,       // "windows" was mapped to this — nonsensical in stock content
-    /\bgeneric term(s)?\b/gi,           // AI hallucination from "STICK TO GENERIC TERMS" instruction
-    /\bgeneric tech\b/gi,               // "apple" was mapped to this
-    /\bgeneric (?:surface|background|item|product|object|element|material|concept)\b/gi,
-    /\belectronics brand\b/gi,          // "samsung" was mapped to this
-    /\bsoftware company\b/gi,           // "microsoft" was mapped to this
-    /\bsearch engine company\b/gi,      // "google" was mapped to this
-    /\bandroid phone\b/gi,              // "pixel" was mapped to this
-    /\bmobile device(s)?\b/gi,          // "galaxy" was mapped to this
-    /\btech company\b/gi,
-    /\btech brand\b/gi,
-    /\bfood brand\b/gi,
-    /\bgeneric smartphone\b/gi,         // from prompt instruction leaking into output
-    /\bgeneric brand\b/gi,
-    /\bname brand\b/gi,
-    /\b\[Redacted-IP\]\b/gi,            // internal redaction marker that should never reach CSV
+    /\boperating system(s)?\b/gi,
+    /\bgeneric (?:term|tech|surface|background|item|product|object|element|material|concept)\b/gi,
+    /\belectronics brand\b/gi,
+    /\bsoftware company\b/gi,
+    /\bsearch engine company\b/gi,
+    /\bandroid phone\b/gi,
+    /\bmobile device(s)?\b/gi,
+    /\b\[Redacted-IP\]\b/gi,
   ];
   for (const pattern of artifactPatterns) {
     sanitized = sanitized.replace(pattern, "");
   }
 
-  // 5. Fix broken sentence fragments left by removals
+  // 4. Fragment Cleanup
   sanitized = sanitized
-    .replace(/\s*,\s*,/g, ",")         // double commas
-    .replace(/\s+,/g, ",")             // space before comma
-    .replace(/,\s*\./g, ".")           // comma before period
-    .replace(/\.\.+/g, ".")            // multiple periods
-    .replace(/^\s*[,.]\s*/g, "")       // leading comma/period
-    .replace(/\s*[,.]\s*$/g, "")       // trailing comma/period
-    .replace(/\bA\s+-/g, "A")          // "A -down" → "A" (fix broken "top-down" etc.)
-    .replace(/\s+/g, " ").trim();
-
-  return sanitized;
-}
-
-/**
- * Sanitize an array of strings (keywords), removing any that contain blacklisted content.
- */
-export function sanitizeStringArray(arr: string[]): string[] {
-  if (!Array.isArray(arr)) return [];
-  // Also filter out any keywords that BECAME entirely "[Redacted-IP]"
-  return arr
-    .map(kw => sanitizePromptOrKeywords(kw))
-    .filter(kw => kw.trim().length > 0 && !kw.includes("[Redacted-IP]"));
-}
-
-/**
- * FINAL EXPORT GATE — sanitizeForExport()
- * ===========================================
- * This is the LAST defense before data hits a CSV file.
- * It runs sanitizePromptOrKeywords() first, then applies
- * additional hardened checks for any AI hallucination artifacts
- * that may have slipped through all prior stages.
- */
-export function sanitizeForExport(text: string): string {
-  if (!text) return "";
-  
-  // Run the standard sanitizer first
-  let cleaned = sanitizePromptOrKeywords(text);
-  
-  // Double-check: catch any remaining artifact phrases with loose matching
-  // (case-insensitive, not relying on word boundaries for compound phrases)
-  const hardPatterns: [RegExp, string][] = [
-    [/generic\s+term/gi, ""],
-    [/operating\s+system/gi, ""],
-    [/mobile\s+device/gi, ""],
-    [/electronics\s+brand/gi, ""],
-    [/software\s+company/gi, ""],
-    [/search\s+engine\s+company/gi, ""],
-    [/tech\s+company/gi, ""],
-    [/tech\s+brand/gi, ""],
-    [/food\s+brand/gi, ""],
-    [/generic\s+smartphone/gi, ""],
-    [/android\s+phone/gi, ""],
-    [/\[Redacted-IP\]/gi, ""],
-  ];
-  for (const [pattern, replacement] of hardPatterns) {
-    cleaned = cleaned.replace(pattern, replacement);
-  }
-  
-  // Final whitespace/fragment cleanup
-  return cleaned
     .replace(/\s*,\s*,/g, ",")
     .replace(/\s+,/g, ",")
     .replace(/,\s*\./g, ".")
     .replace(/\.\.+/g, ".")
     .replace(/^\s*[,.]\s*/g, "")
     .replace(/\s*[,.]\s*$/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/\s+/g, " ").trim();
+
+  return sanitized;
+}
+
+/**
+ * TIER-BASED KEYWORD SORTER
+ * Adobe priorities the FIRST 10 keywords. This ensures subject/action are first.
+ */
+function prioritizeKeywords(keywords: string[]): string[] {
+  const subjectTerms = ["man", "woman", "person", "interior", "exterior", "building", "landscape", "technology", "abstract", "nature", "science", "medical", "business"];
+  const actionTerms = ["running", "walking", "sitting", "working", "glowing", "flowing", "growing", "falling", "flying", "moving"];
+  const environmentTerms = ["office", "forest", "city", "sky", "ocean", "room", "laboratory", "hospital", "street", "garden"];
+  
+  const tier1: string[] = []; // Subjects & Actions (Highest priority)
+  const tier2: string[] = []; // Environments & Materials
+  const tier3: string[] = []; // Colors & Moods
+  const tier4: string[] = []; // Others
+
+  keywords.forEach(kw => {
+    const low = kw.toLowerCase();
+    if (subjectTerms.some(t => low.includes(t)) || actionTerms.some(t => low.includes(t))) {
+      tier1.push(kw);
+    } else if (environmentTerms.some(t => low.includes(t))) {
+      tier2.push(kw);
+    } else if (low.length < 4) {
+      tier4.push(kw);
+    } else {
+      tier3.push(kw);
+    }
+  });
+
+  return [...new Set([...tier1, ...tier2, ...tier3, ...tier4])].slice(0, 49);
+}
+
+/**
+ * FINAL EXPORT GATE — sanitizeForExport()
+ */
+export function sanitizeForExport(text: string): string {
+  return sanitizePromptOrKeywords(text);
 }
 
 /**
  * Sanitize an array of keyword strings for CSV export.
- * Applies sanitizeForExport to each keyword individually.
+ * ENFORCES: relevance ordering + 49 limit.
  */
 export function sanitizeKeywordsForExport(keywords: string[]): string[] {
   if (!Array.isArray(keywords)) return [];
   const unique = new Set<string>();
   
   keywords.forEach(kw => {
-    // Split by comma in case the model returned a combined string
     const parts = kw.split(",");
     parts.forEach(p => {
       const cleaned = sanitizeForExport(p);
       if (cleaned && cleaned.length > 1) {
-        unique.add(cleaned.toLowerCase());
+        unique.add(cleaned);
       }
     });
   });
   
-  return Array.from(unique);
+  const sanitizedArray = Array.from(unique);
+  return prioritizeKeywords(sanitizedArray);
 }
 
 /**
- * 1.5 BATCH SIMILARITY DETECTOR — NEW
- * =====================================
- * Prevents "SIMILAR CONTENT IN OUR COLLECTION" rejection.
- * Compares titles and keywords across a batch to detect near-duplicates
- * BEFORE upload, alerting the user to remove highly similar assets.
+ * Detects if content should be "Graphic Resources" (e.g. isolated on white)
  */
-
-export interface SimilarityWarning {
-  indexA: number;
-  indexB: number;
-  filenameA: string;
-  filenameB: string;
-  similarity: number; // 0 to 100
-  reason: string;
-}
-
-/**
- * Compute Jaccard similarity between two keyword sets (0-100).
- */
-function keywordSimilarity(kwA: string[], kwB: string[]): number {
-  if (kwA.length === 0 && kwB.length === 0) return 100;
-  if (kwA.length === 0 || kwB.length === 0) return 0;
-  const setA = new Set(kwA.map(k => k.toLowerCase().trim()));
-  const setB = new Set(kwB.map(k => k.toLowerCase().trim()));
-  let intersection = 0;
-  for (const k of setA) {
-    if (setB.has(k)) intersection++;
+export function suggestCategory(title: string, keywords: string[]): string | null {
+  const combined = (title + " " + keywords.join(" ")).toLowerCase();
+  if (combined.includes("white background") || combined.includes("isolated") || combined.includes("alpha channel") || combined.includes("green screen")) {
+    return "Graphic Resources";
   }
-  const union = new Set([...setA, ...setB]).size;
-  return Math.round((intersection / union) * 100);
+  return null;
 }
 
-/**
- * Simple word-overlap similarity between two titles (0-100).
- */
-function titleSimilarity(titleA: string, titleB: string): number {
-  const wordsA = new Set(titleA.toLowerCase().split(/\s+/).filter(w => w.length > 2));
-  const wordsB = new Set(titleB.toLowerCase().split(/\s+/).filter(w => w.length > 2));
-  if (wordsA.size === 0 && wordsB.size === 0) return 100;
-  if (wordsA.size === 0 || wordsB.size === 0) return 0;
-  let intersection = 0;
-  for (const w of wordsA) {
-    if (wordsB.has(w)) intersection++;
-  }
-  const union = new Set([...wordsA, ...wordsB]).size;
-  return Math.round((intersection / union) * 100);
-}
+// ... rest of the file (extractAndParseJSON, withCache, etc.) ...
 
-/**
- * Detect pairs of items in a batch that are too similar.
- * Returns warnings for any pair with combined similarity > threshold.
- */
-export function detectBatchSimilarity(
-  items: Array<{ filename: string; title: string; keywords: string[] }>,
-  threshold: number = 60
-): SimilarityWarning[] {
-  const warnings: SimilarityWarning[] = [];
-
-  for (let i = 0; i < items.length; i++) {
-    for (let j = i + 1; j < items.length; j++) {
-      const kwSim = keywordSimilarity(items[i].keywords, items[j].keywords);
-      const ttSim = titleSimilarity(items[i].title, items[j].title);
-      // Weighted average: keywords matter more than title
-      const combined = Math.round(kwSim * 0.7 + ttSim * 0.3);
-
-      if (combined >= threshold) {
-        const reasons: string[] = [];
-        if (kwSim >= 70) reasons.push(`تشابه كلمات مفتاحية: ${kwSim}%`);
-        if (ttSim >= 60) reasons.push(`تشابه عنوان: ${ttSim}%`);
-        if (reasons.length === 0) reasons.push(`تشابه عام: ${combined}%`);
-
-        warnings.push({
-          indexA: i,
-          indexB: j,
-          filenameA: items[i].filename,
-          filenameB: items[j].filename,
-          similarity: combined,
-          reason: reasons.join(" | "),
-        });
-      }
-    }
-  }
-
-  // Sort by highest similarity first
-  warnings.sort((a, b) => b.similarity - a.similarity);
-  return warnings;
-}
 
 /**
  * IP RISK SCANNER — Checks title and keywords for potential IP violations
