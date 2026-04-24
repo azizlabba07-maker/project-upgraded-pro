@@ -223,3 +223,37 @@ export function detectBatchSimilarity(items: Array<{ filename: string; title: st
   }
   return warnings;
 }
+
+export function clearAllCache(): number {
+  let count = 0;
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key?.startsWith(CACHE_PREFIX)) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach((k) => {
+    localStorage.removeItem(k);
+    count++;
+  });
+  return count;
+}
+
+export function clearCacheByPrefix(prefix: string): number {
+  let count = 0;
+  const fullPrefix = CACHE_PREFIX + prefix;
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key?.startsWith(fullPrefix)) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach((k) => {
+    localStorage.removeItem(k);
+    count++;
+  });
+  return count;
+}
+
