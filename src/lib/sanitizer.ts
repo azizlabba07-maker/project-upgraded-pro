@@ -81,6 +81,61 @@ const ADOBE_METADATA_DEATH_LIST = [
 ];
 
 /**
+ * BRAND & IP BLACKLIST
+ */
+const ADOBE_STOCK_BLACKLIST = [
+  "nike", "adidas", "puma", "reebok", "under armour",
+  "iphone", "ipad", "macbook", "imac", "airpods", "apple watch",
+  "microsoft windows", "xbox", "surface tablet", "surface pro",
+  "google pixel", "chromebook", "samsung galaxy",
+  "disney", "marvel", "dc comics", "star wars", "pixar",
+  "coca-cola", "pepsi", "mcdonalds", "burger king", "starbucks",
+  "tesla", "spacex", "ferrari", "porsche", "lamborghini",
+  "bmw", "mercedes", "audi", "bentley", "rolls royce", "maserati",
+  "rolex", "omega", "cartier", "gucci", "louis vuitton", "prada", "chanel",
+  "hermes", "versace", "dior", "balenciaga", "yves saint laurent",
+  "amazon", "facebook", "instagram", "whatsapp", "twitter", "tiktok",
+  "netflix", "youtube", "hulu", "spotify", "twitch",
+  "sony", "playstation", "nintendo switch",
+  "ikea", "lego", "mattel", "barbie", "hasbro", "hot wheels", "nerf",
+  "lenovo", "asus", "acer",
+  "mickey mouse", "donald duck", "goofy", "winnie the pooh",
+  "batman", "superman", "spiderman", "spider-man", "iron man", "avengers",
+  "captain america", "thor marvel", "hulk marvel", "black panther",
+  "wonder woman", "aquaman", "flash dc",
+  "darth vader", "yoda", "luke skywalker", "chewbacca", "r2d2",
+  "harry potter", "hogwarts", "dumbledore", "voldemort",
+  "pokemon", "pikachu", "charizard",
+  "mario bros", "sonic hedgehog", "zelda", "link nintendo",
+  "minions", "shrek", "elsa frozen", "buzz lightyear",
+  "transformers", "optimus prime",
+  "spongebob", "patrick star",
+  "hello kitty", "totoro",
+  "picasso", "van gogh", "da vinci", "monet", "rembrandt", "salvador dali",
+  "andy warhol", "banksy", "frida kahlo", "kandinsky", "klimt",
+  "greg rutkowski", "artgerm", "alphonse mucha", "stanley artgerm",
+  "james gurney", "thomas kinkade", "bob ross", "wlop",
+  "ilya kuvshinov", "makoto shinkai", "hayao miyazaki",
+  "studio ghibli", "disney style", "pixar style", "marvel style",
+  "dreamworks style", "comic book style",
+  "eiffel tower", "statue of liberty", "big ben", "sydney opera house",
+  "taj mahal", "colosseum rome", "christ the redeemer",
+  "burj khalifa", "empire state building", "golden gate bridge",
+  "hollywood sign", "times square",
+  ...GLOBAL_IP_BLACKLIST
+];
+
+/**
+ * Sanitize an array of strings (keywords), removing any that contain blacklisted content.
+ */
+export function sanitizeStringArray(arr: string[]): string[] {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .map(kw => sanitizePromptOrKeywords(kw))
+    .filter(kw => kw.trim().length > 0);
+}
+
+/**
  * Sanitize a single text string (prompt, title, or keyword).
  * FORCED PURGE: Automatically removes banned terms.
  */
