@@ -479,7 +479,8 @@ export async function generateAIVideoPrompts(
   // 🚫 فحص مسبق للفئات المشبعة — يمنع إهدار tokens على محتوى مضمون الرفض
   const satCheck = isSaturatedContent(category);
   if (satCheck.saturated) {
-    throw new Error(satCheck.reason);
+    console.warn(`[Saturated Warning] ${satCheck.reason}`);
+    // السماح بالمرور بدلاً من الرفض القاطع
   }
 
   // نطلب count+3 لتعويض أي فلترة لاحقة
@@ -550,7 +551,8 @@ export async function generateGeminiStockPrompts(
   // 🚫 فحص مسبق للفئات المشبعة — يمنع إهدار tokens على محتوى مضمون الرفض
   const satCheck = isSaturatedContent(category, topicHint);
   if (satCheck.saturated) {
-    throw new Error(satCheck.reason);
+    console.warn(`[Saturated Warning] ${satCheck.reason}`);
+    // السماح بالمرور بدلاً من الرفض القاطع
   }
 
   // نطلب عدداً إضافياً لضمان وصول العدد المطلوب بعد الفلترة

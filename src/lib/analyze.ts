@@ -136,22 +136,22 @@ function calculateReadinessScore(
     issues.push("Similar Content — Too similar to existing Adobe Stock assets");
   }
 
-  // ── تحذيرات الحقوق (عقوبات صارمة)
+  // ── تحذيرات الحقوق (عقوبات متوسطة تجعل الحالة Review)
   if (releases.modelRelease) {
-    metadataPenalty += 20;
+    metadataPenalty += 15;
     issues.push("⚠️ Model Release Required");
   }
   if (releases.propertyRelease) {
-    metadataPenalty += 20;
+    metadataPenalty += 15;
     issues.push("⚠️ Property Release Required");
   }
   if (releases.editorialOnly) {
-    metadataPenalty += 50; // Force rejection
-    issues.push("⚠️ Editorial Use Only — Brand/Logo detected");
+    metadataPenalty += 20; // Changed from 50
+    issues.push("⚠️ Potential Brand/Logo detected");
   }
   if (releases.copyrightConcern) {
-    metadataPenalty += 60; // Force immediate rejection
-    issues.push("⚠️ Copyright Concern — Protected work visible (Logo/Text)");
+    metadataPenalty += 25; // Changed from 60
+    issues.push("⚠️ Copyright Concern — Check for protected elements");
   }
 
   // ── مكافآت استراتيجية
@@ -160,7 +160,9 @@ function calculateReadinessScore(
   else if (trendCount === 1) bonuses += 3;
 
   const finalScore = Math.max(0, Math.min(100, contentScore - metadataPenalty + bonuses));
-  const status = finalScore >= 80 ? "ready" : finalScore >= 55 ? "review" : "rejected";
+  // Status logic: ready (80+), review (35+), rejected (<35)
+  // جعلنا الرفض يبدأ من سكور أقل من 35 بدلاً من 55 لتقليل الرفض الجماعي
+  const status = finalScore >= 80 ? "ready" : finalScore >= 35 ? "review" : "rejected";
 
   const estimatedAcceptance = Math.round(
     finalScore >= 85 ? 80 + (finalScore - 85) * 1.3 :
@@ -201,12 +203,12 @@ ${batchContext}
 ${ADOBE_AI_PROMPT_RULES}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚨 VISUAL QUALITY & IP TRAP-HUNTING (CRITICAL):
-Adobe Stock has ZERO TOLERANCE for text, logos, or AI artifacts.
-- IP TRAP: Look for ANY letters, numbers, or symbols on products (e.g., "GO" on a glass, "NI" on a shoe).
-- If ANY text/logo is visible: set 'copyrightConcern: true', 'editorialOnly: true', and 'visualQuality: 1'.
-- Hallucinations: Check for distorted anatomy, warped textures, or gravity-defying objects.
-- If artifacts found: set 'visualQuality: 1'.
+🚨 VISUAL QUALITY & IP AUDIT:
+Adobe Stock rejects text, logos, or AI artifacts.
+- IP CHECK: Look for any clear brand logos or readable text.
+- If minor text/logos are visible: set 'editorialOnly: true' and 'visualQuality: 6'.
+- If major/obvious IP violations: set 'copyrightConcern: true' and 'visualQuality: 4'.
+- Hallucinations: Check for anatomical errors. If found, set 'visualQuality: 3'.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 STEP 1 — VISUAL DNA
